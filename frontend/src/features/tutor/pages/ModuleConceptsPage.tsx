@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 
 import { Badge, Card } from '@/shared/components/ui';
-import { useModuleConcepts, type Concept } from '../api/curriculumApi';
+import { useModuleConcepts, type Concept } from '../api/tutorApi';
 
 export function ModuleConceptsPage() {
   const { moduleId } = useParams<{ moduleId: string }>();
@@ -21,7 +21,7 @@ export function ModuleConceptsPage() {
     return (
       <Card className="px-[20px] py-[18px]">
         <p className="text-[13px] text-caution-ink">
-          Could not load this module. It may not exist, or the curriculum service may not be
+          Could not load this module. It may not exist, or the tutor service may not be
           running.
         </p>
         <Link

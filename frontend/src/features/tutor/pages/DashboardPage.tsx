@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { Badge, Card } from '@/shared/components/ui';
-import { useModules, type Module } from '../api/curriculumApi';
+import { useModules, type Module } from '../api/tutorApi';
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -40,8 +40,8 @@ export function DashboardPage() {
         {error && (
           <Card className="px-[18px] py-[16px]">
             <p className="text-[12.5px] text-caution-ink">
-              Could not load your modules. Check that the curriculum service is running on
-              port 8101.
+              Could not load your modules. Check that the tutor service is running on
+              port 8301.
             </p>
           </Card>
         )}

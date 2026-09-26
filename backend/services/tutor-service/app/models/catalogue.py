@@ -1,4 +1,4 @@
-"""Response schemas for the catalogue routes."""
+"""Response schemas for the learner catalogue."""
 
 from __future__ import annotations
 

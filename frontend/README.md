@@ -13,8 +13,8 @@ Opens on http://localhost:5173. The app calls same-origin `/api/*` paths, which
 `vite.config.ts` proxies to the gateway on 8080. The browser never addresses a
 service directly.
 
-You also need the gateway and at least auth-service and curriculum-service
-running for the current screens. See the root README.
+You also need the gateway and at least auth-service and tutor-service running
+for the current screens. See the root README.
 
 ## What exists today
 
@@ -22,8 +22,8 @@ running for the current screens. See the root README.
 |---|---|---|
 | `/login` | `features/auth` | Sign in |
 | `/register` | `features/auth` | Register, student or lecturer |
-| `/dashboard` | `features/curriculum` | The student's modules |
-| `/modules/:moduleId` | `features/curriculum` | Concepts of one module, grouped by topic |
+| `/dashboard` | `features/tutor` | The student's modules |
+| `/modules/:moduleId` | `features/tutor` | Concepts of one module, grouped by topic |
 
 Everything below `RequireAuth` needs a valid token; `/login` and `/register` are
 the only public screens.
@@ -60,7 +60,7 @@ Types for a service are generated from that service's live OpenAPI document, so
 run the service first:
 
 ```bash
-pnpm gen:types:curriculum      # needs curriculum-service on 8101
+pnpm gen:types:tutor           # needs tutor-service on 8301
 ```
 
 Output lands in `src/shared/api/generated/` and is never hand-edited.

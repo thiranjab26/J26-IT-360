@@ -1,7 +1,7 @@
 import { Navigate, createBrowserRouter } from 'react-router-dom';
 
 import { authRoutes } from '@/features/auth';
-import { curriculumRoutes } from '@/features/curriculum';
+import { tutorRoutes } from '@/features/tutor';
 import { RequireAuth } from './RequireAuth';
 import { StudentLayout } from './layouts/StudentLayout';
 
@@ -17,8 +17,8 @@ export const router = createBrowserRouter([
       {
         element: <StudentLayout />,
         children: [
-          ...curriculumRoutes,
-          // C2, C3 and C4 mount their own routes here as they are built.
+          ...tutorRoutes,
+          // C1, C2 and C4 mount their own routes here as they are built.
         ],
       },
     ],

@@ -1,9 +1,7 @@
-"""FastAPI application factory for curriculum-service (C1).
+"""FastAPI application factory for tutor-service (C3 VeriTutor).
 
-P0 scaffold: a read-only catalogue over the shared `core` reference data so the
-student dashboard has real modules and concepts to render. The adaptive engine
-(concept graph, BKT mastery, next-topic decisions) is C1's work and lands in
-this service's own `curriculum` schema.
+Current phase: P0 Foundation. The learner catalogue is live; generation,
+retrieval and the faithfulness gate arrive in P1 to P3.
 """
 
 from __future__ import annotations
@@ -18,8 +16,8 @@ from app.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
 
-SERVICE_NAME = "curriculum-service"
-API_PREFIX = "/api/v1/curriculum"
+SERVICE_NAME = "tutor-service"
+API_PREFIX = "/api/v1/tutor"
 
 
 def create_app() -> FastAPI:
@@ -29,7 +27,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=SERVICE_NAME,
         version="0.1.0",
-        description="C1 Adaptive Curriculum Engine. P0: read-only module and concept catalogue.",
+        description="C3 VeriTutor. Faithfulness-verified, mastery-gated AI tutor.",
         docs_url="/docs",
         openapi_url="/openapi.json",
     )

@@ -1,7 +1,7 @@
 [project]
-name = "curriculum-service"
+name = "tutor-service"
 version = "0.1.0"
-description = "C1 Adaptive Curriculum Engine. P0: read-only catalogue of core reference data."
+description = "C3 VeriTutor. Faithfulness-verified, mastery-gated AI tutor."
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi>=0.115",

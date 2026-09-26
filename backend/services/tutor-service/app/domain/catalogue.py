@@ -1,9 +1,13 @@
-"""Read-only queries over the shared `core` reference data.
+"""What a learner can study: modules, topics and the concepts inside them.
 
-P0 scaffold, owned by C1. This reads `core` tables directly, which architecture
-rule 4 permits (`core` is the documented exception to view-only access). It
-computes nothing: no mastery, no graph, no ordering decisions. Those are C1's
-research contribution and belong in this service's own `curriculum` schema.
+This reads the shared `core` tables directly, which architecture rule 4 permits
+(`core` is the documented exception to view-only access). It is the learner
+catalogue that the tutor dashboard and, later, the quest map are built on.
+
+What this deliberately does not do: compute mastery, decide unlock order, or
+derive prerequisite structure. Mastery belongs to C1 and is consumed from
+`curriculum.v_mastery` from phase P7. Until then a concept here carries the
+seeded prerequisite IDs and nothing about the learner's progress.
 
 No FastAPI imports in this layer.
 """
@@ -73,7 +77,7 @@ def get_module(session: Session, module_id: str) -> ModuleSummary | None:
 
 
 def list_concepts(session: Session, module_id: str) -> list[ConceptRow]:
-    """Concepts of one module in seeded order, each with its prerequisite IDs."""
+    """Concepts of one module in seeded teaching order, with prerequisite IDs."""
     rows = session.execute(
         text(
             """
@@ -110,3 +114,21 @@ def list_concepts(session: Session, module_id: str) -> list[ConceptRow]:
         )
         for row in rows
     ]
+
+
+def group_by_topic(rows: list[ConceptRow]) -> list[tuple[str, str, list[ConceptRow]]]:
+    """Group concepts into (topic_id, topic_name, concepts).
+
+    Topics come out in the order their first concept appeared, which preserves
+    the teaching order the query produced.
+    """
+    order: list[str] = []
+    grouped: dict[str, tuple[str, list[ConceptRow]]] = {}
+
+    for row in rows:
+        if row.topic_id not in grouped:
+            order.append(row.topic_id)
+            grouped[row.topic_id] = (row.topic_name, [])
+        grouped[row.topic_id][1].append(row)
+
+    return [(topic_id, grouped[topic_id][0], grouped[topic_id][1]) for topic_id in order]

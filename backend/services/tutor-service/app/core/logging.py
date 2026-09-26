@@ -71,7 +71,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             request_id_var.reset(token)
 
         response.headers["x-request-id"] = request_id
-        logging.getLogger("curriculum.access").info(
+        logging.getLogger("tutor.access").info(
             "request handled",
             extra={
                 "method": request.method,

@@ -1,4 +1,12 @@
-"""Settings for curriculum-service. Every variable is listed in .env.example."""
+"""Settings for tutor-service (C3 VeriTutor).
+
+Every variable this service reads is listed in .env.example. Service-specific
+variables are prefixed TUTOR_; DATABASE_URL and INTEGRATION_MODE are shared.
+
+Only the settings the current code actually reads live here. The generation,
+retrieval and verification settings arrive with the phases that need them, so
+nothing in .env.example is a variable with no reader.
+"""
 
 from __future__ import annotations
 
@@ -19,11 +27,14 @@ class Settings(BaseSettings):
     database_url: str = Field(alias="DATABASE_URL")
     environment: str = Field(default="development", alias="ENVIRONMENT")
     log_level: str = Field(default="info", alias="LOG_LEVEL")
+    # stub | live. Cross-component reads (C1 mastery, C2 load) stay stubbed
+    # until phase P7.
     integration_mode: str = Field(default="stub", alias="INTEGRATION_MODE")
 
     # --- service ------------------------------------------------------------
-    port: int = Field(default=8101, alias="CURRICULUM_PORT")
-    db_schema: str = Field(default="curriculum", alias="CURRICULUM_DB_SCHEMA")
+    port: int = Field(default=8301, alias="TUTOR_PORT")
+    db_schema: str = Field(default="tutor", alias="TUTOR_DB_SCHEMA")
+    content_db_schema: str = Field(default="content", alias="TUTOR_CONTENT_DB_SCHEMA")
 
     @field_validator("database_url")
     @classmethod

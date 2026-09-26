@@ -33,15 +33,15 @@ export interface ModuleConcepts {
 
 export function useModules() {
   return useQuery({
-    queryKey: ['curriculum', 'modules'],
-    queryFn: () => request<Module[]>('/v1/curriculum/modules'),
+    queryKey: ['tutor', 'modules'],
+    queryFn: () => request<Module[]>('/v1/tutor/modules'),
   });
 }
 
 export function useModuleConcepts(moduleId: string | undefined) {
   return useQuery({
-    queryKey: ['curriculum', 'modules', moduleId, 'concepts'],
-    queryFn: () => request<ModuleConcepts>(`/v1/curriculum/modules/${moduleId}/concepts`),
+    queryKey: ['tutor', 'modules', moduleId, 'concepts'],
+    queryFn: () => request<ModuleConcepts>(`/v1/tutor/modules/${moduleId}/concepts`),
     enabled: Boolean(moduleId),
   });
 }
