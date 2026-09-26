@@ -41,27 +41,64 @@ Nothing else needs Docker. C3's Piston sandbox is the single exception and lives
 ```bash
 git clone https://github.com/thiranjab26/J26-IT-360.git
 cd J26-IT-360
-
-# 1. JS side (frontend + gateway), from the repo root
-pnpm install
-
-# 2. Your own Python service
-cd backend/services/<your>-service
-uv sync
-cp .env.example .env          # paste your own Neon branch connection string
-uv run alembic upgrade head   # migrates only your schema
-uv run uvicorn app.main:app --reload --port <your port>
+pnpm install                      # frontend + gateway, one lockfile
 ```
 
-Nobody runs the whole platform. Each member runs exactly three processes:
+**Database, once per Neon branch.** Ask the leader for Neon access and create
+your own branch, then:
 
 ```bash
-pnpm --filter frontend dev                                   # http://localhost:5173
-pnpm --filter api-gateway dev                                # http://localhost:8080
-uv run uvicorn app.main:app --reload --port <your port>       # your service
+cp database/.env.example database/.env     # paste your branch's DIRECT url
+cd database/core && uv run --with alembic --with sqlalchemy --with "psycopg[binary]" alembic upgrade head
+cd ../.. && uv run --with sqlalchemy --with "psycopg[binary]" python database/seed/seed_concepts.py
 ```
 
-Services that are not running return a clean 503 from the gateway. Other components' data comes from stubs (`INTEGRATION_MODE=stub`) until the integration phase.
+That creates the six schemas' `core` tables and seeds 2 modules, 10 topics,
+24 concepts and 37 prerequisite edges from `database/seed/*.csv`. Check the CSVs
+parse before touching the database with `python database/seed/seed_concepts.py --dry-run`.
+
+**Each service you run** needs its own `.env` (copy its `.env.example` and paste
+your Neon *pooled* url):
+
+```bash
+cd backend/services/<service>
+uv sync
+cp .env.example .env
+uv run uvicorn app.main:app --reload --port <port>
+```
+
+## Running it
+
+Nobody runs the whole platform. Today's screens need four processes:
+
+```bash
+pnpm --filter frontend dev                                      # 5173
+pnpm --filter api-gateway dev                                   # 8080
+cd backend/services/auth-service       && uv run uvicorn app.main:app --reload --port 8001
+cd backend/services/curriculum-service && uv run uvicorn app.main:app --reload --port 8101
+```
+
+Then open http://localhost:5173, register as a student, and you land on a
+dashboard listing both modules; clicking one shows its concepts grouped by topic.
+
+Once your own component has a service, that is the only extra process you run.
+Services that are not running return a clean 503 from the gateway naming the
+service and the command to start it. Other components' data comes from stubs
+(`INTEGRATION_MODE=stub`) until the integration phase.
+
+`api-gateway`'s `JWT_SECRET` must be byte-identical to `auth-service`'s
+`AUTH_JWT_SECRET`, since auth signs the token the gateway verifies.
+
+## What works today
+
+| Area | State |
+|---|---|
+| `core` schema and concept seed | Live on Neon. 2 modules, 10 topics, 24 concepts, 37 prerequisite edges |
+| `auth-service` | Register (student and lecturer, separate endpoints), login, `/me`. bcrypt + JWT |
+| `api-gateway` | JWT verification, header forwarding, five proxy routes, 503 fallback, `/internal/*` blocked |
+| `frontend` | Login, register, student dashboard, module concept list |
+| `curriculum-service` | **P0 read-only catalogue only.** C1 owns it and replaces it |
+| C2, C3, C4 services | Not started. Directory placeholders only |
 
 ## Repository map
 
