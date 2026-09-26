@@ -1,0 +1,13 @@
+concept_id,name,module_id,topic,description,prerequisites_same_module,prerequisites_cross_module
+prog.variables_types,Variables and data types,prog,Basics,"Storing values in named variables; integers, floats, booleans and strings",,
+prog.operators_expressions,Operators and expressions,prog,Basics,"Arithmetic, comparison and logical operators and how expressions evaluate",prog.variables_types,
+prog.conditionals,Conditionals,prog,Control Flow,"Branching with if, else-if and else based on boolean conditions",prog.operators_expressions,
+prog.loops,Loops,prog,Control Flow,Repeating work with for and while loops; loop conditions and termination,prog.conditionals,
+prog.nested_loops,Nested loops,prog,Control Flow,Loops inside loops and how the total number of iterations multiplies,prog.loops,
+prog.functions,Functions and parameters,prog,Functions,Defining and calling functions; passing arguments to parameters,prog.variables_types,
+prog.return_values_scope,Return values and scope,prog,Functions,Returning results from functions; local versus outer variable scope,prog.functions,
+prog.call_flow,Function call flow,prog,Functions,Functions calling other functions and the order in which calls start and finish,prog.return_values_scope,
+prog.lists_indexing,Lists and indexing,prog,Collections,Ordered collections accessed by index; reading and updating elements,prog.variables_types,
+prog.collection_iteration,Iterating over collections,prog,Collections,Visiting every element of a collection with a loop,prog.lists_indexing;prog.loops,
+prog.references_mutability,References and mutability,prog,Collections,Variables referring to objects; mutating shared data through a reference,prog.lists_indexing;prog.functions,
+prog.code_tracing,Tracing program execution,prog,Program Tracing,Following code line by line and recording variable state at each step,prog.loops;prog.call_flow,

@@ -1,0 +1,13 @@
+concept_id,name,module_id,topic,description,prerequisites_same_module,prerequisites_cross_module
+dsa.big_o,Big-O and growth rate,dsa,Complexity,Counting operations as input grows and expressing the growth with Big-O,,prog.loops;prog.nested_loops
+dsa.complexity_classes,Complexity classes and case analysis,dsa,Complexity,"Comparing O(1), O(log n), O(n), O(n log n), O(n^2); best and worst case",dsa.big_o,
+dsa.array_costs,Array operation costs,dsa,Linear Structures,Why array access is constant time but insertion and deletion are linear,dsa.big_o,prog.lists_indexing
+dsa.linked_list,Linked lists,dsa,Linear Structures,"Nodes and pointers; traversal, insertion and deletion by pointer reassignment",dsa.array_costs,prog.references_mutability;prog.collection_iteration
+dsa.stack,Stacks,dsa,Linear Structures,"LIFO ordering; push, pop and peek; applications such as bracket matching and undo",dsa.array_costs,
+dsa.queue,Queues,dsa,Linear Structures,FIFO ordering; enqueue and dequeue; applications such as scheduling,dsa.linked_list,
+dsa.call_stack,The call stack,dsa,Recursion,How the runtime tracks active function calls as a stack of frames,dsa.stack,prog.call_flow
+dsa.recursion_cases,Base case and recursive case,dsa,Recursion,Stopping condition and reducing a problem to a smaller instance of itself,dsa.call_stack,prog.conditionals;prog.return_values_scope
+dsa.recursion_tracing,Tracing recursion,dsa,Recursion,Following recursive calls frame by frame; call depth and stack overflow,dsa.recursion_cases,prog.code_tracing
+dsa.tree_traversal,Tree structure and traversal,dsa,Trees,"Root, leaf, height and subtree; in-order, pre-order and post-order traversal",dsa.recursion_tracing;dsa.linked_list,
+dsa.bst,Binary search trees,dsa,Trees,The BST invariant; search and insertion; degradation on sorted input,dsa.tree_traversal;dsa.complexity_classes,
+dsa.merge_sort,Divide-and-conquer and merge sort,dsa,Sorting,"Divide, conquer, combine; merge sort and why it runs in O(n log n)",dsa.recursion_tracing;dsa.complexity_classes,

@@ -1,0 +1,75 @@
+# ---------------------------------------------------------------------------
+# Local AI assistant context. Personal to each member, never committed.
+# ---------------------------------------------------------------------------
+CLAUDE.md
+**/CLAUDE.md
+CLAUDE.local.md
+**/CLAUDE.local.md
+FIRST_PROMPT.md
+**/FIRST_PROMPT.md
+.claude/
+.cursor/
+.aider*
+
+# ---------------------------------------------------------------------------
+# Secrets and environment
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.uv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Node
+# ---------------------------------------------------------------------------
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+
+# ---------------------------------------------------------------------------
+# Data stores and model artefacts (C3)
+# ---------------------------------------------------------------------------
+.chroma/
+*.sqlite3
+models/local/
+*.onnx
+*.bin
+*.safetensors
+
+# ---------------------------------------------------------------------------
+# Research outputs. Keep scripts and labelled data, drop generated artefacts.
+# ---------------------------------------------------------------------------
+research/**/results/**
+!research/**/results/.gitkeep
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Editors and OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

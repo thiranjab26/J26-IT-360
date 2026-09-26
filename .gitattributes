@@ -1,0 +1,17 @@
+# Normalise line endings so Windows and macOS members do not fight over diffs.
+* text=auto eol=lf
+
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+*.png   binary
+*.jpg   binary
+*.pdf   binary
+*.onnx  binary
+*.bin   binary
+
+# Generated or vendored: keep out of diffs and language stats.
+frontend/src/shared/api/generated/** linguist-generated=true
+pnpm-lock.yaml                       linguist-generated=true
+database/seed/*.csv                  linguist-language=Text

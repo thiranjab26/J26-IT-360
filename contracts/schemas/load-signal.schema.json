@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://adaptlearn.sliit/contracts/load-signal.schema.json",
+  "title": "Load signal",
+  "description": "Draft v0. Cognitive load state pushed by C2 (load-service) to C3 (tutor-service) at POST /internal/load. Categorical state only: no webcam, landmark or biometric data crosses this boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session_id", "user_id", "load_state", "confidence", "timestamp"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "The tutor session the observation belongs to"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "load_state": {
+      "type": "string",
+      "enum": ["low", "moderate", "high"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+# Code owners. Replace the placeholder usernames with real GitHub handles in
+# your first PR, then remove this line.
+#
+# @leader        project leader, shared areas
+# @owner-c1      C1 Adaptive Curriculum Engine
+# @owner-c2      C2 Cognitive Load Detection
+# @owner-c3      C3 VeriTutor
+# @owner-c4      C4 Intelligent Viva System
+
+# Default: the leader reviews anything not claimed below.
+*                                           @leader
+
+# Shared infrastructure, leader owned.
+/.github/                                   @leader
+/package.json                               @leader
+/pnpm-workspace.yaml                        @leader
+/.gitignore                                 @leader
+/backend/services/api-gateway/              @leader
+/backend/services/auth-service/             @leader
+/backend/services/_service-template/        @leader
+/frontend/src/app/                          @leader
+/frontend/src/features/auth/                @leader
+
+# Per component.
+/backend/services/curriculum-service/       @owner-c1
+/frontend/src/features/curriculum/          @owner-c1
+/research/c1-curriculum/                    @owner-c1
+
+/backend/services/load-service/             @owner-c2
+/frontend/src/features/cognitive-load/      @owner-c2
+/research/c2-load/                          @owner-c2
+
+/backend/services/tutor-service/            @owner-c3
+/frontend/src/features/tutor/               @owner-c3
+/research/c3-veritutor/                     @owner-c3
+/docs/c3/                                   @owner-c3
+
+/backend/services/viva-service/             @owner-c4
+/frontend/src/features/viva/                @owner-c4
+/research/c4-viva/                          @owner-c4
+
+# Areas that need every affected owner to approve. Listing all four means a
+# change here cannot merge on one review.
+/contracts/                                 @leader @owner-c1 @owner-c2 @owner-c3 @owner-c4
+/database/core/                             @leader @owner-c1 @owner-c2 @owner-c3 @owner-c4
+/database/seed/                             @leader @owner-c1 @owner-c2 @owner-c3 @owner-c4
+/frontend/src/shared/                       @leader @owner-c1 @owner-c2 @owner-c3 @owner-c4
+/docs/architecture.md                       @leader @owner-c1 @owner-c2 @owner-c3 @owner-c4

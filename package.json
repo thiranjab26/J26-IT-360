@@ -1,0 +1,24 @@
+{
+  "name": "adaptlearn",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AdaptLearn: personalized learning intelligence platform (J26-IT-360)",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev:gateway": "pnpm --filter api-gateway dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "gen:types:auth": "openapi-typescript http://localhost:8001/openapi.json -o frontend/src/shared/api/generated/auth.d.ts",
+    "gen:types:curriculum": "openapi-typescript http://localhost:8101/openapi.json -o frontend/src/shared/api/generated/curriculum.d.ts",
+    "gen:types:load": "openapi-typescript http://localhost:8201/openapi.json -o frontend/src/shared/api/generated/load.d.ts",
+    "gen:types:tutor": "openapi-typescript http://localhost:8301/openapi.json -o frontend/src/shared/api/generated/tutor.d.ts",
+    "gen:types:viva": "openapi-typescript http://localhost:8401/openapi.json -o frontend/src/shared/api/generated/viva.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.4.0"
+  }
+}
