@@ -28,20 +28,46 @@ receiver for C2's signal.
 
 ## Course content
 
-`content/prog/` holds the authored Java 21 course material for Programming Fundamentals: a module introduction and 13 concept files. Each concept file has the same sections, marked with `<!-- section: ... -->` comments (objectives, theory, examples, misconceptions, key facts, practice questions, solutions, rubrics). The markers are what the indexer will chunk on, and the section type decides which jobs may retrieve a chunk: solutions and rubrics are for grading only and never reach the tutor or chatbot.
+`content/prog/` holds the authored Java 21 course material for Programming Fundamentals: a module introduction and 13 concept files. Each concept file has the same sections, marked with `<!-- section: ... -->` comments (objectives, theory, examples, misconceptions, key facts, practice questions, solutions, rubrics). The markers are what the chunker splits on, and the section type decides which jobs may retrieve a chunk: solutions and rubrics are for grading only and never reach the tutor or chatbot.
 
-The frontmatter `concept_id` values must exist in `core.concepts`. DSA content comes later, in `content/dsa/`.
+The frontmatter `concept_id` values must exist in `core.concepts`, and the frontmatter prerequisites must match `core.concept_prerequisites`. The programming seed CSV is generated from this frontmatter, so the content is the source of truth. DSA content comes later, in `content/dsa/`.
 
-## Schemas
+### Turning content into chunks
 
-This service owns two schemas, `content` and `tutor`, both migrated from inside
-this service once it has tables of its own. There is no Alembic setup yet
-because P0 adds no tables: the catalogue reads the shared `core` tables, which
-`database/core` migrates.
+`app/content/` reads the markdown and cuts it into retrievable chunks (about 580 for the Programming module):
 
-Reading `core` directly is allowed. Architecture rule 4 makes `core` the one
-exception to view-only access, because it is shared reference data nobody but the
-leader writes.
+| Section | One chunk per |
+|---|---|
+| theory | run of small blocks, merged up to 200 words |
+| example | worked example |
+| misconception | misconception |
+| exercise, solution | question |
+| rubric | rubric entry (it can cover several questions) |
+| objectives, prerequisites, facts, overview | block |
+| further_practice | not indexed |
+
+```bash
+uv run python -m app.content.cli check            # parse, chunk, validate against core; writes nothing
+uv run python -m app.content.cli check --no-db    # same without the database comparison
+uv run python -m app.content.cli sync             # check, then write content.units and content.chunks
+```
+
+Run `check` after editing any markdown file. It fails on a question with no solution, a free-form question with no rubric, a prerequisite taught later than the concept, or a concept ID or prerequisite list that disagrees with `core`. `sync` refuses to write while any of those are open, and only rewrites units whose file actually changed.
+
+## Schemas and migrations
+
+This service owns two schemas: `content` (indexed course material: `units`, `chunks`) and `tutor` (runtime data: `gate_events` now, sessions and attempts from P2). Both are migrated from here, with the Alembic version table in `tutor`:
+
+```bash
+uv run alembic upgrade head     # apply
+uv run alembic check            # fails if app/db/tables.py and the migrations disagree
+```
+
+Migrations use `TUTOR_MIGRATION_DATABASE_URL` (Neon's direct endpoint) when set, otherwise `DATABASE_URL`.
+
+`content` concept IDs are plain text, not foreign keys into `core.concepts`: the indexer rejects unknown IDs, and a foreign key would also stop the seed script pruning a renamed concept.
+
+Reading `core` directly is allowed. Architecture rule 4 makes `core` the one exception to view-only access, because it is shared reference data nobody but the leader writes.
 
 ## What the catalogue deliberately does not do
 
