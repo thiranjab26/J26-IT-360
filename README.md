@@ -53,8 +53,8 @@ cd database/core && uv run --with alembic --with sqlalchemy --with "psycopg[bina
 cd ../.. && uv run --with sqlalchemy --with "psycopg[binary]" python database/seed/seed_concepts.py
 ```
 
-That creates the six schemas' `core` tables and seeds 2 modules, 10 topics,
-24 concepts and 37 prerequisite edges from `database/seed/*.csv`. Check the CSVs
+That creates the `core` tables and seeds 2 modules, 12 topics, 25 concepts and
+39 prerequisite edges from `database/seed/*.csv`. Check the CSVs
 parse before touching the database with `python database/seed/seed_concepts.py --dry-run`.
 
 **Each service you run** needs its own `.env` (copy its `.env.example` and paste
@@ -93,11 +93,11 @@ service and the command to start it. Other components' data comes from stubs
 
 | Area | State |
 |---|---|
-| `core` schema and concept seed | Live on Neon. 2 modules, 10 topics, 24 concepts, 37 prerequisite edges |
+| `core` schema and concept seed | Live on Neon. 2 modules, 12 topics, 25 concepts, 39 prerequisite edges |
 | `auth-service` | Register (student and lecturer, separate endpoints), login, `/me`. bcrypt + JWT |
 | `api-gateway` | JWT verification, header forwarding, five proxy routes, 503 fallback, `/internal/*` blocked |
-| `tutor-service` (C3) | Learner catalogue: modules, and concepts grouped by topic |
-| `frontend` | Login, register, student dashboard, module concept list |
+| `tutor-service` (C3) | Learner catalogue: modules, and concepts grouped by topic. Holds the Java course content in `content/prog/` (not indexed yet) |
+| `frontend` | Login, register, module picker (Programming open, DSA coming soon), quest-map view of a module's topics |
 | C1, C2, C4 services | Not started. Directory placeholders, owned by their members |
 
 The learner catalogue lives in **tutor-service** because C3's owner is also the

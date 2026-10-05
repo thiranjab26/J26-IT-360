@@ -26,8 +26,13 @@ class ModuleSummary:
     code: str | None
     name: str
     description: str | None
+    status: str  # "available" or "coming_soon"
     topic_count: int
     concept_count: int
+
+    @property
+    def is_available(self) -> bool:
+        return self.status == "available"
 
 
 @dataclass(frozen=True)
@@ -48,12 +53,13 @@ def list_modules(session: Session) -> list[ModuleSummary]:
                    m.code,
                    m.name,
                    m.description,
+                   m.status,
                    count(DISTINCT t.topic_id) AS topic_count,
                    count(DISTINCT c.concept_id) AS concept_count
               FROM core.modules m
               LEFT JOIN core.topics   t ON t.module_id = m.module_id
               LEFT JOIN core.concepts c ON c.module_id = m.module_id
-             GROUP BY m.module_id, m.code, m.name, m.description, m.position
+             GROUP BY m.module_id, m.code, m.name, m.description, m.status, m.position
              ORDER BY m.position, m.module_id
             """
         )
@@ -65,6 +71,7 @@ def list_modules(session: Session) -> list[ModuleSummary]:
             code=row.code,
             name=row.name,
             description=row.description,
+            status=row.status,
             topic_count=row.topic_count,
             concept_count=row.concept_count,
         )

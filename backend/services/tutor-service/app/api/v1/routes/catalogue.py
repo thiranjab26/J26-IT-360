@@ -24,6 +24,7 @@ def _module_out(module: catalogue.ModuleSummary) -> ModuleOut:
         code=module.code,
         name=module.name,
         description=module.description,
+        status=module.status,
         topic_count=module.topic_count,
         concept_count=module.concept_count,
     )
@@ -57,6 +58,16 @@ def list_module_concepts(
             status.HTTP_404_NOT_FOUND,
             "module_not_found",
             f"No module with id {module_id!r}.",
+            {"module_id": module_id},
+        )
+
+    # A coming-soon module has a seeded concept list (C1's graph needs the IDs)
+    # but no authored content yet, so there is nothing for a learner to open.
+    if not module.is_available:
+        raise ApiError(
+            status.HTTP_409_CONFLICT,
+            "module_coming_soon",
+            f"{module.name} is coming soon. Its course content is not available yet.",
             {"module_id": module_id},
         )
 

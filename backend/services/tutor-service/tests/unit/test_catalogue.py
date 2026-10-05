@@ -53,3 +53,21 @@ def test_topic_name_is_carried_through() -> None:
 
 def test_no_rows_means_no_topics() -> None:
     assert group_by_topic([]) == []
+
+
+def test_a_module_is_open_only_when_available() -> None:
+    from app.domain.catalogue import ModuleSummary
+
+    def module(status: str) -> ModuleSummary:
+        return ModuleSummary(
+            module_id="m",
+            code=None,
+            name="M",
+            description=None,
+            status=status,
+            topic_count=0,
+            concept_count=0,
+        )
+
+    assert module("available").is_available
+    assert not module("coming_soon").is_available

@@ -15,8 +15,8 @@ Design docs: `docs/c3/Implementation-plan.md`, `docs/c3/dsa-module-plan.md`,
 | Method | Path | Purpose | Phase |
 |---|---|---|---|
 | GET | `/health` | Liveness | P0 |
-| GET | `/api/v1/tutor/modules` | Modules the learner can study | P0 |
-| GET | `/api/v1/tutor/modules/{module_id}/concepts` | Concepts grouped by topic, in teaching order | P0 |
+| GET | `/api/v1/tutor/modules` | Modules, each `available` or `coming_soon` | P0 |
+| GET | `/api/v1/tutor/modules/{module_id}/concepts` | Concepts grouped by topic, in teaching order. `409 module_coming_soon` for a module with no content yet | P0 |
 
 Everything below needs an authenticated caller: identity arrives as `X-User-Id`
 and `X-User-Role` from the gateway. This service never parses a JWT and never
@@ -25,6 +25,12 @@ holds the signing secret.
 Arriving with later phases: sessions (start, next, answer, end, resume),
 practicals, progress and XP, content admin, and the internal `/internal/load`
 receiver for C2's signal.
+
+## Course content
+
+`content/prog/` holds the authored Java 21 course material for Programming Fundamentals: a module introduction and 13 concept files. Each concept file has the same sections, marked with `<!-- section: ... -->` comments (objectives, theory, examples, misconceptions, key facts, practice questions, solutions, rubrics). The markers are what the indexer will chunk on, and the section type decides which jobs may retrieve a chunk: solutions and rubrics are for grading only and never reach the tutor or chatbot.
+
+The frontmatter `concept_id` values must exist in `core.concepts`. DSA content comes later, in `content/dsa/`.
 
 ## Schemas
 

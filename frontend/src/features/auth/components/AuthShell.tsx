@@ -35,8 +35,8 @@ export function AuthShell({
             Tutoring you can check.
           </h1>
           <p className="mt-[12px] text-[13.5px] text-ink-muted">
-            A personalized learning platform for Programming Fundamentals and Data Structures
-            and Algorithms, built around verified explanations and mastery-gated progress.
+            A personalized learning platform that starts with Programming Fundamentals in Java,
+            built around verified explanations and mastery-gated progress.
           </p>
 
           <ul className="mt-[26px] flex flex-col gap-[14px]">

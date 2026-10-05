@@ -2,11 +2,15 @@ import { useQuery } from '@tanstack/react-query';
 
 import { request } from '@/shared/api/client';
 
+export type ModuleStatus = 'available' | 'coming_soon';
+
 export interface Module {
   module_id: string;
   code: string | null;
   name: string;
   description: string | null;
+  /** coming_soon modules have a seeded concept list but no authored content yet. */
+  status: ModuleStatus;
   topic_count: number;
   concept_count: number;
 }

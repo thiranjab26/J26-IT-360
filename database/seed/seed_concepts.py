@@ -30,19 +30,30 @@ SEED_DIR = Path(__file__).resolve().parent
 DATABASE_DIR = SEED_DIR.parent
 REPO_ROOT = DATABASE_DIR.parent
 
-# module_id -> (code, display name, description, ordering)
-MODULES: dict[str, tuple[str | None, str, str, int]] = {
+# module_id -> (code, display name, description, ordering, status)
+#
+# `code` is the university's course code and is left unset until the real codes
+# are confirmed, so the UI never shows a made-up one.
+#
+# `status` is `available` once the module's course content is authored and
+# indexed, and `coming_soon` until then. The concept list for a coming-soon
+# module is still seeded, because C1's graph needs the concept IDs and the
+# cross-module prerequisites to resolve.
+MODULES: dict[str, tuple[str | None, str, str, int, str]] = {
     "prog": (
-        "IT1010",
-        "Programming Fundamentals",
-        "Variables, control flow, functions and collections, up to tracing program execution.",
+        None,
+        "Programming Fundamentals in Java",
+        "Variables, control flow, methods, arrays and objects in Java 21, ending with "
+        "tracing programs by hand.",
         1,
+        "available",
     ),
     "dsa": (
-        "IT2070",
+        None,
         "Data Structures and Algorithms",
         "Complexity analysis, linear structures, recursion, trees and sorting.",
         2,
+        "coming_soon",
     ),
 }
 
@@ -190,13 +201,14 @@ def seed(engine: Engine, concepts: list[Concept]) -> None:
         connection.execute(
             text(
                 """
-                INSERT INTO core.modules (module_id, code, name, description, position)
-                VALUES (:module_id, :code, :name, :description, :position)
+                INSERT INTO core.modules (module_id, code, name, description, position, status)
+                VALUES (:module_id, :code, :name, :description, :position, :status)
                 ON CONFLICT (module_id) DO UPDATE SET
                     code        = EXCLUDED.code,
                     name        = EXCLUDED.name,
                     description = EXCLUDED.description,
-                    position    = EXCLUDED.position
+                    position    = EXCLUDED.position,
+                    status      = EXCLUDED.status
                 """
             ),
             [
@@ -206,8 +218,9 @@ def seed(engine: Engine, concepts: list[Concept]) -> None:
                     "name": name,
                     "description": description,
                     "position": position,
+                    "status": status,
                 }
-                for module_id, (code, name, description, position) in MODULES.items()
+                for module_id, (code, name, description, position, status) in MODULES.items()
             ],
         )
 
@@ -259,6 +272,18 @@ def seed(engine: Engine, concepts: list[Concept]) -> None:
         # Prerequisites are replaced wholesale: the CSV is the source of truth, so
         # an edge deleted there must disappear here too.
         connection.execute(text("DELETE FROM core.concept_prerequisites"))
+
+        # Likewise, a concept or topic dropped from the CSVs is removed, after the
+        # edges that reference it are gone. A renamed concept would otherwise
+        # linger next to its replacement.
+        removed_concepts = connection.execute(
+            text("DELETE FROM core.concepts WHERE concept_id <> ALL(:keep)"),
+            {"keep": [c.concept_id for c in concepts]},
+        ).rowcount
+        removed_topics = connection.execute(
+            text("DELETE FROM core.topics WHERE topic_id <> ALL(:keep)"),
+            {"keep": list(topics)},
+        ).rowcount
         if edges:
             connection.execute(
                 text(
@@ -275,6 +300,8 @@ def seed(engine: Engine, concepts: list[Concept]) -> None:
         f"Seeded {len(MODULES)} modules, {len(topics)} topics, "
         f"{len(concepts)} concepts, {len(edges)} prerequisite edges."
     )
+    if removed_concepts or removed_topics:
+        print(f"Pruned {removed_concepts} stale concepts and {removed_topics} stale topics.")
 
 
 def main() -> None:

@@ -3,4 +3,5 @@
  * Architecture Section 6: features never reach into each other's internals.
  */
 export { tutorRoutes } from './routes';
-export type { Concept, Module, ModuleConcepts, Topic } from './api/tutorApi';
+export { useModules } from './api/tutorApi';
+export type { Concept, Module, ModuleConcepts, ModuleStatus, Topic } from './api/tutorApi';

@@ -22,8 +22,8 @@ for the current screens. See the root README.
 |---|---|---|
 | `/login` | `features/auth` | Sign in |
 | `/register` | `features/auth` | Register, student or lecturer |
-| `/dashboard` | `features/tutor` | The student's modules |
-| `/modules/:moduleId` | `features/tutor` | Concepts of one module, grouped by topic |
+| `/dashboard` | `features/tutor` | Module picker. Programming is open, DSA shows as coming soon |
+| `/modules/:moduleId` | `features/tutor` | Quest map: a module's topics as a path, with their concepts |
 
 Everything below `RequireAuth` needs a valid token; `/login` and `/register` are
 the only public screens.

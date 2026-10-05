@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from pydantic import BaseModel
-#catalogue
+
+# catalogue
+
 
 class ModuleOut(BaseModel):
     module_id: str
     code: str | None = None
     name: str
     description: str | None = None
+    status: str
     topic_count: int
     concept_count: int
 

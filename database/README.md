@@ -28,7 +28,7 @@ One Neon Postgres database, one schema per owner. Owned by the project leader.
 | `schemas.sql` | Creates `core`, `content`, `tutor`, `curriculum`, `load`, `viva` |
 | `roles.sql` | Creates one role per service, write grants on its own schema, read grants on `core` |
 | `core/alembic.ini`, `core/migrations/` | Migrations for the `core` schema only |
-| `seed/concepts_programming.csv` | Agreed concept list for the programming module (`prog.*`) |
+| `seed/concepts_programming.csv` | Concept list for Programming Fundamentals in Java (`prog.*`), generated from the frontmatter of `tutor-service/content/prog/` |
 | `seed/concepts_dsa.csv` | Agreed concept list for the DSA module (`dsa.*`) |
 
 ## Concept IDs
@@ -38,6 +38,8 @@ Concept IDs are the join key between C3's content and C1's graph, so they are de
 - C1 owns the prerequisite **relationships** between concepts (in Neo4j).
 - C3 owns which **units and practicals** cover which concepts (in `content`).
 - Nobody invents a concept ID locally. New concepts are added by PR to the seed files, approved by C1 and C3.
+
+The programming CSV is derived from the course content, so the content is the source of truth: change a concept in its markdown frontmatter first, then regenerate the CSV. `core.modules.status` is `available` once a module's content is authored and `coming_soon` until then; the DSA concept list is seeded early because C1's graph needs the IDs.
 
 Seed columns: `concept_id`, `name`, `module_id`, `topic`, `description`, `prerequisites_same_module`, `prerequisites_cross_module`. Prerequisite lists are `;` separated.
 
