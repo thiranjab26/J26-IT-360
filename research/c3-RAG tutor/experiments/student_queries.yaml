@@ -1,0 +1,17 @@
+# Natural, student-style questions for the retrieval experiment (optional).
+#
+# The 143 practice questions are a proxy: many are pasted programs, which is not how a
+# student asks. Questions written the way students really phrase them are a better test.
+# Write about 3 per concept, in your own words, WITHOUT looking at the course text, so
+# the wording is not copied from the chunks.
+#
+# Format: a list of  {concept: <concept id>, text: <the question>}
+# Example (delete the leading '#' to use):
+#
+# - concept: prog.loops
+#   text: why does my for loop run one extra time
+# - concept: prog.references
+#   text: why did changing one variable also change the other
+#
+# Then re-run the experiment; the script scores this file as a separate query set.
+[]
