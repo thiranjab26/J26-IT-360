@@ -96,7 +96,7 @@ service and the command to start it. Other components' data comes from stubs
 | `core` schema and concept seed | Live on Neon. 2 modules, 12 topics, 25 concepts, 39 prerequisite edges |
 | `auth-service` | Register (student and lecturer, separate endpoints), login, `/me`. bcrypt + JWT |
 | `api-gateway` | JWT verification, header forwarding, five proxy routes, 503 fallback, `/internal/*` blocked |
-| `tutor-service` (C3) | Learner catalogue, plus the content pipeline: parses and chunks the Java course material (581 chunks) into `content.units` and `content.chunks`. Embedding and retrieval are next |
+| `tutor-service` (C3) | Learner catalogue, plus the content pipeline: parses and chunks the Java course material (581 chunks) into `content.units` and `content.chunks`. Chunks are embedded locally into ChromaDB (`bge-small`). Retrieval with per-use access rules is next |
 | `frontend` | Login, register, module picker (Programming open, DSA coming soon), quest-map view of a module's topics |
 | C1, C2, C4 services | Not started. Directory placeholders, owned by their members |
 

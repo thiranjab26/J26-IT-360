@@ -3,6 +3,7 @@
     uv run python -m app.content.cli check            parse, chunk, validate; no writes
     uv run python -m app.content.cli check --no-db    same, without the database checks
     uv run python -m app.content.cli sync             check, then write units and chunks
+    uv run python -m app.content.cli index            sync, then embed the chunks into ChromaDB
 
 `check` is the dry run: it is what to run after editing a markdown file. By default
 it also compares against core.concepts and core.concept_prerequisites, because a
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, help_text in (
         ("check", "parse, chunk and validate the content without writing"),
         ("sync", "validate, then write units and chunks to the database"),
+        ("index", "sync, then embed the chunks into ChromaDB (incremental)"),
     ):
         command = sub.add_parser(name, help=help_text)
         command.add_argument("--module", help="only this module, e.g. prog")
@@ -62,7 +64,7 @@ def main(argv: list[str] | None = None) -> int:
     known_edges: dict[str, set[str]] | None = None
     engine: Engine | None = None
 
-    if args.command == "sync" or not args.no_db:
+    if args.command in ("sync", "index") or not args.no_db:
         engine = create_engine(settings.migration_database_url or settings.database_url)
         try:
             known_concepts, known_edges = _core_reference(engine)
@@ -76,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
     errors = [i for i in issues if i.severity == "error"]
     if errors:
-        suffix = " Nothing was written." if args.command == "sync" else ""
+        suffix = " Nothing was written." if args.command != "check" else ""
         print(f"\n{len(errors)} error(s).{suffix}")
         return 1
 
@@ -85,6 +87,9 @@ def main(argv: list[str] | None = None) -> int:
 
     assert engine is not None
     _sync(engine, units, chunks_by_unit)
+
+    if args.command == "index":
+        _embed(settings, units, chunks_by_unit)
     return 0
 
 
@@ -161,6 +166,33 @@ def _sync(engine: Engine, units: list[Unit], chunks_by_unit: dict[str, list[Chun
 
     summary = ", ".join(f"{n} {name}" for name, n in sorted(results.items()))
     print(f"\nsynced: {summary}")
+
+
+def _embed(settings, units: list[Unit], chunks_by_unit: dict[str, list[Chunk]]) -> None:  # noqa: ANN001
+    # Imported here: loading torch takes seconds and `check` and `sync` never need it.
+    from app.content.embedder import SentenceTransformerEmbedder
+    from app.content.indexer import index_module, open_store, truncated_chunks
+
+    embedder = SentenceTransformerEmbedder(settings.embedding_model)
+    client = open_store(settings.chroma_root)
+    print(f"\nembedding with {embedder.name} (reads {embedder.max_tokens} tokens per chunk)")
+
+    for module in sorted({u.module_id for u in units}):
+        chunks = [c for u in units if u.module_id == module for c in chunks_by_unit[u.unit_id]]
+
+        cut_off = truncated_chunks(embedder, chunks)
+        if cut_off:
+            print(f"WARNING {len(cut_off)} chunk(s) are longer than the model reads, so their")
+            print("        ends are not searchable. Shorten them or use a longer-window model:")
+            for chunk, tokens in sorted(cut_off, key=lambda item: -item[1])[:5]:
+                print(f"        {chunk.chunk_id} ({tokens} tokens)")
+
+        result = index_module(client, embedder, module, chunks)
+        print(
+            f"  {result.collection}: {result.added} added, {result.updated} updated, "
+            f"{result.unchanged} unchanged, {result.removed} removed "
+            f"({result.seconds:.1f}s)"
+        )
 
 
 if __name__ == "__main__":

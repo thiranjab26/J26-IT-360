@@ -52,6 +52,16 @@ uv run python -m app.content.cli check --no-db    # same without the database co
 uv run python -m app.content.cli sync             # check, then write content.units and content.chunks
 ```
 
+### Embedding and the vector store
+
+```bash
+uv run python -m app.content.cli index            # sync to Postgres, then embed into ChromaDB
+```
+
+`index` is incremental: it embeds only chunks that are new or whose text or heading changed, so re-running on unedited content embeds nothing (0.1 s) and a full first run takes about 20 s on a laptop CPU. The vectors live in `.chroma/` (gitignored, private to this service), in one collection per module and model, for example `content_prog__bge-small-en-v1-5`.
+
+The default model is `BAAI/bge-small-en-v1.5` (`TUTOR_EMBEDDING_MODEL`). It reads 512 tokens per chunk; `all-MiniLM-L6-v2` reads only 256 and measured 13% of our chunks over that, including 44% of theory and 77% of facts, so their ends would have been silently unsearchable. `index` warns if any chunk exceeds the model's window, so a longer unit or a model swap cannot reintroduce this unnoticed. Because collections are per model, a second model can be indexed alongside the first for the evaluation.
+
 Run `check` after editing any markdown file. It fails on a question with no solution, a free-form question with no rubric, a prerequisite taught later than the concept, or a concept ID or prerequisite list that disagrees with `core`. `sync` refuses to write while any of those are open, and only rewrites units whose file actually changed.
 
 ## Schemas and migrations

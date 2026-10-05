@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     # folder, so the CLI works from any working directory.
     content_dir: Path = Field(default=Path("content"), alias="TUTOR_CONTENT_DIR")
 
+    # Embedded vector store (ChromaDB). Private to this service and gitignored.
+    chroma_path: Path = Field(default=Path(".chroma"), alias="TUTOR_CHROMA_PATH")
+
+    # Local sentence embedding model. The default has a 512-token window, which
+    # covers every course chunk; all-MiniLM-L6-v2 stops at 256 and would silently
+    # drop the end of the longer theory and example chunks.
+    embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", alias="TUTOR_EMBEDDING_MODEL")
+
     @field_validator("database_url", "migration_database_url")
     @classmethod
     def normalise_driver(cls, value: str | None) -> str | None:
@@ -53,9 +61,16 @@ class Settings(BaseSettings):
 
     @property
     def content_root(self) -> Path:
-        if self.content_dir.is_absolute():
-            return self.content_dir
-        return Path(__file__).resolve().parents[1] / self.content_dir
+        return _service_path(self.content_dir)
+
+    @property
+    def chroma_root(self) -> Path:
+        return _service_path(self.chroma_path)
+
+
+def _service_path(path: Path) -> Path:
+    """A relative path is resolved against the tutor-service folder, not the cwd."""
+    return path if path.is_absolute() else Path(__file__).resolve().parents[1] / path
 
 
 @lru_cache
