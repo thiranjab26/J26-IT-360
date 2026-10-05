@@ -64,6 +64,30 @@ The default model is `BAAI/bge-small-en-v1.5` (`TUTOR_EMBEDDING_MODEL`). It read
 
 Run `check` after editing any markdown file. It fails on a question with no solution, a free-form question with no rubric, a prerequisite taught later than the concept, or a concept ID or prerequisite list that disagrees with `core`. `sync` refuses to write while any of those are open, and only rewrites units whose file actually changed.
 
+## Retrieval and who may see what
+
+`app/retrieval/` finds course material for a question. It reads only the local ChromaDB, so it works with the database down, and a search takes about 35 ms (embedding the query dominates).
+
+The rule it enforces is in `app/retrieval/access.py`, because it protects both the student and the research. Practice questions have authored solutions and rubrics in the same files as the theory; if the tutor could retrieve them, pasting a practice question into the chat would hand back its answer.
+
+| Mode | May search | Never |
+|---|---|---|
+| `tutoring` (teaching, chatbot, hints) | theory, example, misconception, facts | solutions, rubrics, exercises |
+| `practical` (generating questions) | theory, facts, misconception, exercise (as style examples) | solutions, rubrics |
+| `grading` | solution, rubric, facts, theory, **only for the named concept** | searching answer keys across a module |
+
+Callers can narrow a mode's sections (the question generator searches theory for grounding and exercises for style separately) but can never widen it: asking for a forbidden type raises an error. Grading also has an exact lookup, `question_materials`, which returns one authored question with its solution and the rubric entry covering it.
+
+Checked against the real index with every one of the 143 practice questions pasted verbatim as the query: 0 answer keys returned in tutoring or question generation, 0 cross-concept results in grading, and all 143 questions resolve to their solution and (when free-form) their rubric.
+
+```bash
+uv run python -m app.retrieval.cli search "difference between while and do-while"
+uv run python -m app.retrieval.cli search "..." --mode practical --concept prog.loops
+uv run python -m app.retrieval.cli question prog.loops 8      # question + solution + rubric
+```
+
+Not yet exposed over HTTP: a `/retrieve` route would need its own authorisation so a student can never reach `grading` mode.
+
 ## Schemas and migrations
 
 This service owns two schemas: `content` (indexed course material: `units`, `chunks`) and `tutor` (runtime data: `gate_events` now, sessions and attempts from P2). Both are migrated from here, with the Alembic version table in `tutor`:

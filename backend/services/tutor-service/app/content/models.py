@@ -49,6 +49,17 @@ LEVEL_QUESTION_TYPES = {
 }
 FIRST_RUBRIC_LEVEL = 3
 
+
+def question_chunk_id(unit_id: str, section_type: str, number: int) -> str:
+    """The ID of an exercise, solution or rubric chunk for a question number.
+
+    One definition, because the chunker writes these IDs and the retriever looks
+    them up by them. For a rubric entry that covers several questions the number is
+    the first one it names.
+    """
+    return f"{unit_id}#{section_type}-q{number:02d}"
+
+
 KIND_CONCEPT = "concept"
 KIND_MODULE_INTRO = "module_introduction"
 

@@ -32,6 +32,7 @@ from app.content.models import (
     Chunk,
     Section,
     Unit,
+    question_chunk_id,
 )
 
 # Merge adjacent theory blocks while the result stays at or under this many words.
@@ -72,7 +73,7 @@ def chunk_unit(unit: Unit) -> list[Chunk]:
             return
         kind = section.section_type
         if question_nos:
-            chunk_id = f"{unit.unit_id}#{kind}-q{question_nos[0]:02d}"
+            chunk_id = question_chunk_id(unit.unit_id, kind, question_nos[0])
         else:
             counters[kind] += 1
             chunk_id = f"{unit.unit_id}#{kind}-{counters[kind]:02d}"
