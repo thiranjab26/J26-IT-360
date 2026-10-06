@@ -31,7 +31,8 @@ Preparation material for every item below (question lists, request text, checkli
   - ESLint 10 flat config with typescript-eslint `strictTypeChecked`; Prettier last. Vitest 5 needs Node `^22.12 || ^24`, so the package `engines` is `^22.13.0 || >=24.0.0` (stricter than the root's `>=20`). Playwright e2e runs against `vite build && vite preview` with a fake camera; Chromium only for now, Firefox/Edge come with the bench (A7).
 - [x] npm scripts: `dev`, `build`, `preview`, `typecheck`, `lint`, `test`, `test:e2e`, `bench`
   - Run with `pnpm`. Added `check` (typecheck + lint + unit tests = definition of done) and `format`. `bench` is a stub that exits 1 with "not implemented" until A7, so a missing benchmark can never look like a pass.
-- [ ] `.gitignore` covering `data/`, `training/data/`, model caches, `.env`
+- [x] `.gitignore` covering `data/`, `training/data/`, model caches, `.env`
+  - In `packages/load-sensor/.gitignore` and `research/c2-load/.gitignore` (root file is leader-owned and already covers `.env*`). Also ignores all video files and test images (invariant 2), and downloaded FaceMesh/WASM assets. Committed on purpose: `public/models/MANIFEST.json` (source + checksum lock for `fetch-models`) and our trained classifier, whose `.bin` shards are re-included against the root `*.bin` rule. Rules verified with `git check-ignore`.
 - [ ] ESLint rules: no CDN hostnames in `src/`; no network APIs in `src/core` outside the model loader; `events/` and `recorder/` may not import `camera/`
 - [ ] CI workflow (GitHub Actions): typecheck, lint, unit tests on push
 

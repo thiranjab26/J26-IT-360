@@ -1,0 +1,18 @@
+# C2 training and evaluation. Root .gitignore already covers .venv/, caches,
+# notebooks checkpoints and research/**/results/.
+
+# Participant data and public datasets never enter git (CLAUDE.md invariant 7;
+# dataset licences forbid redistribution).
+data/
+training/data/
+
+# Model training artefacts. The shipped TF.js export is committed under
+# packages/load-sensor/public/models/classifier/ instead.
+*.h5
+*.keras
+*.pkl
+*.joblib
+saved_model/
+checkpoints/
+logs/
+mlruns/
