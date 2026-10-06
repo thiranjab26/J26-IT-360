@@ -35,7 +35,8 @@ Preparation material for every item below (question lists, request text, checkli
   - In `packages/load-sensor/.gitignore` and `research/c2-load/.gitignore` (root file is leader-owned and already covers `.env*`). Also ignores all video files and test images (invariant 2), and downloaded FaceMesh/WASM assets. Committed on purpose: `public/models/MANIFEST.json` (source + checksum lock for `fetch-models`) and our trained classifier, whose `.bin` shards are re-included against the root `*.bin` rule. Rules verified with `git check-ignore`.
 - [x] ESLint rules: no CDN hostnames in `src/`; no network APIs in `src/core` outside the model loader; `events/` and `recorder/` may not import `camera/`
   - `packages/load-sensor/eslint/privacy.js`, proven by 35 cases in `tests/unit/eslint-privacy.test.ts` (rules switched off → 20 fail). Extras beyond the item: frame-export ban (`toDataURL`, `toBlob`, `convertToBlob`, `captureStream`) in all of `src/` (invariant 1); `events/`/`recorder/` also barred from `landmarks/` (the 478-point mesh must not reach the recorder, §9); `index.html` checked for CDN hosts. The exempt loader is `src/core/model-loader.ts` (not created yet). Flat config replaces rule options per file, so core repeats the `src/` selectors.
-- [ ] CI workflow (GitHub Actions): typecheck, lint, unit tests on push
+- [x] CI workflow (GitHub Actions): typecheck, lint, unit tests on push
+  - `.github/workflows/c2-load-sensor.yml`, path-filtered to the package and lockfile, Node 24, actions pinned to commit SHAs, read-only token. Passes actionlint and a local `--frozen-lockfile` run; not yet run on GitHub. `.github/` is leader-owned, so the PR needs the leader's review. E2E joins CI with the privacy tests (A7).
 
 ### A2. Camera [FR1, NFR4]
 
