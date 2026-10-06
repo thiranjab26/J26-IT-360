@@ -27,7 +27,6 @@
 /research/c1-curriculum/                    @owner-c1
 
 /backend/services/load-service/             @owner-c2
-/packages/load-sensor/                      @owner-c2
 /frontend/src/features/cognitive-load/      @owner-c2
 /research/c2-load/                          @owner-c2
 
