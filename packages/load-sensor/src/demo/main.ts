@@ -8,7 +8,7 @@ if (app) {
   heading.textContent = 'AdaptLearn C02 — Load sensor';
 
   const status = document.createElement('p');
-  status.dataset['testid'] = 'sensor-status';
+  status.dataset.testid = 'sensor-status';
   status.textContent = 'Sensing is off.';
 
   app.append(heading, status);
