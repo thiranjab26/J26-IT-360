@@ -19,6 +19,11 @@ pnpm dev          # demo / debug page on http://localhost:5174 (camera needs loc
 pnpm build        # production build of the demo page
 pnpm preview      # serve the production build on http://localhost:4174
 pnpm typecheck    # tsc for browser code and for node-side code
+pnpm lint         # eslint + prettier --check
+pnpm test         # vitest unit tests
+pnpm test:e2e     # playwright against the production build, fake camera
+pnpm check        # typecheck + lint + test: run before calling a change done
+pnpm bench        # latency and memory benchmark (TODO A7; exits 1 until then)
 ```
 
 ## Layout

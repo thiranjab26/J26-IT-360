@@ -29,7 +29,8 @@ Preparation material for every item below (question lists, request text, checkli
   - Lives at `packages/load-sensor/` as pnpm workspace package `@adaptlearn/load-sensor` (ADR 0004); training goes in `research/c2-load/`. TypeScript pinned to 5.9.3 and `@types/node` to 22.20.4 to match the rest of the workspace — newer versions changed peer resolution for teammates' packages, and typescript-eslint does not yet support TS 7. Use `pnpm`, not `npm`; on this machine `corepack pnpm` (no admin rights for `corepack enable`).
 - [x] ESLint + Prettier; Vitest; Playwright
   - ESLint 10 flat config with typescript-eslint `strictTypeChecked`; Prettier last. Vitest 5 needs Node `^22.12 || ^24`, so the package `engines` is `^22.13.0 || >=24.0.0` (stricter than the root's `>=20`). Playwright e2e runs against `vite build && vite preview` with a fake camera; Chromium only for now, Firefox/Edge come with the bench (A7).
-- [ ] npm scripts: `dev`, `build`, `preview`, `typecheck`, `lint`, `test`, `test:e2e`, `bench`
+- [x] npm scripts: `dev`, `build`, `preview`, `typecheck`, `lint`, `test`, `test:e2e`, `bench`
+  - Run with `pnpm`. Added `check` (typecheck + lint + unit tests = definition of done) and `format`. `bench` is a stub that exits 1 with "not implemented" until A7, so a missing benchmark can never look like a pass.
 - [ ] `.gitignore` covering `data/`, `training/data/`, model caches, `.env`
 - [ ] ESLint rules: no CDN hostnames in `src/`; no network APIs in `src/core` outside the model loader; `events/` and `recorder/` may not import `camera/`
 - [ ] CI workflow (GitHub Actions): typecheck, lint, unit tests on push
