@@ -28,6 +28,11 @@ Run your own service, generate, commit the result into `frontend/src/shared/api/
 | `tutor.v_attempt_outcomes` | C3 | C1 | view |
 | `curriculum.v_mastery` | C1 | C3 | view |
 | `curriculum.v_next_topic` | C1 | C3 | view |
+| `curriculum.v_topic_mastery` | C1 | C3 | view (proposed v1) |
+| `curriculum.v_verification_candidates` | C1 | C4 | view (proposed v1) |
+| `tutor.v_session_exits` | C3 | C1 | view (proposed v1) |
+| `load.v_current_load` | C2 | C1 | view (proposed v1) |
+| `viva.v_review_flags` | C4 | C1 | view (proposed v1) |
 | `load-signal` | C2 | C3 | HTTP push to `tutor-service POST /internal/load` |
 
 The load signal is the only API contract between components because it is real time and changes within a session. Everything else is read from the shared database.
