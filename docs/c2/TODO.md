@@ -14,6 +14,8 @@ Goal: open a page, opt in, see live features and a load state, with privacy and 
 
 ### A0. Things to start today because they have lead time 🧑
 
+Preparation material for every item below (question lists, request text, checklists, teammate message, label brief, laptop spec) is in [`A0-prep.md`](A0-prep.md). Boxes stay unticked until the human step is done.
+
 - [ ] 🧑 Confirm ethics clearance status. No participant data is collected before it is granted.
 - [ ] 🧑 Request access to mEBAL2 and ADABase (licence/request forms).
 - [ ] 🧑 Download the Kaggle E-Learning Cognitive Load dataset and check what it actually contains (video? landmarks? tabular?).
