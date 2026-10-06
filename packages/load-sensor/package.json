@@ -1,0 +1,21 @@
+{
+  "name": "@adaptlearn/load-sensor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "C02 cognitive load detection: privacy-first, in-browser webcam load sensor for AdaptLearn.",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "typescript": "5.9.3",
+    "vite": "8.3.3"
+  }
+}

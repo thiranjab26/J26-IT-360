@@ -25,7 +25,8 @@ Preparation material for every item below (question lists, request text, checkli
 
 ### A1. Scaffold
 
-- [ ] Vite + TypeScript (strict) project with the folder layout in CLAUDE.md
+- [x] Vite + TypeScript (strict) project with the folder layout in CLAUDE.md
+  - Lives at `packages/load-sensor/` as pnpm workspace package `@adaptlearn/load-sensor` (ADR 0004); training goes in `research/c2-load/`. TypeScript pinned to 5.9.3 and `@types/node` to 22.20.4 to match the rest of the workspace — newer versions changed peer resolution for teammates' packages, and typescript-eslint does not yet support TS 7. Use `pnpm`, not `npm`; on this machine `corepack pnpm` (no admin rights for `corepack enable`).
 - [ ] ESLint + Prettier; Vitest; Playwright
 - [ ] npm scripts: `dev`, `build`, `preview`, `typecheck`, `lint`, `test`, `test:e2e`, `bench`
 - [ ] `.gitignore` covering `data/`, `training/data/`, model caches, `.env`
