@@ -1,10 +1,13 @@
 {
-  // Node-side TypeScript: unit and e2e tests, scripts, and tool configs.
+  // Node-side TypeScript: unit and e2e tests, scripts, tool configs and the
+  // privacy lint rules (eslint/*.js, checked via JSDoc types).
   // Tests import browser code from src/, so the DOM lib is included here too.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["node"]
+    "types": ["node"],
+    "allowJs": true,
+    "checkJs": true
   },
-  "include": ["tests", "scripts", "*.config.ts"]
+  "include": ["tests", "scripts", "eslint", "*.config.ts"]
 }
