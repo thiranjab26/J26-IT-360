@@ -1,0 +1,36 @@
+# C2 load sensor. Root .gitignore already covers node_modules/, dist/, .env*, *.bin.
+
+# Tool output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.cache/
+
+# Participant and session data (CLAUDE.md invariant 7). Study-mode exports,
+# NASA-TLX answers and anything recorded from a person never enter git.
+data/
+*.session.json
+
+# Raw video never enters git, not even as a test fixture (invariant 2).
+# Fake-camera clips for e2e/bench are generated or kept outside the repo.
+*.y4m
+*.mjpeg
+*.mp4
+*.webm
+*.avi
+*.mov
+*.mkv
+tests/**/*.png
+tests/**/*.jpg
+tests/**/*.jpeg
+
+# Third-party model and runtime assets are downloaded by `pnpm fetch-models`
+# (checksummed, source recorded in MANIFEST.json), not committed.
+public/models/facemesh/*
+!public/models/facemesh/.gitkeep
+public/wasm/
+
+# Our own trained classifier is a deliverable and is committed. Re-include its
+# weight shards, which the root *.bin rule would otherwise drop.
+!public/models/classifier/*.bin
