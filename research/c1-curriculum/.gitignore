@@ -1,0 +1,24 @@
+# Datasets, derived data and trained models never go into git.
+# Junyi, ASSISTments and EdNet carry research-use licences; checkpoints are large.
+data/
+junyi/
+*.rar
+*.zip
+*.parquet
+*.npz
+*.pt
+*.pth
+*.pkl
+
+# CSVs are data, so they are ignored everywhere except annotation/, where the
+# small lecturer edge-review sheets are the evidence behind the kappa result.
+*.csv
+!annotation/**/*.csv
+
+# Generated outputs: regenerate them from the notebook or script that made them.
+results/*
+!results/.gitkeep
+
+# Notebook and Python noise.
+.ipynb_checkpoints/
+__pycache__/
