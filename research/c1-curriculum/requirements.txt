@@ -1,0 +1,14 @@
+# Libraries the C1 research notebooks need. Colab already ships most of them;
+# the notebooks install what is missing. After a successful run, record the
+# exact versions in that run's manifest.json (each notebook does this).
+EduData>=0.0.18
+pandas>=2.2
+numpy>=1.26
+pyarrow>=15
+networkx>=3.2
+scikit-learn>=1.4
+scipy>=1.11
+pyBKT>=1.4
+torch>=2.2
+torch-geometric>=2.5
+neo4j>=5.20
