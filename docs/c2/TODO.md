@@ -22,6 +22,8 @@ Preparation material for every item below (question lists, request text, checkli
 - [ ] 🧑 Ask C01/C03/C04 owners: where does your component run (same page / other tab / server)? Share the event schema in ARCHITECTURE.md §8 and agree the additive fields and `null` handling.
 - [ ] 🧑 Decide the label definition with the supervisor (ARCHITECTURE.md §12).
 - [ ] 🧑 Identify the weakest laptop available for benchmarking and note its spec.
+- [ ] 🧑 **Camera-required policy (decided by owner 2026-10-07, needs approval):** you want study pages to require the camera. This breaks invariant 4 ("opt-in, off by default, AdaptLearn works with it off"), contradicts the survey finding (45.8 % not comfortable) and changes what the ethics application must say. Get written OK from the supervisor and the ethics reviewer, then update CLAUDE.md invariant 4. Until then the code ships `cameraPolicy: 'optional'` (A5) and `'required'` stays off.
+- [ ] 🧑 Share the proposed wellbeing fields (`presence`, `fatigue`, `affect`, `strain`; ARCHITECTURE.md §8a) with C01/C03/C04 and agree names and meanings (invariant 5).
 
 ### A1. Scaffold
 
@@ -74,6 +76,8 @@ Preparation material for every item below (question lists, request text, checkli
 - [ ] Iris offset → gaze proxy; dispersion
 - [ ] Head pose (yaw/pitch/roll) from landmarks
 - [ ] Brow raise, brow furrow; mouth-open, lip-press (expression proxies)
+- [ ] Drowsiness signals (ARCHITECTURE.md §8a): PERCLOS (share of time eyes ≥ 80 % closed over 60 s), long-blink count (> 500 ms), yawn events (sustained mouth-open), head-nod events (pitch drop + recovery). Thresholds baseline-relative and commented.
+- [ ] Presence signals: face present / looking away (head pose or gaze off-screen for > N s) / absent (no face > 2 s)
 - [ ] Per-second aggregator → feature vector (F=14) + `validRatio`
 - [ ] 30 s ring buffer; face-loss rules from ARCHITECTURE.md §5.5
 - [ ] Baseline calibration (60 s) and z-scoring
@@ -91,6 +95,9 @@ Preparation material for every item below (question lists, request text, checkli
 - [ ] `BroadcastChannel` publisher
 - [ ] Placeholder classifier: a transparent rule (e.g. weighted z-scores) clearly labelled `model_version: "heuristic-0"` so nobody mistakes it for the trained model
 - [ ] Heuristic `engagement` and `frustration`
+- [ ] Heuristic wellbeing fields (§8a), each clearly labelled heuristic: `presence`, `fatigue` (Low/Medium/High), `affect` (coarse mood from expression proxies, switchable with `useExpressionFeatures` for the FR3 ablation), `strain` (accumulated load over the day: time on task, time at High load, fatigue trend, minutes since last break) + `suggest_break` boolean. Day totals are derived numbers kept on the device only.
+- [ ] `cameraPolicy: 'optional' | 'required'` option; default `'optional'`. `'required'` only after the A0 approval item is ticked.
+- [ ] **Single integration file** `packages/load-sensor/src/signals.ts`: the one module teammates import. Exports the event types, `subscribe(callback)`, one helper per signal (`onLoadChange`, `onPresenceChange`, `onFatigueChange`, `onAffectChange`, `onStrainChange`), `getLatestSignal()`, and the `BroadcastChannel` name for other tabs/iframes. Documented field by field in `INTEGRATION.md`. HTTP endpoints in `backend/services/load-service/` only if a teammate's component runs on a server (A0 question).
 - [ ] EMA smoothing + hysteresis, unit-tested for no flapping on noisy input
 - [ ] `INTEGRATION.md` for teammates: install, 10-line example, field meanings, what `null` means
 - [ ] Tiny mock consumer page that subscribes and prints events (give this to teammates)
@@ -99,6 +106,7 @@ Preparation material for every item below (question lists, request text, checkli
 
 - [ ] Plain-language consent screen: what is processed, that nothing is uploaded or recorded, how to turn it off
 - [ ] Sensing off by default; visible on/off toggle; visible "camera active" indicator
+  - If `cameraPolicy: 'required'` is approved (A0), this becomes a "turn on the camera to start studying" gate instead of an off-by-default toggle; the indicator and the off switch stay.
 - [ ] App remains usable with sensing off
 - [ ] Short calibration prompt ("look at the screen normally for a minute")
 

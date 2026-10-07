@@ -218,6 +218,37 @@ sensor.getState();         // last event, synchronously
 - Cross-tab / iframe: `BroadcastChannel('adaptlearn.load-state')`.
 - To a backend: **not done by the core.** If a teammate's server needs the signal, their integration code forwards the JSON event. Only the event object crosses the network — it contains no image or landmark data. Keep that boundary visible so the privacy claim stays easy to audit.
 
+### 8a. Wellbeing signals (proposed, additive)
+
+Requested by the C2 owner on 2026-10-07 so that C01/C03/C04 can adapt when a learner is away, drowsy, upset or worn out after a long day. All are **documented heuristics**, not model outputs, and need agreement from the consumers before anyone relies on them (invariant 5). Every one is `null` when sensing is off or unreliable.
+
+```ts
+// additive, proposed:
+presence: 'present' | 'away' | 'absent' | null;
+fatigue: 'Low' | 'Medium' | 'High' | null;
+affect: 'neutral' | 'frustrated' | 'confused' | null;
+strain: 'Low' | 'Medium' | 'High' | null;
+suggest_break: boolean | null;
+```
+
+| Field | Built from | Notes |
+|---|---|---|
+| `presence` | face present; head pose / gaze off-screen for > N s **(tune)**; no face > 2 s | `absent` matches `status: "no_face"`. |
+| `fatigue` | PERCLOS over 60 s (eyes ≥ 80 % closed), long blinks > 500 ms, blink-rate trend, yawns, head nods | Standard drowsiness indicators from driver-monitoring work; thresholds relative to the learner's own baseline. A webcam cannot prove sleep: say "drowsy", never "asleep". |
+| `affect` | brow furrow, brow raise, lip press, mouth open vs baseline | Coarse and weak; part of the FR3 ablation (`useExpressionFeatures`). A real emotion model stays in the parking lot. |
+| `strain` | time on task today, time at High load, fatigue trend, minutes since last break | Covers "many assignments and exams in one day". Day totals are derived numbers kept on the device only, never frames or landmarks. C01/C04 know the exam/assignment schedule and may combine it with this. |
+| `suggest_break` | `strain` High, or `fatigue` High for > N min **(tune)** | Advice for the consumer, not an action C02 takes. |
+
+Evaluation: the pilot NASA-TLX (B1) has Effort and Frustration subscales; add one self-report "how tired are you?" item after each block so `fatigue` can be checked against something. Without it, report these fields as unvalidated.
+
+### Single integration file
+
+Teammates import one module, `packages/load-sensor/src/signals.ts`, which re-exports the event type, `subscribe`, per-signal helpers (`onLoadChange`, `onPresenceChange`, `onFatigueChange`, `onAffectChange`, `onStrainChange`), `getLatestSignal()` and the `BroadcastChannel` name. `INTEGRATION.md` documents every field. Server-side consumers, if any, get the same JSON from `backend/services/load-service/`; only the event crosses the network.
+
+### Camera policy
+
+The owner wants studying to require the camera. That conflicts with invariant 4 and needs supervisor and ethics approval first (TODO A0). Until then `createLoadSensor({ cameraPolicy })` defaults to `'optional'`; `'required'` is implemented but not enabled.
+
 ## 9. Privacy architecture (FR7, NFR2)
 
 Defence in depth, each layer independently checkable:
