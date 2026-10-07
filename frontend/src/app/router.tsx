@@ -2,6 +2,7 @@ import { Navigate, createBrowserRouter } from 'react-router-dom';
 
 import { authRoutes } from '@/features/auth';
 import { tutorRoutes } from '@/features/tutor';
+import { vivaRoutes } from '@/features/viva';
 import { RequireAuth } from './RequireAuth';
 import { StudentLayout } from './layouts/StudentLayout';
 
@@ -11,6 +12,8 @@ import { StudentLayout } from './layouts/StudentLayout';
  */
 export const router = createBrowserRouter([
   ...authRoutes,
+  // C4 viva uses its own login for now, so it is mounted outside RequireAuth.
+  ...vivaRoutes,
   {
     element: <RequireAuth />,
     children: [
