@@ -1,0 +1,50 @@
+[project]
+name = "viva-service"
+version = "0.1.0"
+description = "C4 Intelligent Viva System. Adaptive spoken viva with knowledge and communication gap evidence."
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.13",
+    "httpx>=0.27",
+    "python-multipart>=0.0.12",
+    "scikit-learn>=1.5",
+    "pypdf>=5.0",
+]
+
+[project.optional-dependencies]
+# Spoken answers: audio decoding, Silero VAD pauses and the local Whisper fallback.
+speech = [
+    "av>=13",
+    "numpy>=1.26",
+    "faster-whisper>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.27",
+    "ruff>=0.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# ponytail: the ported prompt strings and rule tables are long single lines; wrap them
+# when the logic is next edited, then remove this ignore.
+ignore = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Header", "fastapi.Query", "fastapi.Path", "fastapi.File"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
