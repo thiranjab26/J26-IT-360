@@ -83,19 +83,29 @@ export class TfjsFaceMeshProvider implements LandmarkProvider {
   // in the interface is not needed here.
   async estimate(frame: VideoFrameSource): Promise<FaceResult | null> {
     const detector = this.#detector;
-    if (!detector) throw new Error('TfjsFaceMeshProvider.estimate() called before init()');
+    const tf = this.#tf;
+    if (!detector || !tf) throw new Error('TfjsFaceMeshProvider.estimate() called before init()');
     const width = frame.videoWidth;
     const height = frame.videoHeight;
     if (width === 0 || height === 0) return null;
 
-    // staticImageMode false: after a face is found, the next frame's region of
-    // interest comes from the previous landmarks and the detector is skipped,
-    // which is both faster and steadier for video. The library disposes its own
-    // intermediate tensors.
-    const faces = await detector.estimateFaces(frame, {
-      flipHorizontal: false,
-      staticImageMode: false,
-    });
+    // The library sizes a <video> input by its `width`/`height` *attributes*
+    // (image_utils.getImageSize), which are 0 unless set, so it would see a
+    // 0×0 image and never find a face. A pixel tensor carries the real frame
+    // size in its shape. It stays on the GPU/WASM heap and is disposed below.
+    const pixels = tf.browser.fromPixels(frame);
+    let faces: Awaited<ReturnType<Detector['estimateFaces']>>;
+    try {
+      // staticImageMode false: after a face is found, the next frame's region
+      // of interest comes from the previous landmarks and the detector is
+      // skipped, which is both faster and steadier for video.
+      faces = await detector.estimateFaces(pixels, {
+        flipHorizontal: false,
+        staticImageMode: false,
+      });
+    } finally {
+      pixels.dispose();
+    }
     const face = faces[0];
     if (!face) return null;
     const landmarks = keypointsToLandmarks(face.keypoints, width, height);

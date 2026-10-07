@@ -8,8 +8,12 @@ const mocks = vi.hoisted(() => {
     estimateFaces: vi.fn(),
     dispose: vi.fn(),
   };
+  // Stands in for a Tensor3D: shape is what the library sizes the image by.
+  const pixels = { shape: [480, 640, 3], dispose: vi.fn() };
   return {
     detector,
+    pixels,
+    fromPixels: vi.fn(() => pixels),
     createDetector: vi.fn(() => Promise.resolve(detector)),
     setWasmPaths: vi.fn(),
     setBackend: vi.fn((name: string) => Promise.resolve(name === 'webgl')),
@@ -22,6 +26,7 @@ vi.mock('@tensorflow/tfjs-core', () => ({
   getBackend: mocks.getBackend,
   ready: () => Promise.resolve(),
   memory: () => ({ numTensors: 7 }),
+  browser: { fromPixels: mocks.fromPixels },
 }));
 vi.mock('@tensorflow/tfjs-backend-webgl', () => ({}));
 vi.mock('@tensorflow/tfjs-backend-wasm', () => ({ setWasmPaths: mocks.setWasmPaths }));
@@ -85,7 +90,7 @@ describe('TfjsFaceMeshProvider.estimate', () => {
 
     const result = await provider.estimate(video);
 
-    expect(mocks.detector.estimateFaces).toHaveBeenCalledWith(video, {
+    expect(mocks.detector.estimateFaces).toHaveBeenCalledWith(mocks.pixels, {
       flipHorizontal: false,
       staticImageMode: false,
     });
@@ -93,6 +98,28 @@ describe('TfjsFaceMeshProvider.estimate', () => {
     expect(Array.from(result?.landmarks.slice(0, 3) ?? [])).toEqual([
       0.5, 0.25, 0.10000000149011612,
     ]);
+  });
+
+  it('passes a pixel tensor, not the <video>, and disposes it (regression: 0×0 image)', async () => {
+    // face-landmarks-detection sizes a <video> by its width/height attributes,
+    // which are 0 on a normal page; with the element, no face is ever found.
+    const provider = new TfjsFaceMeshProvider();
+    await provider.init();
+    mocks.pixels.dispose.mockClear();
+    mocks.detector.estimateFaces.mockResolvedValue([]);
+    await provider.estimate(video);
+    expect(mocks.fromPixels).toHaveBeenCalledWith(video);
+    expect(mocks.detector.estimateFaces.mock.calls[0]?.[0]).toBe(mocks.pixels);
+    expect(mocks.pixels.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('disposes the pixel tensor even when inference throws', async () => {
+    const provider = new TfjsFaceMeshProvider();
+    await provider.init();
+    mocks.pixels.dispose.mockClear();
+    mocks.detector.estimateFaces.mockRejectedValue(new Error('context lost'));
+    await expect(provider.estimate(video)).rejects.toThrow('context lost');
+    expect(mocks.pixels.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('returns null when no face is found', async () => {
