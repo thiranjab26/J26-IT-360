@@ -1,3 +1,4 @@
+import { FEATURE_LANDMARKS } from '../core/features/index.js';
 import { LANDMARK_COUNT, LANDMARK_STRIDE, type FaceResult } from '../core/landmarks/index.js';
 
 /** First iris landmark: points 468–477 are the two irises (5 each) added by refinement. */
@@ -20,6 +21,9 @@ export class LandmarkOverlay {
     this.#ctx = ctx;
   }
 
+  /** When true, the landmarks the features use are ringed and numbered for checking. */
+  featurePoints = false;
+
   draw(face: FaceResult | null, width: number, height: number): void {
     if (this.#canvas.width !== width || this.#canvas.height !== height) {
       this.#canvas.width = width;
@@ -30,13 +34,45 @@ export class LandmarkOverlay {
     if (!face) return;
 
     const { landmarks } = face;
+    const at = (i: number): [number, number] => [
+      (landmarks[i * LANDMARK_STRIDE] ?? 0) * width,
+      (landmarks[i * LANDMARK_STRIDE + 1] ?? 0) * height,
+    ];
     const r = Math.max(1, Math.round(width / 400));
+    ctx.globalAlpha = this.featurePoints ? 0.35 : 0.9;
     for (let i = 0; i < LANDMARK_COUNT; i += 1) {
-      const o = i * LANDMARK_STRIDE;
-      const x = (landmarks[o] ?? 0) * width;
-      const y = (landmarks[o + 1] ?? 0) * height;
-      ctx.fillStyle = i >= FIRST_IRIS_INDEX ? '#ff3b6b' : '#28e0a0';
+      const [x, y] = at(i);
+      ctx.fillStyle = i >= FIRST_IRIS_INDEX ? '#ff5d87' : '#2ee6a6';
       ctx.fillRect(x - r / 2, y - r / 2, r, r);
+    }
+    ctx.globalAlpha = 1;
+    if (!this.featurePoints) return;
+
+    // Feature landmarks: ring + index number, so each constant in
+    // landmark-indices.ts can be checked against a real face (TODO A4).
+    const ring = Math.max(3, Math.round(width / 160));
+    ctx.font = `600 ${String(Math.max(9, Math.round(width / 70)))}px ui-monospace, Consolas, monospace`;
+    ctx.textBaseline = 'middle';
+    for (const { index } of FEATURE_LANDMARKS) {
+      const [x, y] = at(index);
+      ctx.beginPath();
+      ctx.arc(x, y, ring, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd166';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#0b0d12';
+      ctx.stroke();
+      // The canvas is mirrored with CSS like the preview; un-mirror the text.
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(-1, 1);
+      const label = String(index);
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(11, 13, 18, 0.78)';
+      ctx.fillRect(ring + 2, -8, tw + 6, 16);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(label, ring + 5, 0);
+      ctx.restore();
     }
   }
 

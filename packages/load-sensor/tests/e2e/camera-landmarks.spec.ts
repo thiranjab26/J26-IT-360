@@ -50,6 +50,11 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
       .toMatch(/ms$/);
     await expect(page.getByTestId('errors')).toHaveText('0');
 
+    // A4: landmark samples reach the feature pipeline. The fake camera shows no
+    // face, so presence must turn "Absent" after 2 s and calibration must not advance.
+    await expect(page.getByTestId('kpi-presence')).toHaveText('Absent', { timeout: 30_000 });
+    await expect(page.getByTestId('calibration')).toContainText('0 / 60 s');
+
     // FR7 / NFR2: everything the page loaded came from its own origin…
     const origin = new URL(baseURL ?? '').origin;
     const foreign = requests.map((r) => r.url()).filter((u) => new URL(u).origin !== origin);

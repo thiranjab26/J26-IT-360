@@ -1,6 +1,7 @@
-// Demo and debug page for the load sensor (TODO A2–A3): camera control and a
-// live landmark overlay with fps, backend and frame time. The consent screen
-// and feature charts come with TODO A4–A6.
+// Demo and debug page for the load sensor (TODO A2–A4): camera control, a
+// live landmark overlay with fps, backend and frame time, and the Signals
+// dashboard (calibration, KPIs, EAR trace, per-second features). The consent
+// screen comes with TODO A6.
 //
 // Sensing is off until the user presses "Turn sensing on" (invariant 4).
 
@@ -11,7 +12,10 @@ import {
   TfjsFaceMeshProvider,
   UnsupportedBackendError,
 } from '../core/landmarks/index.js';
+import { FeaturePipeline } from '../core/window/index.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
+import { FixtureRecorder } from './fixture-recorder.js';
+import { SignalsPanel } from './signals-panel.js';
 
 const STATUS_TEXT: Record<CameraStatus, string> = {
   idle: 'Sensing is off.',
@@ -169,7 +173,17 @@ function mount(root: HTMLElement): void {
   );
   footer.className = 'footer';
 
-  root.append(topbar, layout, footer);
+  // ── Signals dashboard (A4) ──
+  const signals = new SignalsPanel();
+  const pointsSwitch = toggle('Feature points', 'toggle-points', false);
+  const expressionSwitch = toggle('Expression features', 'toggle-expression', true);
+  expressionSwitch.root.title =
+    'FR3 ablation: off zeroes mouth-open and lip-thickness. Changing it restarts calibration.';
+  signals.toolbar.prepend(pointsSwitch.root, expressionSwitch.root);
+  // Development builds only: the recorder is tree-shaken out of production.
+  const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
+
+  root.append(topbar, layout, signals.element, ...(recorder ? [recorder.element] : []), footer);
 
   // ── Pipeline ──
   const camera = new Camera({ video });
@@ -179,6 +193,29 @@ function mount(root: HTMLElement): void {
   });
   const tracker = new LandmarkTracker(camera, provider);
   const overlay = new LandmarkOverlay(canvas);
+  let pipeline = createPipeline(true);
+
+  function createPipeline(useExpressionFeatures: boolean): FeaturePipeline {
+    const p = new FeaturePipeline({ useExpressionFeatures });
+    p.onFrame((f) => {
+      signals.pushFrame(f);
+    });
+    p.onSecond((s) => {
+      signals.pushSecond(s);
+      signals.setState(p.state);
+    });
+    return p;
+  }
+
+  pointsSwitch.input.addEventListener('change', () => {
+    overlay.featurePoints = pointsSwitch.input.checked;
+  });
+  expressionSwitch.input.addEventListener('change', () => {
+    // A different feature definition needs a fresh baseline (FeaturePipelineOptions).
+    pipeline = createPipeline(expressionSwitch.input.checked);
+    signals.reset();
+    if (camera.status === 'active' || camera.status === 'paused') signals.setState(pipeline.state);
+  });
 
   let cameraFrames = 0;
   let face = 'not tracking';
@@ -192,6 +229,10 @@ function mount(root: HTMLElement): void {
   tracker.onSample((sample) => {
     face = sample.face ? 'found' : 'none';
     overlay.draw(sample.face, video.videoWidth, video.videoHeight);
+    const aspect = video.videoWidth > 0 ? video.videoWidth / video.videoHeight : 4 / 3;
+    const landmarks = sample.face?.landmarks ?? null;
+    pipeline.push(sample.tMs, landmarks, aspect);
+    recorder?.push(sample.tMs, landmarks, aspect);
   });
   tracker.onError((error) => {
     console.warn('Landmark inference failed for one frame', error);
@@ -202,7 +243,11 @@ function mount(root: HTMLElement): void {
       tracker.stop();
       overlay.clear();
       face = 'not tracking';
+      // Sensing ended: the next session gets a fresh baseline.
+      pipeline.reset();
+      signals.reset();
     }
+    if (next === 'active' && !pipeline.baseline.ready) signals.setState(pipeline.state);
     if (error) console.info(`Camera ${error.status}: ${error.name} — ${error.message}`);
     render();
   });
@@ -387,4 +432,24 @@ function button(label: string, testId: string, svg: string, variant?: string): H
   b.dataset.testid = testId;
   b.append(icon(svg), el('span', label));
   return b;
+}
+
+/** Accessible switch: a real checkbox with role="switch", styled as a toggle. */
+function toggle(
+  label: string,
+  testId: string,
+  checked: boolean,
+): { root: HTMLLabelElement; input: HTMLInputElement } {
+  const root = el('label');
+  root.className = 'switch';
+  const input = el('input');
+  input.type = 'checkbox';
+  input.checked = checked;
+  input.setAttribute('role', 'switch');
+  input.dataset.testid = testId;
+  const track = el('span');
+  track.className = 'switch-track';
+  track.setAttribute('aria-hidden', 'true');
+  root.append(input, track, el('span', label));
+  return { root, input };
 }
