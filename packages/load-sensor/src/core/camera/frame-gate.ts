@@ -25,6 +25,7 @@ export class FrameGate {
    */
   static readonly EARLY_TOLERANCE = 0.2;
 
+  #targetFps: number;
   #intervalMs: number;
   #nextDueMs = Number.NEGATIVE_INFINITY;
   #busy = false;
@@ -34,15 +35,18 @@ export class FrameGate {
 
   constructor(targetFps: number = FrameGate.DEFAULT_TARGET_FPS) {
     this.#intervalMs = FrameGate.#intervalFor(targetFps);
+    this.#targetFps = targetFps;
   }
 
   get targetFps(): number {
-    return 1000 / this.#intervalMs;
+    // Stored as given: 1000 / (1000 / 15) is 14.999999999999998 in floating point.
+    return this.#targetFps;
   }
 
   /** Changes the rate cap (adaptive rate, ARCHITECTURE.md §4). Takes effect from the next frame. */
   set targetFps(fps: number) {
     this.#intervalMs = FrameGate.#intervalFor(fps);
+    this.#targetFps = fps;
   }
 
   get busy(): boolean {

@@ -45,14 +45,42 @@ export class LandmarkOverlay {
   }
 }
 
-/** A labelled read-out in the debug panel. `testId` is used by the e2e tests. */
+export interface StatRow {
+  /** Used by the e2e tests; keep stable. */
+  readonly testId: string;
+  readonly label: string;
+}
+
+/**
+ * Debug read-outs: headline numbers as tiles, the rest as a key/value list.
+ * Values are updated in place by `testId`.
+ */
 export class StatsPanel {
   readonly #values = new Map<string, HTMLElement>();
 
-  constructor(
-    container: HTMLElement,
-    rows: readonly { readonly testId: string; readonly label: string }[],
-  ) {
+  /** Large tiles for the numbers people watch (fps, frame time). */
+  addTiles(container: HTMLElement, rows: readonly StatRow[]): void {
+    const grid = document.createElement('div');
+    grid.className = 'metrics';
+    for (const { testId, label } of rows) {
+      const tile = document.createElement('div');
+      tile.className = 'metric';
+      const name = document.createElement('p');
+      name.className = 'metric-label';
+      name.textContent = label;
+      const value = document.createElement('p');
+      value.className = 'metric-value';
+      value.dataset.testid = testId;
+      value.textContent = '–';
+      tile.append(name, value);
+      grid.append(tile);
+      this.#values.set(testId, value);
+    }
+    container.append(grid);
+  }
+
+  /** A compact label/value list. */
+  addList(container: HTMLElement, rows: readonly StatRow[]): void {
     const list = document.createElement('dl');
     list.className = 'stats';
     for (const { testId, label } of rows) {
@@ -69,7 +97,10 @@ export class StatsPanel {
 
   set(testId: string, value: string): void {
     const el = this.#values.get(testId);
-    if (el && el.textContent !== value) el.textContent = value;
+    if (el && el.textContent !== value) {
+      el.textContent = value;
+      el.title = value;
+    }
   }
 }
 

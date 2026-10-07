@@ -34,7 +34,7 @@ describe('FrameGate rate cap (target 15 fps)', () => {
   it('can be retargeted (adaptive rate)', () => {
     const gate = new FrameGate();
     gate.targetFps = 10;
-    expect(gate.targetFps).toBeCloseTo(10);
+    expect(gate.targetFps).toBe(10);
   });
 
   it('rejects a non-positive target', () => {
