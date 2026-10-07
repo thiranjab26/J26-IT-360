@@ -8,6 +8,8 @@ to study next with an explanation naming the weak prerequisite behind it.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -16,9 +18,16 @@ from app.api.v1.routes import health
 from app.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
+from app.db.graph_wiring import build_graph_runtime
 
 SERVICE_NAME = "curriculum-service"
 API_PREFIX = "/api/v1/curriculum"
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    app.state.graph_runtime.close()
 
 
 def create_app() -> FastAPI:
@@ -34,7 +43,12 @@ def create_app() -> FastAPI:
         docs_url=None if settings.is_production else "/docs",
         redoc_url=None,
         openapi_url=None if settings.is_production else "/openapi.json",
+        lifespan=lifespan,
     )
+
+    # The graph is loaded on the first request and kept in memory; nothing
+    # connects to a database at startup, so the service starts even when one is down.
+    app.state.graph_runtime = build_graph_runtime(settings)
 
     app.add_middleware(RequestContextMiddleware)
     install_error_handlers(app)
@@ -52,6 +66,7 @@ def create_app() -> FastAPI:
             "environment": settings.environment,
             "port": settings.port,
             "integration_mode": settings.integration_mode,
+            "graph_store": "neo4j" if settings.neo4j_enabled else "postgres-core",
         },
     )
     return app

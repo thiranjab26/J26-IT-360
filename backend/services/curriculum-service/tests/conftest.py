@@ -8,3 +8,8 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("INTEGRATION_MODE", "stub")
+# Environment variables override .env, so a developer's real Neo4j credentials
+# never reach the tests.
+os.environ["CURRICULUM_NEO4J_URI"] = ""
+os.environ["CURRICULUM_NEO4J_USER"] = ""
+os.environ["CURRICULUM_NEO4J_PASSWORD"] = ""

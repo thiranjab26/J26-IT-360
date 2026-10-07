@@ -16,9 +16,23 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | Method | Path | Who | Purpose | Status |
 |---|---|---|---|---|
 | GET | `/health`, `/api/v1/curriculum/health` | public | Liveness | done |
+| GET | `/api/v1/curriculum/graph?module=dsa` | signed in | Prerequisite graph: concepts with depth, edges, stats; a module view keeps its cross-module prerequisites | done |
 
-Arriving next: graph, mastery, recommendations, assessments, gain, feedback,
-and the lecturer cohort and graph-edit routes.
+Arriving next: mastery, recommendations, assessments, gain, feedback, and the
+lecturer cohort and graph-edit routes.
+
+## The prerequisite graph
+
+`app/domain/graph.py` validates the graph (unknown concepts, self-loops,
+cycles) and answers prerequisites, dependents, depth and learning order.
+`app/domain/graph_loader.py` chooses the copy to use and keeps it in memory:
+
+1. Neo4j, when `CURRICULUM_NEO4J_*` are set (the authoritative graph);
+2. the last good copy in `curriculum.graph_snapshot` when Neo4j is unreachable;
+3. `core.concept_prerequisites` when Neo4j is not configured or still empty.
+
+`GET /graph` reports which one answered (`source`) and why a fallback happened
+(`fallback_reason`).
 
 ## Security rules
 
@@ -48,11 +62,20 @@ and the lecturer cohort and graph-edit routes.
 
 ```bash
 uv sync
-cp .env.example .env          # paste your Neon pooled connection string
+cp .env.example .env          # pooled URL, direct URL for migrations, optional Neo4j
+uv run alembic upgrade head --sql    # preview the SQL (writes nothing)
+uv run alembic upgrade head          # create the curriculum schema (writes)
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8101
 ```
 
 Through the gateway: `http://localhost:8080/api/v1/curriculum/health`.
+
+Load the graph into Neo4j (needs the Neo4j settings and the migration above):
+
+```bash
+uv run python -m scripts.import_graph --dry-run      # validate core, write nothing
+uv run python -m scripts.import_graph --version v0   # writes Neo4j, snapshot and audit row
+```
 
 ## Tests
 

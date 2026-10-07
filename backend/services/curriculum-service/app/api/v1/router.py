@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-api_router = APIRouter()
+from app.api.v1.routes import graph
 
-# Arriving with later steps: graph, mastery, recommendations, assessments,
-# gain, feedback and the lecturer cohort and graph-edit routes.
+api_router = APIRouter()
+api_router.include_router(graph.router)
+
+# Arriving with later steps: mastery, recommendations, assessments, gain,
+# feedback and the lecturer cohort and graph-edit routes.
