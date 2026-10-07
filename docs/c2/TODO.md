@@ -40,20 +40,31 @@ Preparation material for every item below (question lists, request text, checkli
 
 ### A2. Camera [FR1, NFR4]
 
-- [ ] `camera/`: `getUserMedia` 640×480, frame loop on `requestVideoFrameCallback` with rAF fallback
-- [ ] Handle permission denied, no camera, camera in use → distinct `status` values
-- [ ] `visibilitychange` → pause / resume
+- [x] `camera/`: `getUserMedia` 640×480, frame loop on `requestVideoFrameCallback` with rAF fallback
+  - `Camera` class (`src/core/camera/camera.ts`). Constraints are all `ideal` (never `exact`) so any webcam is accepted (NFR4); no audio. Frame time is rVFC `metadata.mediaTime`, or `video.currentTime` under rAF (duplicate display refreshes skipped); non-increasing timestamps are dropped. Video element is injectable so the demo shows the preview; the camera never reads pixels.
+- [x] Handle permission denied, no camera, camera in use → distinct `status` values
+  - `CameraStatus`: `permission_denied`, `no_camera`, `camera_in_use`, `unsupported` (no https / no mediaDevices), `error`, plus `idle/starting/active/paused/stopped`. `start()` resolves with the status, never rejects. A track ending on its own (unplugged, revoked) → `no_camera`. **Open for A5:** `LoadStateEvent.status` (ARCHITECTURE.md §8) only has `permission_denied`/`unsupported`; either map `no_camera`/`camera_in_use` onto those or agree new values with C01/C03/C04 (invariant 5 — needs your decision).
+- [x] `visibilitychange` → pause / resume
+  - Pause reasons are a set (`user`, `hidden`): returning to the tab does not undo a user's own pause. Starts paused if the tab is hidden when permission arrives.
 - [ ] `disable()` stops all tracks (camera LED off) — verify by hand
-- [ ] Unit tests with a mocked `MediaStream`
+  - Implemented as `Camera.stop()` (public `disable()` arrives with A5): stops every track, detaches the stream, removes listeners; also releases a stream granted after stop was pressed during the permission prompt. Unit-tested and e2e-checked (`live-tracks` = 0). **Still to do by hand:** watch the laptop LED go off on "Turn sensing off".
+- [x] Unit tests with a mocked `MediaStream`
+  - `tests/unit/camera/*` with doubles in `tests/unit/helpers/fake-media.ts` (Node, no jsdom). e2e `tests/e2e/camera-landmarks.spec.ts` covers the real browser path with the fake camera, pause/resume, and permission denied.
 
 ### A3. Landmarks — adapter A [FR1, FR7]
 
-- [ ] `npm run fetch-models`: download face mesh model files once into `public/models/facemesh/`, verify checksum, write `MANIFEST.json`
-- [ ] `LandmarkProvider` interface + `TfjsFaceMeshProvider` (tfjs runtime, iris refinement, local model URLs)
-- [ ] Backend selection: webgl → wasm; refuse plain cpu with `status: "unsupported"`
-- [ ] Skip-frame scheduling (never queue), target 15 fps
-- [ ] Debug overlay: draw landmarks, show fps, backend, frame time p50/p95
+- [x] `npm run fetch-models`: download face mesh model files once into `public/models/facemesh/`, verify checksum, write `MANIFEST.json`
+  - `pnpm fetch-models` (`scripts/fetch-models.ts`). Fetches the BlazeFace short-range detector and the attention mesh from their tfhub.dev URLs (now redirect to Kaggle storage) and copies the three `tfjs-backend-wasm` binaries from `node_modules` into `public/wasm/`. `MANIFEST.json` is a committed lock (source, licence, SHA-256, bytes); a checksum mismatch fails and writes nothing. `--verify` checks offline; `--update-lock` is the deliberate upgrade path. Shard names from remote `model.json` are restricted to plain file names. Writes are atomic (temp dir + rename).
+- [x] `LandmarkProvider` interface + `TfjsFaceMeshProvider` (tfjs runtime, iris refinement, local model URLs)
+  - Config names confirmed in face-landmarks-detection 1.0.6: `detectorModelUrl`, `landmarkModelUrl`. Output normalised to a flat `Float32Array` (478×3, x/width, y/height, z/width) — no per-frame object allocation. `FaceResult.score` is `number | null` (ARCHITECTURE.md §3 updated): the tfjs runtime filters by face presence internally but does not return the score. `staticImageMode: false` so the detector only re-runs when tracking is lost. TF.js loads lazily in `init()`. All asset URLs pass `resolveSameOriginAsset()` (`src/core/model-loader.ts`), which refuses cross-origin URLs before anything is fetched. `@mediapipe/face_mesh`/`face_detection` (peer deps for the unused mediapipe runtime) are aliased to a throwing stub in `vite.config.ts`: they do not bundle as ESM under Vite 8 and default to cdn.jsdelivr.net. The bundle still contains the library's unused tfhub.dev default constants; a unit test asserts both URLs are always overridden. TF.js packages are modular (`tfjs-core`, `-converter`, `-backend-webgl`, `-backend-wasm`, all 4.22.0) so the cpu backend is never registered.
+- [x] Backend selection: webgl → wasm; refuse plain cpu with `status: "unsupported"`
+  - `selectBackend()` (`src/core/landmarks/backend.ts`) also rejects a backend if TF.js reports a different one after `setBackend`. Failure throws `UnsupportedBackendError` (listing each reason); the demo shows it, A5 maps it to `status: "unsupported"`.
+- [x] Skip-frame scheduling (never queue), target 15 fps
+  - `FrameGate` (`camera/frame-gate.ts`) + `LandmarkTracker` (`landmarks/landmark-tracker.ts`). One inference in flight; rate cap on frame time with 20 % early tolerance so 30 fps camera jitter still gives 15 fps (not 10). Counts dropped-busy vs dropped-rate separately. Adaptive rate (15→12→10) is not wired yet: needs bench numbers (A7).
+- [x] Debug overlay: draw landmarks, show fps, backend, frame time p50/p95
+  - `src/demo/debug-overlay.ts`: points only on a transparent canvas (no camera pixels on it), irises in a second colour, mirrored like the preview. Read-out: camera status, live tracks, frame clock, resolution, landmark fps, inference p50/p95 (NumPy-style percentile over the last 128 frames), skipped frames, face found, TF.js tensor count, errors. Frame time here = time inside `estimate()`; the §11 frame-latency definition is for the bench (A7).
 - [ ] Confirm with DevTools Network tab: no requests after initial load
+  - Automated equivalent passes: `tests/e2e/camera-landmarks.spec.ts` asserts every request is same-origin and that none happen during 5 s of sensing (Chromium, fake camera). **Still to do by hand:** open DevTools → Network on the real webcam and screenshot it for the evidence folder.
 
 ### A4. Features [FR2, FR3, FR8]
 
@@ -71,7 +82,7 @@ Preparation material for every item below (question lists, request text, checkli
 - [ ] Fixtures: record a few landmark sequences from yourself (blinking on purpose, looking away, turning head, leaving frame) — arrays only, no images
 - [ ] Unit tests per feature against fixtures, including "same result at 10 fps and 30 fps"
 - [ ] Live feature strip chart in the debug overlay (you will stare at this a lot)
-
+    
 ### A5. Events and public API [FR5, FR6, NFR8]
 
 - [ ] `LoadStateEvent` type + runtime validator

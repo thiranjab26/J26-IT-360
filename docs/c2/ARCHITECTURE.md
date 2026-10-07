@@ -43,7 +43,7 @@ interface FaceResult {
   landmarks: Float32Array;        // 478 × 3, normalised image coords
   headPose?: { yaw: number; pitch: number; roll: number };   // if the provider gives it
   blendshapes?: Record<string, number>;                      // if the provider gives it
-  score: number;
+  score: number | null;           // null if the provider does not expose one (adapter A)
 }
 ```
 
@@ -57,7 +57,7 @@ Two adapters behind this interface:
 | Head pose | We compute it from landmarks | Comes free from the transformation matrix |
 | Expression signal (FR3) | We compute proxies from landmarks | Blendshapes (brow, blink, mouth) come free |
 | Maintenance | Release cadence has slowed | Actively documented by Google |
-| Self-hosting | Pass local model URLs in the detector config (`detectorModelUrl` / `landmarkModelUrl` — confirm names in the package types) | `FilesetResolver.forVisionTasks('/wasm')` + local `.task` file |
+| Self-hosting | Local `detectorModelUrl` / `landmarkModelUrl` (confirmed in the 1.0.6 types), files from `pnpm fetch-models`; the MediaPipe-runtime packages are aliased to a throwing stub in `vite.config.ts` | `FilesetResolver.forVisionTasks('/wasm')` + local `.task` file |
 
 **Decision rule:** build A first because it is what the approved proposal says. Build B as a thin adapter in week 2 and benchmark both on the same laptop (frame time p50/p95, landmark jitter, Firefox behaviour). If B is clearly better, the switch is a supervisor conversation, not a silent code change — the classifier still runs in TF.js either way. Record the benchmark in `docs/bench/`.
 

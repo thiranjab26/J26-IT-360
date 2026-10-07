@@ -12,6 +12,12 @@ From the repository root, once:
 pnpm install
 ```
 
+Then, once per clone, download the face mesh models and copy the TF.js WASM binaries into `public/` (checked against the committed lock file `public/models/MANIFEST.json`):
+
+```bash
+pnpm fetch-models            # add --verify to check without network, --update-lock to upgrade on purpose
+```
+
 Then, inside `packages/load-sensor/`:
 
 ```bash
