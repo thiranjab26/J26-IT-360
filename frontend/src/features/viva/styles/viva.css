@@ -1,0 +1,2571 @@
+/* C4 viva styles, scoped to .viva-app so they never affect other features. */
+.viva-app { min-height: 100vh; }
+
+.viva-app {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #1b304b;
+  background: #f6f8fc;
+  font-synthesis: none;
+  font-size: 16px;
+  line-height: 1.55;
+  font-weight: 400;
+}
+.viva-app * {
+  box-sizing: border-box;
+}
+.viva-app {
+  margin: 0;
+}
+.viva-app button, .viva-app input, .viva-app textarea, .viva-app select {
+  font: inherit;
+}
+.viva-app button, .viva-app a, .viva-app input, .viva-app select, .viva-app textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+.viva-app button {
+  cursor: pointer;
+}
+.viva-app button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.viva-app button {
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.viva-app a {
+  color: inherit;
+  text-decoration: none;
+}
+.viva-app h1, .viva-app h2, .viva-app h3, .viva-app p {
+  margin: 0;
+}
+.viva-app h1 {
+  font-size: 32px;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -1.1px;
+  color: #122b4a;
+}
+.viva-app h2 {
+  font-size: 20px;
+  line-height: 1.4;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+}
+.viva-app h3 {
+  font-size: 16px;
+  font-weight: 650;
+}
+.viva-app p {
+  line-height: 1.65;
+}
+.viva-app button:focus-visible, .viva-app a:focus-visible, .viva-app summary:focus-visible {
+  outline: 3px solid #7ba3ff;
+  outline-offset: 3px;
+}
+.viva-app input:focus, .viva-app textarea:focus, .viva-app select:focus {
+  outline: none;
+  border-color: #5679de;
+  box-shadow: 0 0 0 3px #e6ecff;
+}
+.viva-app input, .viva-app textarea, .viva-app select {
+  width: 100%;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #213955;
+  padding: 12px 14px;
+}
+.viva-app textarea {
+  resize: vertical;
+  line-height: 1.65;
+}
+.viva-app input[type="checkbox"], .viva-app input[type="radio"] {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  accent-color: #315bd6;
+  padding: 0;
+}
+.viva-app fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.viva-app legend {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.viva-app label {
+  font-size: 14px;
+  font-weight: 550;
+}
+.viva-app summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #385a8a;
+  padding: 13px 0;
+}
+.viva-app details h3 {
+  margin: 16px 0 8px;
+}
+.viva-app details p {
+  margin: 10px 0;
+}
+.viva-app pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 15px;
+  background: #f4f6fa;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.viva-app .app-shell {
+  min-height: 100vh;
+}
+.viva-app .sidebar {
+  width: 248px;
+  position: fixed;
+  inset: 0 auto 0 0;
+  background: #fff;
+  border-right: 1px solid #e5eaf1;
+  padding: 32px 20px 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+}
+.viva-app .brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 10px 31px;
+  font-size: 23px;
+  font-weight: 720;
+  letter-spacing: -0.8px;
+}
+.viva-app .brand-symbol {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #315bd6;
+  border-radius: 11px;
+  width: 39px;
+  height: 43px;
+  box-shadow: 0 5px 12px #315bd625;
+}
+.viva-app .brand-symbol svg {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+}
+.viva-app .brand-sub {
+  font-size: 8px;
+  letter-spacing: 1.75px;
+  display: block;
+  margin-top: 3px;
+  font-weight: 700;
+  color: #8190a5;
+}
+.viva-app .workspace-label {
+  border: 1px solid #e5eaf1;
+  border-radius: 6px;
+  background: #f9fafc;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 1px;
+  display: flex;
+  justify-content: space-between;
+  padding: 9px;
+  margin-bottom: 28px;
+  color: #7a899d;
+}
+.viva-app .workspace-label span {
+  font-size: 9px;
+  letter-spacing: 0;
+  color: #9aabc1;
+}
+.viva-app .nav-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #9ba7b8;
+  margin: 0 13px 12px;
+}
+.viva-app .nav-group {
+  margin-top: 31px;
+}
+.viva-app .nav-item {
+  border: 0;
+  background: transparent;
+  color: #6c7c91;
+  font-size: 13px;
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 13px 12px;
+  border-radius: 7px;
+  margin-bottom: 5px;
+  text-align: left;
+  white-space: nowrap;
+}
+.viva-app .nav-item:hover {
+  background: #f5f7fc;
+  color: #315bd6;
+}
+.viva-app .nav-item.selected {
+  background: #edf2ff;
+  color: #315bd6;
+  font-weight: 650;
+}
+.viva-app .nav-lock {
+  margin-left: auto;
+  color: #a0aec0;
+}
+.viva-app .nav-active-dot {
+  display: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #315bd6;
+  margin-left: auto;
+}
+.viva-app .nav-item.selected .nav-active-dot {
+  display: block;
+}
+.viva-app .sidebar-bottom {
+  margin-top: auto;
+  padding-top: 30px;
+}
+.viva-app .research-note {
+  background: linear-gradient(135deg, #f7f9fe, #eff3fc);
+  border: 1px solid #e7ecf6;
+  border-radius: 10px;
+  padding: 18px 15px;
+  margin-bottom: 20px;
+}
+.viva-app .research-note-icon {
+  display: flex;
+  color: #5578cf;
+  margin-bottom: 13px;
+}
+.viva-app .research-note strong {
+  font-size: 12px;
+}
+.viva-app .research-note p {
+  font-size: 12px;
+  color: #8391a6;
+  margin: 7px 0 13px;
+  line-height: 1.55;
+}
+.viva-app .research-note > span {
+  font-size: 9px;
+  color: #9aa8bd;
+  letter-spacing: 0.2px;
+}
+.viva-app .sidebar-bottom > .nav-item {
+  font-size: 11px;
+  gap: 8px;
+  padding: 12px 4px;
+}
+.viva-app .sidebar-bottom > .nav-item > svg:last-child {
+  margin-left: auto;
+}
+.viva-app .sidebar-user {
+  border-top: 1px solid #e7ecf3;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 20px 0;
+}
+.viva-app .avatar {
+  background: #edf1f9;
+  border: 1px solid #e0e7f2;
+  border-radius: 50%;
+  color: #5c7298;
+  font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 33px;
+  height: 33px;
+  flex-shrink: 0;
+}
+.viva-app .sidebar-user > div:nth-child(2) {
+  overflow: hidden;
+}
+.viva-app .sidebar-user strong {
+  font-size: 11px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viva-app .sidebar-user span {
+  display: block;
+  font-size: 10px;
+  color: #91a0b5;
+  text-transform: capitalize;
+  margin-top: 2px;
+}
+.viva-app .sidebar-user button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.viva-app .main-shell {
+  margin-left: 248px;
+}
+.viva-app .topbar {
+  height: 78px;
+  background: #ffffffd9;
+  border-bottom: 1px solid #e6ecf3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+  gap: 15px;
+}
+.viva-app .breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #9ba7b7;
+}
+.viva-app .breadcrumb strong {
+  font-weight: 500;
+  color: #526883;
+}
+.viva-app .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+}
+.viva-app .environment-label {
+  font-size: 11px;
+  color: #8190a4;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.viva-app .dot {
+  width: 6px;
+  height: 6px;
+  display: inline-block;
+  border-radius: 50%;
+  background: #31a684;
+  flex-shrink: 0;
+}
+.viva-app .green-dot {
+  background: #34a887;
+}
+.viva-app .staff-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-left: 1px solid #e6ecf4;
+  padding-left: 22px;
+  background: none;
+  font-size: 12px;
+  color: #58708f;
+}
+.viva-app .main-content {
+  padding: 38px 40px 20px;
+  max-width: 1570px;
+  margin: auto;
+}
+.viva-app .page-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+.viva-app .eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  color: #6d83a0;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.viva-app .page-title p {
+  font-size: 14px;
+  color: #62748b;
+  margin-top: 10px;
+}
+.viva-app .badge {
+  font-size: 10px;
+  line-height: 1.5;
+  font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f4f8;
+  color: #62748b;
+  border: 1px solid #e7ecf2;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: normal;
+}
+.viva-app .badge.green {
+  background: #edf8f3;
+  border-color: #dcefe5;
+  color: #479b80;
+}
+.viva-app .badge.blue {
+  background: #edf2ff;
+  border-color: #e0e8ff;
+  color: #5072c5;
+}
+.viva-app .badge.amber {
+  background: #fff7e8;
+  border-color: #f7ebd1;
+  color: #9e7a35;
+}
+.viva-app .green {
+  color: #459d81;
+}
+.viva-app .muted {
+  color: #62748b;
+}
+.viva-app .small {
+  font-size: 12px;
+}
+.viva-app .panel {
+  background: #fff;
+  border: 1px solid #e3e9f2;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 3px 9px #1c365004;
+  margin-bottom: 23px;
+}
+.viva-app .section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 21px;
+}
+.viva-app .section-heading h2 {
+  font-size: 17px;
+}
+.viva-app .section-heading h3 {
+  font-size: 14px;
+}
+.viva-app .heading-with-icon {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.viva-app .square-icon {
+  width: 43px;
+  height: 43px;
+  border-radius: 10px;
+  color: #5779d4;
+  background: #f0f4ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.viva-app .heading-with-icon p {
+  margin-top: 3px;
+  font-size: 11px;
+}
+.viva-app .light-step {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #a3b0c0;
+}
+.viva-app .field {
+  margin: 22px 0;
+}
+.viva-app .field > label {
+  display: block;
+  margin-bottom: 9px;
+}
+.viva-app .field-help {
+  font-size: 11px;
+  color: #68798f;
+  margin-top: 8px;
+  line-height: 1.55;
+}
+.viva-app .select-wrap {
+  position: relative;
+}
+.viva-app .select-wrap select {
+  appearance: none;
+  padding-right: 40px;
+}
+.viva-app .select-wrap > svg {
+  position: absolute;
+  right: 15px;
+  top: 15px;
+  color: #98a7bb;
+  pointer-events: none;
+}
+.viva-app .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 41px;
+  padding: 10px 16px;
+}
+.viva-app .button.primary {
+  color: #fff;
+  background: #315bd6;
+  border-color: #315bd6;
+  box-shadow: 0 3px 7px #315bd614;
+}
+.viva-app .button.primary:hover {
+  background: #244cc1;
+}
+.viva-app .button.secondary {
+  background: #fff;
+  border-color: #dce4ee;
+  color: #647895;
+}
+.viva-app .button.secondary:hover {
+  background: #f8faff;
+}
+.viva-app .button.subtle {
+  background: #f6f8fc;
+  color: #7a8aa1;
+}
+.viva-app .button.danger {
+  background: #fff0ee;
+  border-color: #f5d7d1;
+  color: #bd6658;
+}
+.viva-app .button .busy {
+  padding: 0;
+  gap: 8px;
+  color: inherit;
+}
+.viva-app .button-row {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.viva-app .full-width {
+  width: 100%;
+}
+.viva-app .text-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: #5274cc;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 0;
+}
+.viva-app .icon-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: #8a9bb2;
+  padding: 6px;
+  border-radius: 5px;
+}
+.viva-app .icon-button:hover {
+  background: #eef3fb;
+  color: #315bd6;
+}
+.viva-app .steps {
+  display: flex;
+  gap: 38px;
+  margin: 8px 0 27px;
+  border-bottom: 1px solid #e3e9f2;
+}
+.viva-app .steps > div {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 12px;
+  color: #a2adbd;
+  padding: 0 0 14px;
+  position: relative;
+}
+.viva-app .steps > div > span {
+  background: #edf0f5;
+  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 23px;
+  border-radius: 5px;
+  font-weight: 600;
+}
+.viva-app .steps .active {
+  color: #315bd6;
+  font-weight: 600;
+}
+.viva-app .steps .active > span {
+  background: #e7edff;
+}
+.viva-app .steps .active:after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  height: 2px;
+  background: #315bd6;
+  width: 100%;
+  left: 0;
+}
+.viva-app .steps .done {
+  color: #44967b;
+}
+.viva-app .workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 25px;
+}
+.viva-app .main-column, .viva-app .right-column {
+  min-width: 0;
+}
+.viva-app .prepare-panel {
+  padding: 27px;
+}
+.viva-app .mode-field {
+  margin-top: 26px;
+}
+.viva-app .mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.viva-app .mode-option {
+  border: 1px solid #e1e7f1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 17px 13px;
+  display: flex;
+  text-align: left;
+  align-items: center;
+  gap: 10px;
+}
+.viva-app .mode-option.selected {
+  background: #f6f8ff;
+  border-color: #7d9bf0;
+  box-shadow: 0 0 0 1px #dce6ff;
+}
+.viva-app .mode-icon {
+  color: #8e9caf;
+  display: flex;
+  flex-shrink: 0;
+}
+.viva-app .mode-option.selected .mode-icon {
+  color: #5176d9;
+}
+.viva-app .mode-option strong {
+  font-size: 12px;
+  font-weight: 600;
+  display: block;
+  white-space: nowrap;
+}
+.viva-app .mode-option small {
+  font-size: 9px;
+  color: #9ba6b6;
+  display: block;
+  margin-top: 4px;
+}
+.viva-app .radio-dot {
+  margin-left: auto;
+  border: 1.5px solid #d9e1ee;
+  border-radius: 50%;
+  min-width: 13px;
+  height: 13px;
+  background: white;
+}
+.viva-app .selected .radio-dot {
+  border: 4px solid #4971dc;
+}
+.viva-app .start-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid #edf0f5;
+}
+.viva-app .start-row > .small {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.viva-app .context-heading {
+  margin: 29px 0 14px;
+}
+.viva-app .context-heading h2 {
+  font-size: 14px;
+}
+.viva-app .integration-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 13px;
+}
+.viva-app .integration-card {
+  background: #fff;
+  border: 1px solid #e4eaf3;
+  border-radius: 9px;
+  padding: 17px 15px;
+  min-width: 0;
+}
+.viva-app .integration-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #91a5c9;
+  margin-bottom: 13px;
+}
+.viva-app .code-tag {
+  background: #f1f5fc;
+  color: #8b9dbc;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 650;
+  padding: 3px 6px;
+}
+.viva-app .integration-card h3 {
+  font-size: 11px;
+  font-weight: 650;
+  margin-bottom: 7px;
+}
+.viva-app .integration-card p {
+  font-size: 10px;
+  color: #8f9db0;
+  line-height: 1.5;
+}
+.viva-app .integration-card small {
+  font-size: 9px;
+  color: #a4b0c0;
+  display: block;
+  margin-top: 7px;
+}
+.viva-app .signal-bars {
+  letter-spacing: 2px;
+  font-size: 17px;
+  line-height: 1;
+}
+.viva-app .footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 9px;
+  color: #9ca9bc;
+  margin: 13px 0;
+  line-height: 1.7;
+}
+.viva-app .footnote svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.viva-app .guide-card {
+  background: linear-gradient(160deg, #f0f4ff, #f3f6fd 70%, #f8faff);
+  border: 1px solid #e2e9f6;
+  border-radius: 12px;
+  padding: 25px 24px;
+}
+.viva-app .guide-art {
+  height: 135px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: -4px 0 14px;
+}
+.viva-app .orbit {
+  position: absolute;
+  border: 1px solid #dce5f9;
+  border-radius: 50%;
+  transform: rotate(-27deg);
+}
+.viva-app .orbit-one {
+  width: 166px;
+  height: 99px;
+}
+.viva-app .orbit-two {
+  width: 105px;
+  height: 155px;
+  transform: rotate(45deg);
+}
+.viva-app .art-center {
+  width: 63px;
+  height: 63px;
+  background: linear-gradient(140deg, #fff, #e8eeff);
+  border: 1px solid #cddbf9;
+  border-radius: 18px;
+  transform: rotate(-8deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6386e5;
+  box-shadow: 0 7px 20px #7694d918;
+}
+.viva-app .art-center > svg {
+  transform: rotate(8deg);
+}
+.viva-app .art-point {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: #a9bdef;
+  border: 2px solid #eef3ff;
+  border-radius: 50%;
+}
+.viva-app .point-one {
+  top: 22px;
+  left: 40px;
+}
+.viva-app .point-two {
+  bottom: 19px;
+  right: 53px;
+}
+.viva-app .art-check {
+  position: absolute;
+  top: 28px;
+  right: 26px;
+  background: white;
+  padding: 5px;
+  border: 1px solid #e0e8f8;
+  border-radius: 7px;
+  color: #80a096;
+  box-shadow: 0 5px 15px #7899cc13;
+  display: flex;
+}
+.viva-app .guide-card > .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1.1px;
+  color: #7c93ba;
+}
+.viva-app .guide-card > h2 {
+  font-size: 21px;
+  line-height: 1.4;
+  letter-spacing: -0.65px;
+  margin: 9px 0 12px;
+}
+.viva-app .guide-card > p {
+  font-size: 11px;
+  color: #8b9bb3;
+}
+.viva-app .guide-divider {
+  height: 1px;
+  background: #e0e7f5;
+  margin: 24px 0;
+}
+.viva-app .guide-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.viva-app .guide-steps li {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 19px;
+}
+.viva-app .guide-steps li:last-child {
+  margin-bottom: 0;
+}
+.viva-app .guide-steps li > span {
+  width: 21px;
+  height: 21px;
+  background: white;
+  border: 1px solid #e0e8f6;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #7d95c6;
+  flex-shrink: 0;
+}
+.viva-app .guide-steps strong {
+  font-size: 10px;
+  font-weight: 650;
+  display: block;
+}
+.viva-app .guide-steps p {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #96a4b9;
+  margin-top: 4px;
+}
+.viva-app .note-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 20px 10px;
+}
+.viva-app .note-card > svg {
+  color: #9badc8;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.viva-app .note-card strong {
+  font-size: 11px;
+  color: #6b819e;
+}
+.viva-app .note-card p {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #9aa8bb;
+  margin-top: 6px;
+}
+.viva-app .notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid #e1e8f4;
+  border-radius: 8px;
+  background: #f4f7fd;
+  color: #7385a1;
+  padding: 13px 15px;
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.viva-app .notice > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.viva-app .notice > span {
+  flex: 1;
+}
+.viva-app .notice.error {
+  color: #a54b4b;
+  background: #fff2f0;
+  border-color: #f1d4cf;
+}
+.viva-app .notice.success {
+  color: #4b8e75;
+  background: #f0faf5;
+  border-color: #d9eee3;
+}
+.viva-app .notice.amber {
+  color: #a17c3e;
+  background: #fff8ec;
+  border-color: #f5e7cd;
+}
+.viva-app .busy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #8797af;
+  padding: 50px 20px;
+  font-size: 13px;
+}
+.viva-app .spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.viva-app .empty {
+  text-align: center;
+  padding: 70px 20px;
+  background: white;
+  border: 1px dashed #dbe4f0;
+  border-radius: 12px;
+}
+.viva-app .empty-icon {
+  display: flex;
+  justify-content: center;
+  color: #95add7;
+  margin-bottom: 17px;
+}
+.viva-app .empty h3 {
+  font-size: 20px;
+  margin-bottom: 10px;
+}
+.viva-app .empty p {
+  font-size: 14px;
+  color: #93a0b3;
+  max-width: 500px;
+  margin: auto;
+}
+.viva-app .page-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #a7b3c4;
+  border-top: 1px solid #e4eaf2;
+  margin-top: 42px;
+  padding: 22px 0;
+  gap: 20px;
+}
+.viva-app .page-footer > span > span {
+  margin: 0 7px;
+}
+.viva-app .welcome-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 32px;
+  max-width: 1080px;
+}
+.viva-app .welcome-form {
+  padding: 33px;
+  margin: 0;
+}
+.viva-app .welcome-form h2 {
+  font-size: 25px;
+  letter-spacing: -0.7px;
+  margin: 24px 0 12px;
+  max-width: 310px;
+}
+.viva-app .welcome-form > p {
+  font-size: 13px;
+  max-width: 380px;
+}
+.viva-app .welcome-form form {
+  margin-top: 28px;
+}
+.viva-app .welcome-form .field {
+  margin-bottom: 21px;
+}
+.viva-app .welcome-form .button {
+  margin-top: 26px;
+  min-height: 46px;
+}
+.viva-app .consent-row {
+  font-size: 11px;
+  color: #8696ac;
+  line-height: 1.7;
+  font-weight: 400;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+.viva-app .consent-row input {
+  margin-top: 3px;
+}
+.viva-app .welcome-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 10px;
+  color: #a0aec0;
+  margin-top: 24px;
+  line-height: 1.65;
+}
+.viva-app .welcome-privacy svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.viva-app .welcome-story {
+  position: relative;
+  overflow: hidden;
+  border-radius: 13px;
+  background: #eaf0fe;
+  border: 1px solid #dde7fa;
+  padding: 35px 37px;
+  min-height: 520px;
+}
+.viva-app .welcome-story > .eyebrow {
+  font-size: 9px;
+  letter-spacing: 1.4px;
+}
+.viva-app .welcome-story h2 {
+  font-size: 35px;
+  letter-spacing: -1.2px;
+  line-height: 1.3;
+  position: relative;
+  z-index: 1;
+}
+.viva-app .welcome-story em {
+  font-style: normal;
+  color: #5277d4;
+}
+.viva-app .welcome-story > p {
+  font-size: 12px;
+  color: #8b9bb7;
+  position: relative;
+  z-index: 1;
+  margin-top: 205px;
+}
+.viva-app .topic-tags {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.viva-app .topic-tags span {
+  border: 1px solid #cfdbf2;
+  background: #eff4ff;
+  color: #879cc0;
+  border-radius: 5px;
+  font-size: 9px;
+  padding: 4px 7px;
+}
+.viva-app .welcome-orbits {
+  position: absolute;
+  top: 228px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 195px;
+  width: 290px;
+}
+.viva-app .welcome-orbits > div {
+  border: 1px solid #cbdaf7;
+  position: absolute;
+  width: 260px;
+  height: 150px;
+  left: 15px;
+  top: 30px;
+  border-radius: 50%;
+  transform: rotate(-30deg);
+}
+.viva-app .welcome-orbits > div + div {
+  transform: rotate(40deg);
+  width: 200px;
+  height: 180px;
+  left: 45px;
+  top: 7px;
+}
+.viva-app .welcome-orbits > span {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 82px;
+  height: 82px;
+  left: 104px;
+  top: 53px;
+  border: 1px solid #c3d5fa;
+  border-radius: 24px;
+  transform: rotate(-10deg);
+  background: linear-gradient(140deg, #fff, #dbe6ff);
+  box-shadow: 0 15px 25px #7999d627;
+  color: #6a8dde;
+}
+.viva-app .orbit-label {
+  position: absolute;
+  background: #f9fbff;
+  border: 1px solid #dae5fb;
+  border-radius: 6px;
+  color: #7d96c0;
+  box-shadow: 0 6px 12px #638acd09;
+  font-style: normal;
+  font-size: 10px;
+  padding: 6px 11px;
+}
+.viva-app .label-reason {
+  top: 10px;
+  left: 40px;
+}
+.viva-app .label-reflect {
+  bottom: 10px;
+  left: 20px;
+}
+.viva-app .label-connect {
+  right: 0;
+  top: 105px;
+}
+.viva-app .welcome-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+  margin-top: 28px;
+  max-width: 1080px;
+}
+.viva-app .welcome-bottom > div {
+  padding: 20px 5px;
+  position: relative;
+  padding-left: 40px;
+}
+.viva-app .welcome-bottom span {
+  position: absolute;
+  left: 0;
+  top: 20px;
+  font-size: 12px;
+  color: #a5b9dc;
+}
+.viva-app .welcome-bottom strong {
+  font-size: 12px;
+  color: #66809f;
+}
+.viva-app .welcome-bottom p {
+  font-size: 11px;
+  color: #9ba9bb;
+  margin-top: 5px;
+}
+.viva-app .check-questions {
+  border-top: 1px solid #e4ebf5;
+  margin-top: 20px;
+  padding-top: 10px;
+}
+.viva-app .check-questions fieldset {
+  padding: 16px 0;
+}
+.viva-app .check-questions legend {
+  font-size: 13px;
+}
+.viva-app .answer-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  margin: 8px 0;
+  color: #7b8ca5;
+}
+.viva-app .progress-track {
+  height: 4px;
+  border-radius: 5px;
+  background: #edf1f8;
+  margin-bottom: 29px;
+  overflow: hidden;
+}
+.viva-app .progress-track > span {
+  display: block;
+  height: 100%;
+  background: #6a8be6;
+  border-radius: 5px;
+}
+.viva-app .question-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.viva-app .question-label .icon-button {
+  margin-left: auto;
+}
+.viva-app .viva-mark {
+  width: 32px;
+  height: 32px;
+  background: #eef3ff;
+  border-radius: 9px;
+  color: #6685d8;
+  font-size: 18px;
+  font-weight: 550;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.viva-app .question-label strong {
+  font-size: 11px;
+  color: #7185a4;
+}
+.viva-app .question-label small {
+  display: block;
+  font-size: 10px;
+  color: #9dabc0;
+  margin-top: 2px;
+}
+.viva-app .current-question {
+  font-size: 24px;
+  line-height: 1.6;
+  letter-spacing: -0.5px;
+  margin: 23px 0;
+}
+.viva-app .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #91a0b8;
+  font-weight: 400;
+  font-size: 11px;
+}
+.viva-app .checkbox-row input {
+  width: 14px;
+  height: 14px;
+}
+.viva-app .answer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 28px 0 12px;
+}
+.viva-app .segmented {
+  background: #f4f6fa;
+  border: 1px solid #e5ebf4;
+  display: flex;
+  border-radius: 7px;
+  padding: 3px;
+}
+.viva-app .segmented button {
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font-size: 11px;
+  padding: 4px 15px;
+  color: #96a4ba;
+}
+.viva-app .segmented button.selected {
+  background: #fff;
+  box-shadow: 0 1px 3px #1b365512;
+  color: #4e6daf;
+}
+.viva-app .answer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  gap: 15px;
+}
+.viva-app .answer-footer .small {
+  font-size: 10px;
+}
+.viva-app .recording-box {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border: 1px solid #dfe7f4;
+  background: #f8faff;
+  border-radius: 8px;
+  padding: 13px;
+  margin-bottom: 13px;
+}
+.viva-app .recording-box .small {
+  font-size: 10px;
+}
+.viva-app .recording-box.is-recording {
+  border-color: #edc2bc;
+  background: #fff8f7;
+}
+.viva-app .session-outline .eyebrow {
+  font-size: 9px;
+}
+.viva-app .session-outline h2 {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+.viva-app .session-outline > p {
+  font-size: 11px;
+  color: #94a1b6;
+}
+.viva-app .signal-details {
+  margin: 24px 0;
+}
+.viva-app .signal-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  border-bottom: 1px solid #eff2f6;
+  padding: 11px 0;
+  font-size: 11px;
+}
+.viva-app .signal-details dt {
+  color: #95a1b4;
+}
+.viva-app .signal-details dd {
+  margin: 0;
+  color: #637b9c;
+  font-weight: 550;
+  text-align: right;
+}
+.viva-app .session-outline .notice {
+  font-size: 10px;
+  padding: 12px;
+}
+.viva-app .session-outline > .text-button {
+  font-size: 11px;
+  margin-top: 10px;
+}
+.viva-app .integration-list {
+  display: grid;
+  gap: 12px;
+}
+.viva-app .integration-list .integration-card {
+  padding: 15px 18px;
+}
+.viva-app .integration-list .integration-top {
+  margin-bottom: 10px;
+}
+.viva-app .turn-list article {
+  display: flex;
+  gap: 16px;
+  border-top: 1px solid #e9edf5;
+  padding: 21px 0;
+}
+.viva-app .turn-list article:last-child {
+  padding-bottom: 0;
+}
+.viva-app .turn-list article > div:last-child {
+  flex: 1;
+  min-width: 0;
+}
+.viva-app .turn-number {
+  font-size: 11px;
+  color: #afbdd0;
+  padding-top: 3px;
+}
+.viva-app .turn-list .section-heading {
+  margin-bottom: 10px;
+}
+.viva-app .turn-list strong {
+  font-size: 11px;
+  color: #7c91af;
+}
+.viva-app .turn-question {
+  font-size: 13px;
+  color: #617a9a;
+}
+.viva-app blockquote {
+  margin: 13px 0;
+  padding: 14px 17px;
+  background: #f7f9fd;
+  border-left: 2px solid #d3dff5;
+  border-radius: 0 7px 7px 0;
+  font-size: 13px;
+  color: #6f84a1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.viva-app .turn-list .small {
+  font-size: 9px;
+}
+.viva-app .finish-confirm p {
+  margin-bottom: 12px;
+}
+.viva-app .finish-confirm .button {
+  font-size: 10px;
+  padding: 7px 9px;
+}
+.viva-app .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: #11274366;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 25px;
+  overflow: auto;
+}
+.viva-app .modal {
+  width: min(700px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: white;
+  border: 1px solid #e2e9f3;
+  border-radius: 15px;
+  box-shadow: 0 25px 100px #15345622;
+  padding: 30px;
+}
+.viva-app .modal > .section-heading {
+  margin-bottom: 15px;
+}
+.viva-app .modal > p {
+  font-size: 14px;
+  margin: 15px 0;
+}
+.viva-app .modal .notice {
+  margin-top: 20px;
+}
+.viva-app .two-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 23px;
+}
+.viva-app .two-columns > .field {
+  min-width: 0;
+}
+.viva-app .two-columns .panel {
+  min-width: 0;
+}
+.viva-app .two-columns .panel > h2 {
+  margin-bottom: 12px;
+}
+.viva-app .two-columns .panel > p {
+  font-size: 13px;
+}
+.viva-app .tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.viva-app .history-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.viva-app .history-info {
+  flex: 1;
+}
+.viva-app .history-info h2 {
+  font-size: 18px;
+}
+.viva-app .history-info p {
+  margin-top: 8px;
+}
+.viva-app .history-card > .button {
+  flex-shrink: 0;
+}
+.viva-app .report-outcome {
+  display: flex;
+  align-items: center;
+  gap: 21px;
+  background: linear-gradient(120deg, #fff, #f2f6ff);
+  border-color: #d9e4f9;
+}
+.viva-app .round-icon {
+  width: 55px;
+  height: 55px;
+  background: #eaf0ff;
+  border-radius: 50%;
+  color: #7090dd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.viva-app .report-outcome > div:nth-child(2) {
+  flex: 1;
+}
+.viva-app .report-outcome h2 {
+  font-size: 22px;
+}
+.viva-app .report-outcome p {
+  font-size: 12px;
+  color: #8293ad;
+  max-width: 740px;
+  margin-top: 8px;
+}
+.viva-app .coverage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-left: 1px solid #dde6f5;
+  padding-left: 28px;
+  flex-shrink: 0;
+}
+.viva-app .coverage strong {
+  font-size: 40px;
+  line-height: 1.4;
+  letter-spacing: -1px;
+  font-weight: 600;
+  color: #5276d0;
+}
+.viva-app .coverage strong small {
+  font-size: 19px;
+}
+.viva-app .coverage > span {
+  font-size: 10px;
+  color: #8b9fbd;
+}
+.viva-app .check-list {
+  list-style: none;
+  padding: 0;
+  margin: 15px 0;
+}
+.viva-app .check-list li {
+  display: flex;
+  gap: 10px;
+  color: #77908e;
+  font-size: 13px;
+  margin: 11px 0;
+}
+.viva-app .check-list svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: #63a68c;
+}
+.viva-app .spaced {
+  margin: 24px 0 12px;
+}
+.viva-app .plan-list {
+  padding: 0;
+  list-style: none;
+}
+.viva-app .plan-list li {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: #7e90aa;
+  margin: 16px 0;
+}
+.viva-app .plan-list span {
+  width: 23px;
+  height: 23px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eef3ff;
+  border-radius: 6px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #6a8ad2;
+}
+.viva-app .resource {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e1e8f5;
+  padding: 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: #7290bd;
+  margin-top: 9px;
+}
+.viva-app .resource svg {
+  flex-shrink: 0;
+}
+.viva-app .resource svg:last-child {
+  margin-left: auto;
+}
+.viva-app .concept-reports article {
+  border-top: 1px solid #e8edf6;
+  padding: 21px 0;
+}
+.viva-app .concept-reports article:last-child {
+  padding-bottom: 0;
+}
+.viva-app .concept-reports .section-heading {
+  margin-bottom: 10px;
+}
+.viva-app .concept-reports p {
+  font-size: 13px;
+  color: #8a9ab1;
+  margin-bottom: 15px;
+}
+.viva-app .plain-list {
+  padding-left: 19px;
+  color: #8798b0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.viva-app .plain-list li {
+  margin: 9px 0;
+}
+.viva-app .filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 25px 0;
+}
+.viva-app .filter-bar label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #8496af;
+}
+.viva-app .filter-bar select {
+  width: auto;
+  min-width: 125px;
+  font-size: 12px;
+  padding: 9px 13px;
+}
+.viva-app .filter-bar > .small {
+  margin-left: auto;
+}
+.viva-app .bank-card > .eyebrow {
+  margin: 20px 0 7px;
+}
+.viva-app .bank-card > h2 {
+  font-size: 20px;
+  max-width: 900px;
+}
+.viva-app .bank-card details {
+  margin-top: 12px;
+}
+.viva-app .bank-card summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.viva-app .bank-card details p, .viva-app .bank-card details li {
+  font-size: 12px;
+  color: #8093af;
+}
+.viva-app .card-actions {
+  border-top: 1px solid #e7edf5;
+  padding-top: 20px;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.viva-app .followup-list > div {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 15px;
+  padding: 11px 0;
+  border-bottom: 1px solid #edf1f7;
+  font-size: 12px;
+}
+.viva-app .followup-list dt {
+  color: #6f87aa;
+}
+.viva-app .followup-list dd {
+  color: #8b9ab1;
+  margin: 0;
+}
+.viva-app .code-input {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: #f8faff;
+  tab-size: 2;
+}
+.viva-app .tab-bar {
+  display: flex;
+  gap: 28px;
+  border-bottom: 1px solid #e0e7f3;
+  margin: 0 0 25px;
+}
+.viva-app .tab-bar button {
+  border: 0;
+  background: none;
+  padding: 0 2px 14px;
+  color: #8e9eb6;
+  font-size: 13px;
+  position: relative;
+}
+.viva-app .tab-bar button.selected {
+  color: #416bca;
+  font-weight: 600;
+}
+.viva-app .tab-bar button.selected:after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: #4673d4;
+}
+.viva-app .condition-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin: 0 0 23px;
+}
+.viva-app .condition-card {
+  padding: 20px;
+  text-align: left;
+  border: 1px solid #e0e7f3;
+  border-radius: 10px;
+  background: #fff;
+  position: relative;
+}
+.viva-app .condition-card > span {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f1f5fc;
+  border-radius: 7px;
+  color: #8aa2c8;
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+.viva-app .condition-card strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #657f9f;
+}
+.viva-app .condition-card small {
+  display: block;
+  font-size: 10px;
+  color: #9aaac0;
+  margin-top: 6px;
+}
+.viva-app .condition-card.selected {
+  background: #f2f6ff;
+  border-color: #7fa0e8;
+  box-shadow: 0 0 0 1px #dce7fc;
+}
+.viva-app .condition-card.selected > span {
+  color: #5e82cb;
+  background: #e4edff;
+}
+.viva-app .blind-evidence article {
+  border-top: 1px solid #e8eef6;
+  padding: 17px 0;
+}
+.viva-app .blind-evidence h3 {
+  font-size: 14px;
+  margin-top: 9px;
+  line-height: 1.6;
+}
+.viva-app .blind-evidence blockquote {
+  margin-bottom: 0;
+}
+.viva-app .rating-list .two-columns {
+  gap: 20px;
+}
+.viva-app .rating-list .field {
+  margin: 15px 0;
+}
+.viva-app .rating-list label {
+  font-size: 12px;
+}
+.viva-app .rating-list select {
+  font-size: 12px;
+}
+.viva-app .rating-list .field-help {
+  font-size: 10px;
+}
+.viva-app .metrics-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+.viva-app .metrics-summary .panel {
+  display: flex;
+  flex-direction: column;
+}
+.viva-app .metrics-summary .eyebrow {
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.viva-app .metric-value {
+  font-size: 34px;
+  color: #6586cc;
+  font-weight: 550;
+  margin: 10px 0;
+}
+.viva-app .metric-value small {
+  font-size: 14px;
+  color: #a8b7ce;
+}
+.viva-app .table-scroll {
+  overflow-x: auto;
+  margin-top: 25px;
+}
+.viva-app table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+.viva-app th {
+  font-weight: 550;
+  color: #6d84a5;
+  white-space: nowrap;
+}
+.viva-app td {
+  color: #8b9db6;
+}
+.viva-app th, .viva-app td {
+  padding: 16px 12px;
+  border-bottom: 1px solid #e6ecf5;
+}
+.viva-app thead th {
+  font-size: 10px;
+  background: #f7f9fc;
+}
+.viva-app .mobile-menu {
+  display: none;
+}
+.viva-app .nav-scrim {
+  display: none;
+}
+@media (min-width: 1450px) {
+  .viva-app .main-content {
+    padding: 44px 52px;
+  }
+  .viva-app .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 30px;
+  }
+  .viva-app .guide-card {
+    padding: 27px;
+  }
+  .viva-app .mode-option {
+    padding: 20px 16px;
+  }
+  .viva-app .mode-option strong {
+    font-size: 13px;
+  }
+  .viva-app .mode-option small {
+    font-size: 10px;
+  }
+  .viva-app .prepare-panel {
+    padding: 32px;
+  }
+  .viva-app .integration-card h3 {
+    font-size: 12px;
+  }
+  .viva-app .integration-card p {
+    font-size: 11px;
+  }
+  .viva-app .guide-card > h2 {
+    font-size: 23px;
+  }
+  .viva-app .guide-card > p, .viva-app .guide-steps strong {
+    font-size: 12px;
+  }
+  .viva-app .guide-steps p {
+    font-size: 11px;
+  }
+  .viva-app .guide-art {
+    height: 150px;
+  }
+  .viva-app .page-title h1 {
+    font-size: 35px;
+  }
+}
+@media (max-width: 1200px) {
+  .viva-app .sidebar {
+    width: 218px;
+    padding: 26px 15px 0;
+  }
+  .viva-app .brand {
+    font-size: 20px;
+    margin-left: 7px;
+  }
+  .viva-app .main-shell {
+    margin-left: 218px;
+  }
+  .viva-app .topbar {
+    padding: 0 27px;
+  }
+  .viva-app .main-content {
+    padding: 30px 27px 15px;
+  }
+  .viva-app .workspace-grid {
+    grid-template-columns: minmax(0, 1fr) 250px;
+    gap: 18px;
+  }
+  .viva-app .mode-options {
+    grid-template-columns: 1fr;
+  }
+  .viva-app .mode-option {
+    padding: 13px;
+  }
+  .viva-app .mode-option small {
+    font-size: 10px;
+  }
+  .viva-app .guide-card {
+    padding: 21px 19px;
+  }
+  .viva-app .guide-card > h2 {
+    font-size: 20px;
+  }
+  .viva-app .integration-grid {
+    gap: 8px;
+  }
+  .viva-app .integration-card {
+    padding: 14px 11px;
+  }
+  .viva-app .welcome-story {
+    padding: 30px;
+  }
+  .viva-app .welcome-story h2 {
+    font-size: 30px;
+  }
+  .viva-app .welcome-form {
+    padding: 28px;
+  }
+  .viva-app .topbar-right {
+    gap: 12px;
+  }
+  .viva-app .environment-label {
+    font-size: 10px;
+  }
+  .viva-app .staff-button {
+    padding-left: 12px;
+    font-size: 11px;
+  }
+  .viva-app .start-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .viva-app .start-row .button {
+    width: 100%;
+  }
+  .viva-app .report-outcome {
+    align-items: flex-start;
+  }
+  .viva-app .coverage {
+    padding-left: 17px;
+  }
+  .viva-app .coverage strong {
+    font-size: 30px;
+  }
+  .viva-app .page-title h1 {
+    font-size: 29px;
+  }
+}
+@media (max-width: 980px) {
+  .viva-app .sidebar {
+    width: 200px;
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+  .viva-app .brand {
+    font-size: 18px;
+    gap: 7px;
+  }
+  .viva-app .brand-sub {
+    font-size: 7px;
+    letter-spacing: 1.4px;
+  }
+  .viva-app .brand-symbol {
+    width: 33px;
+    height: 38px;
+  }
+  .viva-app .main-shell {
+    margin-left: 200px;
+  }
+  .viva-app .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .viva-app .right-column {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .viva-app .right-column .guide-card {
+    grid-column: 1/-1;
+    display: none;
+  }
+  .viva-app .right-column > .section-heading {
+    display: none;
+  }
+  .viva-app .note-card {
+    padding: 5px;
+    grid-column: 1/-1;
+  }
+  .viva-app .integration-list {
+    gap: 8px;
+    margin-bottom: 23px;
+  }
+  .viva-app .integration-list .integration-card {
+    padding: 12px;
+  }
+  .viva-app .session-outline {
+    margin: 0;
+  }
+  .viva-app .welcome-grid {
+    grid-template-columns: 1fr;
+  }
+  .viva-app .welcome-story {
+    display: none;
+  }
+  .viva-app .welcome-bottom {
+    gap: 10px;
+  }
+  .viva-app .topbar-right .environment-label {
+    display: none;
+  }
+  .viva-app .page-title {
+    align-items: flex-start;
+  }
+  .viva-app .page-title > .badge {
+    display: none;
+  }
+  .viva-app .two-columns {
+    gap: 16px;
+  }
+  .viva-app .panel {
+    padding: 21px;
+  }
+  .viva-app .report-outcome .round-icon {
+    display: none;
+  }
+  .viva-app .metrics-summary {
+    gap: 10px;
+  }
+  .viva-app .metrics-summary .panel {
+    padding: 15px;
+  }
+  .viva-app .metrics-summary .eyebrow {
+    font-size: 8px;
+  }
+  .viva-app .condition-grid {
+    gap: 10px;
+  }
+  .viva-app .condition-card {
+    padding: 16px;
+  }
+  .viva-app .condition-card small {
+    font-size: 9px;
+  }
+  .viva-app .history-card {
+    flex-wrap: wrap;
+  }
+  .viva-app .history-card .history-info {
+    min-width: 200px;
+  }
+  .viva-app .history-card > .button {
+    margin-left: 60px;
+  }
+  .viva-app .page-footer {
+    font-size: 8px;
+  }
+  .viva-app .filter-bar {
+    flex-wrap: wrap;
+  }
+  .viva-app .filter-bar label {
+    font-size: 11px;
+  }
+  .viva-app .filter-bar select {
+    min-width: 100px;
+  }
+  .viva-app .followup-list > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .viva-app .report-outcome h2 {
+    font-size: 19px;
+  }
+  .viva-app .report-outcome p {
+    font-size: 11px;
+  }
+}
+@media (max-width: 700px) {
+  .viva-app .sidebar {
+    transform: translateX(-100%);
+    width: 248px;
+    transition: transform 0.2s;
+  }
+  .viva-app .sidebar.open {
+    transform: translateX(0);
+  }
+  .viva-app .nav-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    background: #10284566;
+    border: 0;
+  }
+  .viva-app .main-shell {
+    margin-left: 0;
+  }
+  .viva-app .mobile-menu {
+    display: flex;
+  }
+  .viva-app .topbar {
+    height: 64px;
+    padding: 0 17px;
+  }
+  .viva-app .breadcrumb {
+    gap: 7px;
+    font-size: 10px;
+  }
+  .viva-app .breadcrumb > span {
+    display: none;
+  }
+  .viva-app .staff-button {
+    border: 0;
+    padding: 0;
+    font-size: 10px;
+    gap: 4px;
+  }
+  .viva-app .main-content {
+    padding: 27px 18px 12px;
+  }
+  .viva-app .page-title {
+    margin-bottom: 23px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .viva-app .page-title h1 {
+    font-size: 28px;
+    letter-spacing: -0.9px;
+  }
+  .viva-app .page-title p {
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .viva-app .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.4px;
+  }
+  .viva-app .welcome-form {
+    padding: 25px;
+  }
+  .viva-app .welcome-form h2 {
+    font-size: 25px;
+  }
+  .viva-app .welcome-bottom {
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin-top: 14px;
+  }
+  .viva-app .welcome-bottom > div {
+    padding-top: 13px;
+    padding-bottom: 13px;
+  }
+  .viva-app .welcome-bottom span {
+    top: 13px;
+  }
+  .viva-app .welcome-form > .section-heading {
+    margin-bottom: 10px;
+  }
+  .viva-app .welcome-form .badge {
+    font-size: 9px;
+  }
+  .viva-app .panel {
+    padding: 21px 18px;
+  }
+  .viva-app .steps {
+    gap: 28px;
+    margin-bottom: 22px;
+  }
+  .viva-app .steps > div {
+    font-size: 11px;
+  }
+  .viva-app .section-heading {
+    margin-bottom: 18px;
+  }
+  .viva-app .heading-with-icon {
+    gap: 10px;
+  }
+  .viva-app .section-heading h2 {
+    font-size: 16px;
+  }
+  .viva-app .light-step {
+    font-size: 9px;
+  }
+  .viva-app .mode-options {
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .viva-app .mode-option {
+    display: block;
+    position: relative;
+    padding: 14px 11px;
+  }
+  .viva-app .mode-option strong {
+    font-size: 11px;
+    margin-top: 10px;
+    white-space: normal;
+  }
+  .viva-app .mode-option small {
+    font-size: 9px;
+  }
+  .viva-app .mode-option .radio-dot {
+    position: absolute;
+    right: 12px;
+    top: 17px;
+  }
+  .viva-app .integration-grid {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  .viva-app .integration-card {
+    padding: 15px;
+    position: relative;
+    padding-left: 64px;
+  }
+  .viva-app .integration-top {
+    position: absolute;
+    left: 15px;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+  }
+  .viva-app .integration-card h3 {
+    font-size: 12px;
+  }
+  .viva-app .integration-card p {
+    font-size: 11px;
+  }
+  .viva-app .integration-card small {
+    font-size: 10px;
+  }
+  .viva-app .context-heading h2 {
+    font-size: 13px;
+  }
+  .viva-app .right-column {
+    grid-template-columns: 1fr;
+  }
+  .viva-app .integration-list {
+    display: none;
+  }
+  .viva-app .current-question {
+    font-size: 22px;
+  }
+  .viva-app .two-columns {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .viva-app .two-columns .panel {
+    margin-bottom: 20px;
+  }
+  .viva-app .report-outcome {
+    gap: 15px;
+    flex-direction: column;
+  }
+  .viva-app .coverage {
+    flex-direction: row;
+    gap: 10px;
+    border: 0;
+    border-top: 1px solid #e3eaf8;
+    padding: 15px 0 0;
+    width: 100%;
+    align-items: center;
+  }
+  .viva-app .coverage > span {
+    font-size: 11px;
+  }
+  .viva-app .condition-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .viva-app .condition-card {
+    padding: 14px 15px;
+    padding-left: 59px;
+  }
+  .viva-app .condition-card > span {
+    position: absolute;
+    left: 15px;
+    top: 17px;
+  }
+  .viva-app .condition-card small {
+    font-size: 10px;
+  }
+  .viva-app .metrics-summary {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .viva-app .metrics-summary .panel {
+    display: block;
+    margin-bottom: 14px;
+  }
+  .viva-app .metrics-summary .eyebrow {
+    display: block;
+  }
+  .viva-app .metrics-summary .metric-value {
+    display: block;
+    font-size: 30px;
+  }
+  .viva-app .metrics-summary .small {
+    font-size: 11px;
+  }
+  .viva-app .table-scroll {
+    margin-left: -5px;
+    margin-right: -5px;
+  }
+  .viva-app .card-actions {
+    flex-wrap: wrap;
+  }
+  .viva-app .card-actions .button {
+    font-size: 11px;
+    padding: 8px 10px;
+  }
+  .viva-app .card-actions > .button {
+    width: 100%;
+  }
+  .viva-app .card-actions > .button-row {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .viva-app .bank-card > h2 {
+    font-size: 18px;
+  }
+  .viva-app .filter-bar {
+    gap: 12px;
+  }
+  .viva-app .filter-bar label {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .viva-app .filter-bar select {
+    width: 70%;
+  }
+  .viva-app .filter-bar > .small {
+    margin-left: 0;
+  }
+  .viva-app .filter-bar > .icon-button {
+    margin-left: auto;
+  }
+  .viva-app .history-card {
+    gap: 13px;
+  }
+  .viva-app .history-info h2 {
+    font-size: 17px;
+  }
+  .viva-app .history-card .history-info {
+    min-width: 160px;
+  }
+  .viva-app .history-card > .button {
+    margin: 0;
+    width: 100%;
+  }
+  .viva-app .page-footer {
+    margin-top: 30px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .viva-app .modal-backdrop {
+    padding: 13px;
+  }
+  .viva-app .modal {
+    padding: 24px 20px;
+    max-height: 94vh;
+  }
+  .viva-app .recording-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 9px;
+  }
+  .viva-app .answer-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .viva-app .answer-footer .button {
+    width: 100%;
+  }
+  .viva-app .welcome-privacy {
+    font-size: 10px;
+  }
+  .viva-app .notice {
+    font-size: 11px;
+  }
+  .viva-app .report-outcome .eyebrow {
+    font-size: 8px;
+  }
+  .viva-app .report-outcome h2 {
+    font-size: 20px;
+  }
+  .viva-app .rating-list .two-columns {
+    gap: 0;
+  }
+  .viva-app .turn-list article {
+    gap: 10px;
+  }
+  .viva-app .turn-list .section-heading {
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+}
+@media print {
+  .viva-app {
+    background: white;
+    color: #111;
+    font-size: 11pt;
+  }
+  .viva-app .sidebar, .viva-app .topbar, .viva-app .page-footer, .viva-app .no-print, .viva-app .nav-scrim {
+    display: none !important;
+  }
+  .viva-app .main-shell {
+    margin: 0;
+  }
+  .viva-app .main-content {
+    padding: 0;
+    max-width: none;
+  }
+  .viva-app .page-title {
+    margin-bottom: 20px;
+  }
+  .viva-app h1 {
+    font-size: 24pt;
+  }
+  .viva-app .page-title p {
+    color: #444;
+  }
+  .viva-app .panel {
+    box-shadow: none;
+    break-inside: avoid;
+    border: 1px solid #ddd;
+    background: white !important;
+    border-radius: 0;
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+  .viva-app .two-columns {
+    display: block;
+  }
+  .viva-app .report-outcome {
+    display: flex;
+  }
+  .viva-app .coverage {
+    padding-left: 15px;
+  }
+  .viva-app .muted, .viva-app .plain-list, .viva-app .concept-reports p, .viva-app .report-outcome p {
+    color: #444 !important;
+  }
+  .viva-app .resource {
+    color: #333;
+  }
+  .viva-app .badge {
+    border-color: #ccc;
+    color: #444;
+    background: white;
+  }
+  .viva-app details {
+    display: block;
+  }
+  .viva-app details::details-content {
+    display: block;
+  }
+  .viva-app .notice.error {
+    display: none;
+  }
+  .viva-app .concept-reports article {
+    break-inside: avoid;
+  }
+  .viva-app a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+  }
+}
+
+
+.viva-app .button, .viva-app .text-button, .viva-app .staff-button, .viva-app .small, .viva-app .mode-option strong {
+  font-size: 14px;
+}
+.viva-app .field-help, .viva-app .footnote, .viva-app .badge, .viva-app .heading-with-icon p, .viva-app .mode-option small, .viva-app .integration-card small, .viva-app .sidebar-user strong, .viva-app .sidebar-user span {
+  font-size: 12px;
+}
+.viva-app .integration-card p, .viva-app .guide-steps strong, .viva-app .guide-steps p, .viva-app .note-card p {
+  font-size: 14px;
+}
+.viva-app .nav-item {
+  font-size: 14px;
+  gap: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  white-space: normal;
+}
+.viva-app .nav-item > svg {
+  flex-shrink: 0;
+}
+.viva-app .nav-lock {
+  display: none;
+}
+
+.viva-app .course-studio { margin: 24px 0; }
+.viva-app .course-studio label { display: grid; gap: 8px; margin: 16px 0; }
+.viva-app .course-studio details { margin: 14px 0; }
+.viva-app .source-preview { max-height: 360px; overflow: auto; padding: 12px; background: var(--surface, #f8fafc); }

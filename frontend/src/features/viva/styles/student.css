@@ -1,0 +1,185 @@
+
+.viva-app .st {
+  --st-ink: #0f172a;
+  --st-muted: #64748b;
+  --st-line: #e2e8f0;
+  --st-card: #ffffff;
+  --st-soft: #f1f5f9;
+  --st-accent: #4f46e5;
+  --st-accent-soft: #eef2ff;
+  --st-green: #059669;
+  --st-amber: #d97706;
+  --st-rose: #e11d48;
+  color: var(--st-ink);
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  gap: 20px;
+}
+.viva-app .st h1, .viva-app .st h2, .viva-app .st h3 { margin: 0; letter-spacing: -0.01em; }
+.viva-app .st p { margin: 0; }
+.viva-app .st-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--st-accent); }
+.viva-app .st-muted { color: var(--st-muted); }
+.viva-app .st-small { font-size: 14px; }
+.viva-app .st-card { background: rgb(255 255 255 / 0.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--st-line); border-radius: 20px; padding: 24px; box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.04); }
+.viva-app .st-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.viva-app .st-between { justify-content: space-between; }
+.viva-app .st-grid-2 { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+
+.viva-app .st-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; border-radius: 12px; padding: 11px 18px; font-weight: 600; font-size: 15px; transition: background 0.15s, box-shadow 0.15s, transform 0.05s; }
+.viva-app .st-btn:active:not(:disabled) { transform: translateY(1px); }
+.viva-app .st-btn:disabled { opacity: 0.5; }
+.viva-app .st-btn-primary { background: var(--st-accent); color: #fff; box-shadow: 0 6px 16px rgb(79 70 229 / 0.25); }
+.viva-app .st-btn-primary:hover:not(:disabled) { background: #4338ca; }
+.viva-app .st-btn-ghost { background: #fff; border-color: var(--st-line); color: var(--st-ink); }
+.viva-app .st-btn-ghost:hover:not(:disabled) { background: var(--st-soft); }
+.viva-app .st-btn-danger { background: #fff1f2; color: var(--st-rose); border-color: #fecdd3; }
+.viva-app .st-link { background: none; border: 0; padding: 0; color: var(--st-accent); font-weight: 600; font-size: 14px; }
+.viva-app .st-btn:focus-visible, .viva-app .st-link:focus-visible, .viva-app .st-option:focus-visible, .viva-app .st-mic:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+
+
+.viva-app:has(.st) {
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 520px at 8% -8%, #e0e7ff 0%, transparent 62%),
+    radial-gradient(760px 460px at 100% 4%, #fce7f3 0%, transparent 58%),
+    radial-gradient(900px 600px at 55% 110%, #ede9fe 0%, transparent 60%),
+    #f8fafc;
+  background-attachment: fixed;
+}
+.viva-app:has(.st) .main-content { background: transparent; }
+
+
+.viva-app .st-hero h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.15; margin-top: 6px; }
+.viva-app .st-hero p { margin-top: 10px; font-size: 17px; }
+.viva-app .st-options { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-top: 14px; }
+.viva-app .st-option { text-align: left; background: #fff; border: 1.5px solid var(--st-line); border-radius: 16px; padding: 16px; display: grid; gap: 6px; transition: border-color 0.15s, box-shadow 0.15s; }
+.viva-app .st-option:hover { border-color: #c7d2fe; }
+.viva-app .st-option[aria-pressed="true"] { border-color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
+.viva-app .st-option strong { font-size: 16px; }
+.viva-app .st-option .st-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--st-accent-soft); color: var(--st-accent); }
+.viva-app .st-label { font-weight: 600; font-size: 15px; }
+.viva-app .st-steps { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.viva-app .st-steps div { display: flex; gap: 12px; align-items: flex-start; }
+.viva-app .st-steps > div > span { flex: none; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: var(--st-accent-soft); color: var(--st-accent); font-weight: 700; font-size: 14px; }
+.viva-app .st details summary { cursor: pointer; font-weight: 600; }
+
+
+.viva-app .st-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.viva-app .st-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--st-soft); font-size: 13px; font-weight: 600; color: var(--st-muted); }
+.viva-app .st-chip-accent { background: var(--st-accent-soft); color: var(--st-accent); }
+.viva-app .st-progress { height: 6px; border-radius: 999px; background: var(--st-soft); overflow: hidden; }
+.viva-app .st-progress span { display: block; height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: inherit; transition: width 0.4s; }
+.viva-app .st-stage { display: grid; justify-items: center; text-align: center; gap: 18px; padding: 36px 24px; }
+.viva-app .st-orb { width: 96px; height: 96px; border-radius: 999px; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 30% 30%, #818cf8, #4f46e5); box-shadow: 0 12px 32px rgb(79 70 229 / 0.35); }
+.viva-app .st-orb.is-speaking { animation: st-pulse 1.4s ease-in-out infinite; }
+.viva-app .st-orb.is-listening { background: radial-gradient(circle at 30% 30%, #fb7185, #e11d48); box-shadow: 0 12px 32px rgb(225 29 72 / 0.35); animation: st-pulse 1s ease-in-out infinite; }
+.viva-app .st-orb.is-thinking { background: radial-gradient(circle at 30% 30%, #a78bfa, #7c3aed); animation: st-spin-glow 1.6s linear infinite; }
+@keyframes st-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
+@keyframes st-spin-glow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(40deg); } }
+.viva-app .st-question { font-size: clamp(21px, 2.6vw, 28px); line-height: 1.35; font-weight: 650; max-width: 760px; }
+.viva-app .st-status { font-size: 14px; color: var(--st-muted); min-height: 21px; }
+.viva-app .st-mic { width: 76px; height: 76px; border-radius: 999px; border: 0; display: grid; place-items: center; background: var(--st-accent); color: #fff; box-shadow: 0 10px 24px rgb(79 70 229 / 0.3); transition: background 0.15s; }
+.viva-app .st-mic.is-recording { background: var(--st-rose); box-shadow: 0 10px 24px rgb(225 29 72 / 0.3); }
+.viva-app .st-mic:disabled { opacity: 0.5; }
+.viva-app .st-answer { width: 100%; max-width: 760px; display: grid; gap: 10px; text-align: left; }
+.viva-app .st-answer textarea { width: 100%; border: 1.5px solid var(--st-line); border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.5; resize: vertical; background: #fff; color: var(--st-ink); }
+.viva-app .st-answer textarea:focus { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
+.viva-app .st-history { display: grid; gap: 14px; }
+.viva-app .st-turn { display: grid; gap: 6px; padding-left: 14px; border-left: 3px solid var(--st-line); }
+.viva-app .st-turn blockquote { margin: 0; color: var(--st-muted); }
+
+
+.viva-app .st-outcome { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; border-width: 2px; }
+.viva-app .st-outcome.tone-knowledge { border-color: #fecdd3; background: linear-gradient(135deg, #fff, #fff1f2); }
+.viva-app .st-outcome.tone-communication { border-color: #fde68a; background: linear-gradient(135deg, #fff, #fffbeb); }
+.viva-app .st-outcome.tone-strong { border-color: #a7f3d0; background: linear-gradient(135deg, #fff, #ecfdf5); }
+.viva-app .st-signals { border-collapse: collapse; width: 100%; font-size: 13px; }
+.viva-app .st-signals th, .viva-app .st-signals td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--st-line); }
+.viva-app .st-signals th { color: var(--st-muted); font-weight: 600; }
+.viva-app .st-signals .is-counted { color: var(--st-rose); font-weight: 700; }
+.viva-app .st-outcome.tone-mixed { border-color: var(--st-line); background: linear-gradient(135deg, #fff, #f8fafc); }
+.viva-app .st-outcome h1 { font-size: clamp(26px, 3.4vw, 34px); margin: 6px 0 8px; }
+.viva-app .st-ring { --value: 0; width: 120px; height: 120px; border-radius: 999px; display: grid; place-items: center; background: conic-gradient(var(--st-accent) calc(var(--value) * 1%), var(--st-soft) 0); }
+.viva-app .st-ring div { width: 92px; height: 92px; border-radius: 999px; background: #fff; display: grid; place-items: center; text-align: center; line-height: 1.1; }
+.viva-app .st-ring strong { font-size: 26px; }
+.viva-app .st-ring small { font-size: 11px; color: var(--st-muted); }
+.viva-app .st-plan { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 12px; counter-reset: step; }
+.viva-app .st-plan li { counter-increment: step; display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; }
+.viva-app .st-plan li::before { content: counter(step); width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; background: var(--st-accent); color: #fff; font-weight: 700; font-size: 14px; }
+.viva-app .st-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.viva-app .st-tag { padding: 5px 11px; border-radius: 999px; font-size: 13px; font-weight: 500; background: var(--st-soft); }
+.viva-app .st-tag.good { background: #ecfdf5; color: #047857; }
+.viva-app .st-tag.warn { background: #fffbeb; color: #b45309; }
+.viva-app .st-concept { display: grid; gap: 8px; padding: 16px; border: 1px solid var(--st-line); border-radius: 14px; }
+.viva-app .st-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-top: 14px; }
+.viva-app .st-stat { background: var(--st-soft); border-radius: 12px; padding: 12px 14px; }
+.viva-app .st-stat strong { display: block; font-size: 20px; }
+.viva-app .st-stat span { font-size: 13px; color: var(--st-muted); }
+.viva-app .st-dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+
+@media (max-width: 640px) {
+  .viva-app .st-card { padding: 18px; border-radius: 16px; }
+  .viva-app .st-outcome { grid-template-columns: 1fr; }
+  .viva-app .st-stage { padding: 24px 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viva-app .st-orb { animation: none !important; }
+}
+@media print {
+  .viva-app .no-print { display: none !important; }
+  .viva-app .st-card { box-shadow: none; }
+}
+
+
+.viva-app .st-mascot { display: grid; place-items: center; }
+.viva-app .st-mascot svg { overflow: visible; }
+.viva-app .st-mascot * { transform-box: fill-box; transform-origin: center; }
+.viva-app .st-mascot .av-head { transform-origin: 50% 90%; transition: transform 0.5s ease; animation: av-breathe 5s ease-in-out infinite; }
+.viva-app .st-mascot .av-iris { transition: transform 0.4s ease; animation: av-glance 9s ease-in-out infinite; }
+.viva-app .st-mascot .av-lid { transform-origin: top; transform: scaleY(0.3); animation: av-blink 4.5s infinite; }
+.viva-app .st-mascot .av-brow { transition: transform 0.35s ease; }
+.viva-app .st-mascot .av-talk { opacity: 0; transform-origin: center; }
+.viva-app .st-mascot .av-smile { transition: opacity 0.15s; }
+.viva-app .st-mascot .av-waves, .viva-app .st-mascot .av-dots { opacity: 0; transition: opacity 0.3s; }
+.viva-app .st-mascot .av-halo { opacity: 0.6; transition: opacity 0.3s; }
+
+.viva-app .st-mascot.is-speaking .av-smile { opacity: 0; }
+.viva-app .st-mascot.is-speaking .av-talk { opacity: 1; animation: av-lips 0.9s steps(1) infinite; }
+.viva-app .st-mascot.is-speaking .av-brow { animation: av-emphasis 2.4s ease-in-out infinite; }
+.viva-app .st-mascot.is-speaking .av-halo { opacity: 1; }
+
+.viva-app .st-mascot.is-listening .av-waves { opacity: 1; }
+.viva-app .st-mascot.is-listening .av-waves path { animation: av-wave 1.2s ease-in-out infinite; }
+.viva-app .st-mascot.is-listening .av-waves path:nth-child(even) { animation-delay: 0.3s; }
+.viva-app .st-mascot.is-listening .av-brow { transform: translateY(-3px); }
+.viva-app .st-mascot.is-listening .av-head { animation: av-listen 3s ease-in-out infinite; }
+.viva-app .st-mascot.is-listening .av-iris { animation: none; transform: translate(0, 0); }
+
+.viva-app .st-mascot.is-thinking .av-iris { animation: none; transform: translate(4px, -4px); }
+.viva-app .st-mascot.is-thinking .av-brow-r { transform: translateY(-4px) rotate(-6deg); }
+.viva-app .st-mascot.is-thinking .av-head { transform: rotate(-4deg); animation: none; }
+.viva-app .st-mascot.is-thinking .av-dots { opacity: 1; }
+.viva-app .st-mascot.is-thinking .av-dots circle { animation: av-dot 1.2s ease-in-out infinite; }
+.viva-app .st-mascot.is-thinking .av-dots circle:nth-child(2) { animation-delay: 0.2s; }
+.viva-app .st-mascot.is-thinking .av-dots circle:nth-child(3) { animation-delay: 0.4s; }
+
+.viva-app .st-mascot.is-nodding .av-head { animation: av-nod 0.8s ease-in-out 2; }
+.viva-app .st-mascot.is-nodding .av-brow { transform: translateY(-2px); }
+@keyframes av-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes av-blink { 0%, 93%, 100% { transform: scaleY(0.3); } 96% { transform: scaleY(1); } }
+@keyframes av-glance { 0%, 40%, 100% { transform: translate(0, 0); } 45%, 60% { transform: translate(-3px, 1px); } 65%, 85% { transform: translate(2px, 0); } }
+@keyframes av-lips {
+  0% { transform: scale(1, 0.35); } 12% { transform: scale(0.9, 1); } 25% { transform: scale(1.05, 0.6); }
+  37% { transform: scale(0.8, 0.9); } 50% { transform: scale(1, 0.3); } 62% { transform: scale(0.95, 1.1); }
+  75% { transform: scale(0.85, 0.5); } 87% { transform: scale(1, 0.8); }
+}
+@keyframes av-emphasis { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-3px); } }
+@keyframes av-listen { 0%, 100% { transform: rotate(3deg); } 50% { transform: rotate(3deg) translateY(2px); } }
+@keyframes av-nod { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px) rotate(1deg); } }
+@keyframes av-wave { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes av-dot { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .viva-app .st-mascot * { animation: none !important; transition: none !important; }
+}
