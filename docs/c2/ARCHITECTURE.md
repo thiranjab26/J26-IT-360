@@ -81,12 +81,12 @@ All distances are divided by inter-ocular distance so they are scale-invariant.
 
 | Signal | How | Notes |
 |---|---|---|
-| `earL`, `earR` | Eye aspect ratio from six eyelid landmarks per eye | Common MediaPipe indices: left `33,160,158,133,153,144`, right `362,385,387,263,373,380`. Verify with the debug overlay. |
+| `earL`, `earR` | Eye aspect ratio from six eyelid landmarks per eye, 3D distances | Subject's right eye `33,160,158,133,153,144`, left `362,385,387,263,373,380` (MediaPipe names sides from the subject's view; checked against the library's region sets in a unit test). 3D rather than the original 2D so a lowered head does not look like closing eyes. |
 | `irisDx`, `irisDy` | Iris centre offset from eye-corner midpoint, normalised by eye width | Iris landmarks are 468–477. This is a gaze *proxy*, not calibrated gaze. |
 | `yaw`, `pitch`, `roll` | Head pose from landmark geometry (or provider matrix) | Degrees. |
-| `browRaiseL/R` | Brow-to-eye vertical distance | |
-| `browFurrow` | Inner-brow separation | |
-| `mouthOpen`, `lipPress` | Lip distances | Expression proxies (FR3). |
+| `browRaise` | Brow (105/334) to upper lid (159/386), mean of both sides | |
+| `browInnerGap` | Inner-brow separation (107–336) | Furrowing shows as a *decrease*. |
+| `mouthOpen`, `lipThickness` | Inner-lip gap (13–14); outer-to-inner lip thickness (0–13 + 14–17) | Expression proxies (FR3). Lip pressing shows as a *decrease* in thickness. |
 | `facePresent`, `score` | From provider | Drives FR8. |
 
 ### 5.2 Blink detection
@@ -110,9 +110,9 @@ Proposed `F = 14` **(tune)**:
 | 8 | head pitch std | Head |
 | 9 | head angular speed (mean abs frame-to-frame change) | Head |
 | 10 | brow raise mean | Brow |
-| 11 | brow furrow mean | Brow |
+| 11 | brow inner gap mean (furrow = decrease) | Brow |
 | 12 | mouth-open mean | Expression (FR3, ablatable) |
-| 13 | lip-press mean | Expression (FR3, ablatable) |
+| 13 | lip thickness mean (press = decrease) | Expression (FR3, ablatable) |
 
 Plus a `validRatio` (fraction of frames with a face) kept alongside as a mask, not as a model input.
 
@@ -132,7 +132,7 @@ Individual differences (resting blink rate, brow position, glasses) are larger t
 
 | Situation | Behaviour |
 |---|---|
-| Face missing < 2 s | Hold last per-frame signals; second is still valid if `validRatio ≥ 0.5` |
+| Face missing < 2 s | Features use only frames with a face (holding the last values was dropped: repeated values would shrink the dispersion and speed features); the second is still valid if `validRatio ≥ 0.5`. Presence stays unchanged. |
 | Second has `validRatio < 0.5` | Mark second invalid |
 | Window has > 30 % invalid seconds **(tune)** | Don't classify. Emit `status: "no_face"`, `load_state: null` |
 | Face returns | Resume immediately; window refills naturally. No recalibration unless absent > 5 min |

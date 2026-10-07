@@ -71,21 +71,37 @@ Preparation material for every item below (question lists, request text, checkli
 ### A4. Features [FR2, FR3, FR8]
 
 - [ ] Landmark index constants in one file, each verified on the debug overlay
-- [ ] `ear()`, inter-ocular normalisation
-- [ ] Blink state machine using frame timestamps and a baseline-relative threshold
-- [ ] Iris offset → gaze proxy; dispersion
-- [ ] Head pose (yaw/pitch/roll) from landmarks
-- [ ] Brow raise, brow furrow; mouth-open, lip-press (expression proxies)
-- [ ] Drowsiness signals (ARCHITECTURE.md §8a): PERCLOS (share of time eyes ≥ 80 % closed over 60 s), long-blink count (> 500 ms), yawn events (sustained mouth-open), head-nod events (pitch drop + recovery). Thresholds baseline-relative and commented.
-- [ ] Presence signals: face present / looking away (head pose or gaze off-screen for > N s) / absent (no face > 2 s)
-- [ ] Per-second aggregator → feature vector (F=14) + `validRatio`
-- [ ] 30 s ring buffer; face-loss rules from ARCHITECTURE.md §5.5
-- [ ] Baseline calibration (60 s) and z-scoring
-- [ ] `useExpressionFeatures` flag
-- [ ] `feature_spec.json` generator with a version hash
+  - `src/core/features/landmark-indices.ts`. Every index is checked automatically against `MEDIAPIPE_FACE_MESH_KEYPOINTS_BY_CONTOUR` from face-landmarks-detection (`tests/unit/features/landmark-indices.test.ts`), which caught nothing but would catch a left/right swap. The demo's **Feature points** switch rings and numbers each one. **Still to do by hand:** turn it on with your real face and check each label sits where its comment says (≈1 min), then tick.
+- [x] `ear()`, inter-ocular normalisation
+  - `features/eye.ts`. EAR uses 3D distances (2D would read a lowered head as closing eyes). IOD = distance between eye-corner midpoints (pupils move with gaze). Landmarks are rescaled by frame aspect so all axes share one unit (`geometry.ts`).
+- [x] Blink state machine using frame timestamps and a baseline-relative threshold
+  - `features/blink.ts`: close below 75 % / reopen above 85 % of open-eye EAR (hysteresis), 80–500 ms = blink, longer = long closure. Closure start/end are midpoints between frames, so durations are within one frame interval at 10–60 fps (tested). EAR is not smoothed: at 15 fps a blink is only 2–5 frames. Open-eye EAR = 10 s running median until calibration ends, then frozen.
+- [x] Iris offset → gaze proxy; dispersion
+  - Measured along the face's own axes, so turning the head does not fake an eye movement (tested at 25° yaw + 15° roll). Called a proxy everywhere: it cannot say where on the screen someone looks.
+- [x] Head pose (yaw/pitch/roll) from landmarks
+  - `features/head-pose.ts`: axes from outer eye corners and forehead→chin, Gram–Schmidt, decomposed as Ry·Rx·Rz. Recovers synthetic poses to <0.001° up to ±40°. Signs documented and tested (yaw + = subject turns to their right; pitch + = head down). Features use pose relative to the learner's neutral and its variability, never absolute angles.
+- [x] Brow raise, brow furrow; mouth-open, lip-press (expression proxies)
+  - Named for what they measure: `browInnerGap` and `lipThickness` fall when furrowing / pressing (ARCHITECTURE.md §5.1, §5.3 updated). All divided by IOD.
+- [x] Drowsiness signals (ARCHITECTURE.md §8a): PERCLOS (share of time eyes ≥ 80 % closed over 60 s), long-blink count (> 500 ms), yawn events (sustained mouth-open), head-nod events (pitch drop + recovery). Thresholds baseline-relative and commented.
+  - Eyes-closed fraction per second (PERCLOS proxy over 60 s), long closures from the blink detector, `YawnDetector` (gap > 0.45 IOD for ≥ 1.5 s), `NodDetector` (pitch drop > 15° and back within 2.5 s; looking down longer is not a nod). Counts are in each second's `aux`, not in the 14 model features. The fatigue *classification* is A5.
+- [x] Presence signals: face present / looking away (head pose or gaze off-screen for > N s) / absent (no face > 2 s)
+  - `window/presence.ts`: away = off-screen (yaw > 25°, pitch > 20° or iris > 0.18 eye widths from neutral) continuously for > 3 s; absent = no face > 2 s.
+- [x] Per-second aggregator → feature vector (F=14) + `validRatio`
+  - `window/second-aggregator.ts`. Seconds on the frame clock; gaps (tab hidden) are emitted as empty invalid seconds. Head speed in deg/s from frame time, so it is rate-independent (tested at 10/15/30 fps). Std is population std (NumPy default).
+- [x] 30 s ring buffer; face-loss rules from ARCHITECTURE.md §5.5
+  - `window/feature-window.ts`: classifiable only when full and ≤ 30 % invalid; invalid rows are zeroed in the model input with a mask, never interpolated. Recalibration after > 5 min absent. **Changed from §5.5:** features no longer "hold last values" through short face loss (it would bias dispersion/speed to 0); §5.5 updated.
+- [x] Baseline calibration (60 s) and z-scoring
+  - `window/baseline.ts`: first 60 *valid* seconds; population std; std < 1e-6 → z = 0; z clipped to ±5. Gaze/pose neutral and open-eye EAR freeze at the same moment.
+- [x] `useExpressionFeatures` flag
+  - Zeroes features 12–13 and nothing else (tested). Fixed per pipeline: switching it in the demo starts a new calibration, because mixing baselines would corrupt the ablation.
+- [x] `feature_spec.json` generator with a version hash
+  - `pnpm feature-spec` → `public/models/classifier/feature_spec.json` (committed): names, order, units, validity, normalisation, ablation and every threshold in `FEATURE_CONFIG`, plus `code_hash` = SHA-256 over the spec and all `features/` + `window/` sources. A unit test fails when the file is stale (`--check` does the same from the CLI).
 - [ ] Fixtures: record a few landmark sequences from yourself (blinking on purpose, looking away, turning head, leaving frame) — arrays only, no images
-- [ ] Unit tests per feature against fixtures, including "same result at 10 fps and 30 fps"
-- [ ] Live feature strip chart in the debug overlay (you will stare at this a lot)
+  - Tool ready: the demo's **DEV · Fixture recorder** (dev server only; not in production builds) saves only the ~40 feature landmarks as numbers. Put files in `tests/fixtures/`; `recorded-fixtures.test.ts` runs them automatically and checks the blink count if you enter how many you made. **Needs you:** record blinks / look-away / head-turn / leave-frame (20 s each).
+- [x] Unit tests per feature against fixtures, including "same result at 10 fps and 30 fps"
+  - Synthetic face with known ground truth (`tests/fixtures/synthetic-face.ts`, geometry only) drives 100+ feature tests; the rate test compares all 14 features over 30 s at 10 vs 30 fps with jitter. Real recordings join automatically once recorded.
+- [x] Live feature strip chart in the debug overlay (you will stare at this a lot)
+  - Signals dashboard: calibration progress, KPI tiles (presence, blink rate, eyes-closed %, head pose, drowsiness events, gaze pad), per-frame EAR trace with threshold and blink markers, and the 14 features as small multiples (raw / z-score) with a shared hover crosshair and calibration / no-face bands. Canvas, theme-aware, one hue per single-series chart, no chart library.
     
 ### A5. Events and public API [FR5, FR6, NFR8]
 
