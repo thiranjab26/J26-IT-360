@@ -19,7 +19,8 @@
     "test:e2e": "playwright test",
     "bench": "tsx scripts/bench.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
-    "fetch-models": "tsx scripts/fetch-models.ts"
+    "fetch-models": "tsx scripts/fetch-models.ts",
+    "feature-spec": "tsx scripts/feature-spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
