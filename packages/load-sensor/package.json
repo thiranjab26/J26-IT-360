@@ -18,7 +18,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "bench": "tsx scripts/bench.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm test"
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "fetch-models": "tsx scripts/fetch-models.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -33,5 +34,15 @@
     "typescript-eslint": "8.71.1",
     "vite": "8.3.3",
     "vitest": "5.0.3"
+  },
+  "dependencies": {
+    "@mediapipe/face_detection": "0.4.1646425229",
+    "@mediapipe/face_mesh": "0.4.1633559619",
+    "@tensorflow-models/face-detection": "1.0.3",
+    "@tensorflow-models/face-landmarks-detection": "1.0.6",
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "4.22.0",
+    "@tensorflow/tfjs-converter": "4.22.0",
+    "@tensorflow/tfjs-core": "4.22.0"
   }
 }

@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "note": "Lock file for third-party assets in public/. Written by `pnpm fetch-models`; do not edit by hand.",
+  "assets": [
+    {
+      "id": "mediapipe-face-detection-short",
+      "source": "https://tfhub.dev/mediapipe/tfjs-model/face_detection/short/1",
+      "license": "Apache-2.0",
+      "dest": "models/facemesh/detector",
+      "files": {
+        "model.json": {
+          "sha256": "c131145fade749f714d39811f282e973760a69cb9e1a9c22f91e132bd8dcd396",
+          "bytes": 75722
+        },
+        "group1-shard1of1.bin": {
+          "sha256": "e9b69ee1c1f8cd33c58120bcd75bf8c56bfba20c880f447e9d293ec102059d4b",
+          "bytes": 201268
+        }
+      }
+    },
+    {
+      "id": "mediapipe-attention-mesh",
+      "source": "https://tfhub.dev/mediapipe/tfjs-model/face_landmarks_detection/attention_mesh/1",
+      "license": "Apache-2.0",
+      "dest": "models/facemesh/landmarks",
+      "files": {
+        "model.json": {
+          "sha256": "df2f0944de7d65f8ce0377deb2ee658e24eca778f8e4d6fd70689e2d59f9634b",
+          "bytes": 934817
+        },
+        "group1-shard1of1.bin": {
+          "sha256": "1ae49614abaa80c6efce9b39e2ec316314fc4d6fab183409afb0a97ae13ba892",
+          "bytes": 2382414
+        }
+      }
+    },
+    {
+      "id": "tfjs-backend-wasm",
+      "source": "npm:@tensorflow/tfjs-backend-wasm@4.22.0",
+      "license": "Apache-2.0",
+      "dest": "wasm",
+      "files": {
+        "tfjs-backend-wasm.wasm": {
+          "sha256": "70a5d516060464e5269f01c74bac1772d6b8ab6cb612acf16b5cdaf61f78d892",
+          "bytes": 311123
+        },
+        "tfjs-backend-wasm-simd.wasm": {
+          "sha256": "77ebb28a6d34f371dbbf2086b7f2de8994acd8ea5a3cf1fa24d2c26c840cac7b",
+          "bytes": 424594
+        },
+        "tfjs-backend-wasm-threaded-simd.wasm": {
+          "sha256": "c052228d4bef185c27bbe59a9e029570c78bbb9f08b3cb46b597851650373de2",
+          "bytes": 435643
+        }
+      }
+    }
+  ]
+}
