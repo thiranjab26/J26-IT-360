@@ -17,9 +17,26 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 |---|---|---|---|---|
 | GET | `/health`, `/api/v1/curriculum/health` | public | Liveness | done |
 | GET | `/api/v1/curriculum/graph?module=dsa` | signed in | Prerequisite graph: concepts with depth, edges, stats; a module view keeps its cross-module prerequisites | done |
+| GET | `/api/v1/curriculum/me/mastery?module=prog` | signed in | My BKT mastery per concept (`null` = no evidence yet) | done |
+| GET | `/api/v1/curriculum/me/recommendation?module=dsa` | signed in | Next concept, one-sentence explanation, locked concepts and their weak prerequisite (`rules-v1`) | done |
+| POST | `/api/v1/curriculum/dev/attempts` | signed in, dev + stub only | C3 stand-in: record one practice answer for me and update my mastery | done |
 
-Arriving next: mastery, recommendations, assessments, gain, feedback, and the
-lecturer cohort and graph-edit routes.
+Arriving next: assessments, gain, feedback, and the lecturer cohort and
+graph-edit routes.
+
+## Mastery and recommendations
+
+- `app/domain/mastery.py`: BKT. Practice answers get the learning step; pre-test
+  and post-test answers do not (a test only measures). Correct = right on the
+  first try without a hint.
+- `app/db/mastery_store.py`: reads new attempts from `curriculum.stub_attempt_outcomes`
+  (stub mode) or `tutor.v_attempt_outcomes` (live mode), stores every answer in
+  `mastery_evidence` with mastery before and after, and keeps `concept_mastery`.
+  Reads ingest the learner's new attempts first, so mastery is never stale.
+- `app/domain/recommend.py`: `rules-v1`. Ready = every prerequisite mastered
+  (>= 0.70); the ready concept with the lowest mastery comes next. When a module
+  is blocked by another module (DSA by PF), the weak PF prerequisite comes first.
+- Views for other components: `curriculum.v_mastery`, `v_topic_mastery`, `v_next_topic`.
 
 ## The prerequisite graph
 

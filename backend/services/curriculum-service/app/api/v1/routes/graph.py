@@ -6,29 +6,22 @@ from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.core.deps import CurrentUser, current_user
 from app.core.errors import ApiError
-from app.domain.graph import GraphError
-from app.domain.graph_loader import GraphCache, GraphUnavailableError
+from app.domain.graph import GraphError, PrerequisiteGraph
+from app.domain.graph_loader import GraphCache, GraphUnavailableError, LoadedGraph
 from app.models.graph import GraphEdge, GraphNode, GraphResponse, GraphStats
 
 router = APIRouter(tags=["graph"])
+
+MODULE_PATTERN = r"^[a-z]{2,16}$"
 
 
 def get_graph_cache(request: Request) -> GraphCache:
     return request.app.state.graph_runtime.cache
 
 
-@router.get("/graph", response_model=GraphResponse, summary="Prerequisite graph")
-def read_graph(
-    module: str | None = Query(
-        default=None,
-        pattern=r"^[a-z]{2,16}$",
-        description="Limit to one module (e.g. dsa); its cross-module prerequisites are included.",
-    ),
-    _: CurrentUser = Depends(current_user),
-    cache: GraphCache = Depends(get_graph_cache),
-) -> GraphResponse:
+def load_graph(cache: GraphCache) -> LoadedGraph:
     try:
-        loaded = cache.get()
+        return cache.get()
     except GraphUnavailableError as exc:
         raise ApiError(
             status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -36,17 +29,31 @@ def read_graph(
             "The prerequisite graph is temporarily unavailable.",
         ) from exc
 
-    graph = loaded.graph
-    if module is not None:
-        try:
-            graph = graph.for_module(module)
-        except GraphError as exc:
-            raise ApiError(
-                status.HTTP_404_NOT_FOUND,
-                "unknown_module",
-                f"No concepts belong to module '{module}'.",
-                {"modules": list(loaded.graph.module_ids())},
-            ) from exc
+
+def module_view(graph: PrerequisiteGraph, module: str) -> PrerequisiteGraph:
+    try:
+        return graph.for_module(module)
+    except GraphError as exc:
+        raise ApiError(
+            status.HTTP_404_NOT_FOUND,
+            "unknown_module",
+            f"No concepts belong to module '{module}'.",
+            {"modules": list(graph.module_ids())},
+        ) from exc
+
+
+@router.get("/graph", response_model=GraphResponse, summary="Prerequisite graph")
+def read_graph(
+    module: str | None = Query(
+        default=None,
+        pattern=MODULE_PATTERN,
+        description="Limit to one module (e.g. dsa); its cross-module prerequisites are included.",
+    ),
+    _: CurrentUser = Depends(current_user),
+    cache: GraphCache = Depends(get_graph_cache),
+) -> GraphResponse:
+    loaded = load_graph(cache)
+    graph = loaded.graph if module is None else module_view(loaded.graph, module)
 
     nodes = [
         GraphNode(

@@ -14,11 +14,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
-from app.api.v1.routes import health
+from app.api.v1.routes import dev, health
 from app.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.db.graph_wiring import build_graph_runtime
+from app.db.mastery_store import MasteryStore
+from app.db.session import get_engine
+from app.domain.learner import Learner
+from app.integrations.attempts import attempts_relation
 
 SERVICE_NAME = "curriculum-service"
 API_PREFIX = "/api/v1/curriculum"
@@ -49,6 +53,9 @@ def create_app() -> FastAPI:
     # The graph is loaded on the first request and kept in memory; nothing
     # connects to a database at startup, so the service starts even when one is down.
     app.state.graph_runtime = build_graph_runtime(settings)
+    app.state.learner = Learner(
+        MasteryStore(get_engine(), attempts_relation(settings.integration_mode))
+    )
 
     app.add_middleware(RequestContextMiddleware)
     install_error_handlers(app)
@@ -59,6 +66,8 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(api_router, prefix=API_PREFIX)
+    if settings.dev_tools_enabled:
+        app.include_router(dev.router, prefix=API_PREFIX)
 
     logging.getLogger(SERVICE_NAME).info(
         "service configured",
@@ -67,6 +76,7 @@ def create_app() -> FastAPI:
             "port": settings.port,
             "integration_mode": settings.integration_mode,
             "graph_store": "neo4j" if settings.neo4j_enabled else "postgres-core",
+            "dev_tools": settings.dev_tools_enabled,
         },
     )
     return app
