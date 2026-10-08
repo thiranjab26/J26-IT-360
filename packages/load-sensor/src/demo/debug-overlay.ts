@@ -42,7 +42,7 @@ export class LandmarkOverlay {
     ctx.globalAlpha = this.featurePoints ? 0.35 : 0.9;
     for (let i = 0; i < LANDMARK_COUNT; i += 1) {
       const [x, y] = at(i);
-      ctx.fillStyle = i >= FIRST_IRIS_INDEX ? '#ff5d87' : '#2ee6a6';
+      ctx.fillStyle = i >= FIRST_IRIS_INDEX ? '#ff7a59' : '#d4ff3a';
       ctx.fillRect(x - r / 2, y - r / 2, r, r);
     }
     ctx.globalAlpha = 1;

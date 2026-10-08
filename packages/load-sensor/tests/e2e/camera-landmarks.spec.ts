@@ -52,8 +52,21 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
 
     // A4: landmark samples reach the feature pipeline. The fake camera shows no
     // face, so presence must turn "Absent" after 2 s and calibration must not advance.
+    await page.getByTestId('tab-signals').click();
+    await expect(page.getByTestId('kpi-presence')).toBeVisible();
     await expect(page.getByTestId('kpi-presence')).toHaveText('Absent', { timeout: 30_000 });
     await expect(page.getByTestId('calibration')).toContainText('0 / 60 s');
+
+    // On the Signals tab the camera is docked as a mini preview and keeps
+    // delivering frames (a display:none video could stop its frame callbacks).
+    await expect(page.getByTestId('dock-expand')).toBeVisible();
+    const docked = Number(await page.getByTestId('camera-frames').textContent());
+    await expect
+      .poll(async () => Number(await page.getByTestId('camera-frames').textContent()))
+      .toBeGreaterThan(docked + 10);
+    await page.getByTestId('dock-expand').click();
+    await expect(page.getByTestId('tab-camera')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('dock-expand')).toBeHidden();
 
     // FR7 / NFR2: everything the page loaded came from its own origin…
     const origin = new URL(baseURL ?? '').origin;

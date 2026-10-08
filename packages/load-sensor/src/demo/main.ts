@@ -1,7 +1,8 @@
-// Demo and debug page for the load sensor (TODO A2–A4): camera control, a
-// live landmark overlay with fps, backend and frame time, and the Signals
-// dashboard (calibration, KPIs, EAR trace, per-second features). The consent
-// screen comes with TODO A6.
+// Demo and debug page for the load sensor (TODO A2–A4), in two tabs:
+// - Camera: camera control, a live landmark overlay with fps, backend and
+//   frame time, and (dev builds) the fixture recorder.
+// - Signals: calibration, KPIs, EAR trace and the per-second features.
+// The consent screen comes with TODO A6.
 //
 // Sensing is off until the user presses "Turn sensing on" (invariant 4).
 
@@ -16,6 +17,7 @@ import { FeaturePipeline } from '../core/window/index.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
 import { SignalsPanel } from './signals-panel.js';
+import { Tabs, type TabTone } from './tabs.js';
 
 const STATUS_TEXT: Record<CameraStatus, string> = {
   idle: 'Sensing is off.',
@@ -46,6 +48,7 @@ const ICONS = {
   power: '<path d="M12 3v8"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/>',
   shield:
     '<path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3z"/><path d="m9 12 2 2 4-4"/>',
+  expand: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
 } as const;
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -109,7 +112,24 @@ function mount(root: HTMLElement): void {
   faceChip.className = 'chip';
   hud.append(liveChip, faceChip);
 
-  stage.append(video, canvas, empty, hud);
+  const privacy = el('span');
+  privacy.className = 'chip privacy-chip';
+  privacy.append(icon(ICONS.shield), el('span', 'On-device · nothing uploaded'));
+
+  // Viewfinder corners: decoration only.
+  const corners = el('div');
+  corners.className = 'viewfinder';
+  corners.setAttribute('aria-hidden', 'true');
+
+  // Shown only while the camera is docked as a mini preview on another tab.
+  const expandBtn = el('button');
+  expandBtn.type = 'button';
+  expandBtn.className = 'dock-expand';
+  expandBtn.dataset.testid = 'dock-expand';
+  expandBtn.setAttribute('aria-label', 'Open the camera view');
+  expandBtn.append(icon(ICONS.expand));
+
+  stage.append(video, canvas, corners, empty, hud, privacy, expandBtn);
 
   // ── Controls ──
   const enableBtn = button('Turn sensing on', 'enable', ICONS.camera, 'btn-primary');
@@ -118,12 +138,11 @@ function mount(root: HTMLElement): void {
   const disableBtn = button('Turn sensing off', 'disable', ICONS.power, 'btn-danger');
   const spacer = el('div');
   spacer.className = 'spacer';
-  const privacy = el('span');
-  privacy.className = 'privacy-note';
-  privacy.append(icon(ICONS.shield), el('span', 'Processed on-device · nothing uploaded'));
+  const pointsSwitch = toggle('Feature points', 'toggle-points', false);
+  pointsSwitch.root.title = 'Ring and number every landmark the features use (TODO A4 check).';
   const controls = el('div');
   controls.className = 'controls';
-  controls.append(enableBtn, pauseBtn, resumeBtn, disableBtn, spacer, privacy);
+  controls.append(enableBtn, pauseBtn, resumeBtn, disableBtn, spacer, pointsSwitch.root);
 
   const cameraCard = el('section');
   cameraCard.className = 'card camera-card';
@@ -175,15 +194,40 @@ function mount(root: HTMLElement): void {
 
   // ── Signals dashboard (A4) ──
   const signals = new SignalsPanel();
-  const pointsSwitch = toggle('Feature points', 'toggle-points', false);
   const expressionSwitch = toggle('Expression features', 'toggle-expression', true);
   expressionSwitch.root.title =
     'FR3 ablation: off zeroes mouth-open and lip-thickness. Changing it restarts calibration.';
-  signals.toolbar.prepend(pointsSwitch.root, expressionSwitch.root);
+  signals.toolbar.prepend(expressionSwitch.root);
   // Development builds only: the recorder is tree-shaken out of production.
   const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
 
-  root.append(topbar, layout, signals.element, ...(recorder ? [recorder.element] : []), footer);
+  // ── Tabs: Camera | Signals ──
+  const cameraPanel = el('section');
+  cameraPanel.id = 'panel-camera';
+  cameraPanel.className = 'panel camera-panel';
+  cameraPanel.append(layout, ...(recorder ? [recorder.element] : []));
+  const signalsPanel = el('section');
+  signalsPanel.id = 'panel-signals';
+  signalsPanel.className = 'panel';
+  signalsPanel.append(signals.element);
+  const tabs = new Tabs(
+    [
+      // Kept rendered so the video keeps producing frames; on the Signals tab
+      // it shrinks to a mini preview in the corner (styles.css, "Dock").
+      { id: 'camera', index: '01', label: 'Camera', panel: cameraPanel, keepRendered: true },
+      { id: 'signals', index: '02', label: 'Signals', panel: signalsPanel },
+    ],
+    'Views',
+  );
+  tabs.onChange(() => {
+    window.scrollTo({ top: 0 });
+    render();
+  });
+  expandBtn.addEventListener('click', () => {
+    tabs.select('camera', true);
+  });
+
+  root.append(topbar, tabs.element, cameraPanel, signalsPanel, footer);
 
   // ── Pipeline ──
   const camera = new Camera({ video });
@@ -327,6 +371,8 @@ function mount(root: HTMLElement): void {
 
     stage.dataset.active = String(running);
     stage.dataset.paused = String(s === 'paused');
+    cameraPanel.dataset.running = String(running);
+    expandBtn.hidden = tabs.active === 'camera';
     liveText.textContent = s === 'paused' ? 'PAUSED' : 'LIVE';
     renderFaceChip();
   }
@@ -366,6 +412,45 @@ function mount(root: HTMLElement): void {
     stats.set('tensors', String(provider.numTensors ?? '–'));
     stats.set('errors', String(st.errors));
     renderFaceChip();
+    renderTabMeta();
+  }
+
+  function renderTabMeta(): void {
+    const s = camera.status;
+    const tone = toneFor(s, false, message !== null);
+    const camTone: TabTone = tone === 'paused' ? 'busy' : tone;
+    tabs.setMeta(
+      'camera',
+      s === 'active'
+        ? tracker.running
+          ? `Live · ${tracker.stats.fps.toFixed(0)} fps`
+          : 'Loading model'
+        : s === 'paused'
+          ? 'Paused'
+          : s === 'starting'
+            ? 'Starting'
+            : camTone === 'error'
+              ? 'Needs attention'
+              : 'Off',
+      camTone,
+    );
+    const state = pipeline.state;
+    const running = s === 'active' || s === 'paused';
+    if (!running) {
+      tabs.setMeta('signals', 'Waiting for camera', 'idle');
+    } else if (state.phase === 'calibrating') {
+      tabs.setMeta(
+        'signals',
+        `Calibrating ${String(Math.round(state.calibrationProgress * 100))} %`,
+        'busy',
+      );
+    } else {
+      tabs.setMeta(
+        'signals',
+        state.classifiable ? 'Baseline ready' : 'Filling window',
+        state.classifiable ? 'live' : 'busy',
+      );
+    }
   }
 
   render();
