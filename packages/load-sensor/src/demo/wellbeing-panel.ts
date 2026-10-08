@@ -103,7 +103,10 @@ export class WellbeingPanel {
     title: HTMLElement;
     body: HTMLElement;
     reason: HTMLElement;
+    play: HTMLButtonElement;
   };
+  /** Set by the page: opens the neck-stretch game from the stretch tip. */
+  onPlayStretch: (() => void) | null = null;
   readonly #listItems = new Map<TipId, HTMLElement>();
 
   #seconds: NormalisedSecond[] = [];
@@ -157,7 +160,7 @@ export class WellbeingPanel {
     breakBtn.type = 'button';
     breakBtn.dataset.testid = 'took-break';
     breakBtn.addEventListener('click', () => {
-      this.#takeBreak();
+      this.markBreak();
     });
     timeHead.append(breakBtn);
     this.#screenTime = el('p', 'wb-big', '0:00');
@@ -190,8 +193,22 @@ export class WellbeingPanel {
     const fRow = el('div', 'wb-tip-row');
     fRow.append(fIcon, fText);
     fRow.setAttribute('aria-live', 'polite');
-    tipCard.append(tipHead, fRow);
-    this.#featured = { root: tipCard, icon: fIcon, title: fTitle, body: fBody, reason: fReason };
+    const play = el('button', 'btn btn-small btn-primary wb-play', 'Play the neck-stretch game');
+    play.type = 'button';
+    play.dataset.testid = 'wb-play-stretch';
+    play.hidden = true;
+    play.addEventListener('click', () => {
+      this.onPlayStretch?.();
+    });
+    tipCard.append(tipHead, fRow, play);
+    this.#featured = {
+      root: tipCard,
+      icon: fIcon,
+      title: fTitle,
+      body: fBody,
+      reason: fReason,
+      play,
+    };
 
     // ── All tips ──
     const listCard = el('section', 'card wb-card');
@@ -242,7 +259,7 @@ export class WellbeingPanel {
       this.#awayMs = 0;
     } else if (sensing) {
       this.#awayMs += dt;
-      if (this.#awayMs >= AWAY_IS_BREAK_MS) this.#takeBreak();
+      if (this.#awayMs >= AWAY_IS_BREAK_MS) this.markBreak();
     }
     if (!this.#rotateAt) this.#rotateAt = now + ROTATE_MS;
     if (now >= this.#rotateAt) {
@@ -265,7 +282,8 @@ export class WellbeingPanel {
     this.#renderFeatured();
   }
 
-  #takeBreak(): void {
+  /** Resets both break timers (button, 2 min away, or a finished break game). */
+  markBreak(): void {
     this.#sinceEyeBreakMs = 0;
     this.#sinceMoveBreakMs = 0;
     this.#awayMs = 0;
@@ -298,6 +316,7 @@ export class WellbeingPanel {
     if (!tip) return;
     const f = this.#featured;
     f.root.dataset.suggested = String(reason !== 'Reminder');
+    f.play.hidden = id !== 'stretch' || this.onPlayStretch === null;
     if (f.reason.textContent !== reason) f.reason.textContent = reason;
     if (this.#featuredId === id) return;
     this.#featuredId = id;

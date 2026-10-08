@@ -4,6 +4,7 @@
 //   fixture recorder.
 // - Signals: calibration, KPIs, EAR trace and the per-second features.
 // - Performance: fps, backend, frame time and pipeline read-outs.
+// - Break: two short calm games (neck stretch steered by head pose, memory match).
 // The consent screen comes with TODO A6.
 //
 // Sensing is off until the user presses "Turn sensing on" (invariant 4).
@@ -17,6 +18,7 @@ import {
 } from '../core/landmarks/index.js';
 import { FeaturePipeline } from '../core/window/index.js';
 import { AlarmSound, AttentionMonitor, type AlarmReason } from './attention-alarm.js';
+import { BreakPanel } from './break/break-panel.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
 import { SignalsPanel } from './signals-panel.js';
@@ -255,6 +257,26 @@ function mount(root: HTMLElement): void {
   perfTitles.append(perfTitle, perfSub);
   perfHead.append(perfTitles);
   perfPanel.append(perfHead, perfGrid);
+  const breakPanel = new BreakPanel({
+    requestSensing: () => {
+      alarmSound.unlock();
+      void enable();
+    },
+    stopSensing: () => {
+      disable();
+    },
+    onBreakTaken: () => {
+      wellbeing.markBreak();
+    },
+    onLayout: () => {
+      placeDock();
+    },
+  });
+  const breakTabPanel = el('section');
+  breakTabPanel.id = 'panel-break';
+  breakTabPanel.className = 'panel';
+  breakTabPanel.append(breakPanel.element);
+
   const tabs = new Tabs(
     [
       // Kept rendered so the video keeps producing frames; on the
@@ -262,18 +284,26 @@ function mount(root: HTMLElement): void {
       { id: 'camera', index: '01', label: 'Camera', panel: cameraPanel, keepRendered: true },
       { id: 'signals', index: '02', label: 'Signals', panel: signalsPanel },
       { id: 'performance', index: '03', label: 'Performance', panel: perfPanel },
+      { id: 'break', index: '04', label: 'Break', panel: breakTabPanel },
     ],
     'Views',
   );
-  tabs.onChange(() => {
+  tabs.onChange((id) => {
     window.scrollTo({ top: 0 });
+    // Games pause whenever their tab is not on screen.
+    breakPanel.setVisible(id === 'break');
     render();
   });
+  breakPanel.setVisible(tabs.active === 'break');
+  wellbeing.onPlayStretch = () => {
+    tabs.select('break');
+    breakPanel.open('neck');
+  };
   expandBtn.addEventListener('click', () => {
     tabs.select('camera', true);
   });
 
-  root.append(topbar, tabs.element, cameraPanel, signalsPanel, perfPanel, footer);
+  root.append(topbar, tabs.element, cameraPanel, signalsPanel, perfPanel, breakTabPanel, footer);
 
   // ── Pipeline ──
   const camera = new Camera({ video });
@@ -291,6 +321,10 @@ function mount(root: HTMLElement): void {
     const p = new FeaturePipeline({ useExpressionFeatures });
     p.onFrame((f) => {
       signals.pushFrame(f);
+      breakPanel.pushPose(
+        f.tMs,
+        f.signals ? { yaw: f.signals.yaw, pitch: f.signals.pitch, roll: f.signals.roll } : null,
+      );
       attention.update({ tMs: f.tMs, faceFound: f.signals !== null, eyesClosed: f.eyesClosed });
       renderAlarm();
     });
@@ -377,11 +411,40 @@ function mount(root: HTMLElement): void {
     camera.resume('user');
   });
   disableBtn.addEventListener('click', () => {
+    disable();
+  });
+
+  function disable(): void {
     tracker.stop();
     camera.stop();
     message = null;
     render();
-  });
+  }
+
+  /**
+   * On the Break tab the neck game has a slot for the live preview: the camera
+   * card is positioned over it (page coordinates, so scrolling needs no
+   * updates). Moving the <video> element itself could pause it, so it stays put.
+   */
+  let dockFrame = 0;
+  function placeDock(): void {
+    if (dockFrame) return;
+    dockFrame = requestAnimationFrame(() => {
+      dockFrame = 0;
+      const slot = tabs.active === 'break' ? breakPanel.cameraSlot : null;
+      const running = camera.status === 'active' || camera.status === 'paused';
+      const r = slot?.getBoundingClientRect();
+      if (!r || !running || r.width === 0) {
+        delete cameraPanel.dataset.dock;
+        return;
+      }
+      cameraPanel.dataset.dock = 'slot';
+      cameraCard.style.setProperty('--slot-x', `${String(r.left + window.scrollX)}px`);
+      cameraCard.style.setProperty('--slot-y', `${String(r.top + window.scrollY)}px`);
+      cameraCard.style.setProperty('--slot-w', `${String(r.width)}px`);
+    });
+  }
+  window.addEventListener('resize', placeDock);
   // Release the camera when the page goes away, including bfcache navigations.
   window.addEventListener('pagehide', () => {
     tracker.stop();
@@ -444,6 +507,8 @@ function mount(root: HTMLElement): void {
     stage.dataset.paused = String(s === 'paused');
     cameraPanel.dataset.running = String(running);
     expandBtn.hidden = tabs.active === 'camera';
+    breakPanel.setSensing(s === 'active');
+    placeDock();
     liveText.textContent = s === 'paused' ? 'PAUSED' : 'LIVE';
     renderFaceChip();
   }
@@ -536,6 +601,16 @@ function mount(root: HTMLElement): void {
         ? `p95 ${formatMs(tracker.stats.inferenceP95)}`
         : (provider.backend ?? 'Idle'),
       tracker.running ? 'live' : 'idle',
+    );
+    const game = breakPanel.active;
+    tabs.setMeta(
+      'break',
+      game === 'neck'
+        ? 'Playing · neck stretch'
+        : game === 'memory'
+          ? 'Playing · memory'
+          : '2 calm games',
+      game ? 'live' : 'idle',
     );
     const state = pipeline.state;
     const running = s === 'active' || s === 'paused';

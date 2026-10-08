@@ -142,6 +142,16 @@ export class Tabs {
   #placeIndicator(): void {
     const tab = this.#tabs.find((t) => t.spec.id === this.#active);
     if (!tab) return;
+    // Narrow screens: keep the active tab in view in the sideways-scrolling bar
+    // (scrollLeft only, so the page itself never jumps vertically).
+    const list = tab.button.parentElement;
+    if (list && list.scrollWidth > list.clientWidth) {
+      const left = tab.button.offsetLeft;
+      const right = left + tab.button.offsetWidth;
+      if (left < list.scrollLeft || right > list.scrollLeft + list.clientWidth) {
+        list.scrollLeft = left - 8;
+      }
+    }
     this.#indicator.style.width = `${String(tab.button.offsetWidth)}px`;
     this.#indicator.style.transform = `translateX(${String(tab.button.offsetLeft)}px)`;
     // Animate only moves between tabs, not the first placement after layout.

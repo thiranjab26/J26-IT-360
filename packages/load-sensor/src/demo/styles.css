@@ -246,6 +246,13 @@ h1 {
   position: relative;
   display: flex;
   gap: 4px;
+  /* Narrow screens: tabs scroll sideways instead of squeezing into each other. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-list::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
@@ -350,7 +357,7 @@ h1 {
 
 .tabs-indicator {
   position: absolute;
-  bottom: -1px;
+  bottom: 0;
   left: 0;
   height: 2px;
   background: var(--accent-text);
@@ -1238,8 +1245,36 @@ h1 {
 /* ── Dock: the camera as a mini preview while another tab is open ───── */
 
 /* Room at the bottom so the docked preview never covers the last content. */
-.shell:has(.camera-panel[data-active='false'][data-running='true']) {
+.shell:has(.camera-panel[data-active='false'][data-running='true']:not([data-dock='slot'])) {
   padding-bottom: 240px;
+}
+
+/*
+ * Slot dock: on the Break tab the neck game reserves a slot for the preview;
+ * main.ts writes its page position into --slot-x / --slot-y / --slot-w.
+ */
+.camera-panel[data-active='false'][data-running='true'][data-dock='slot'] .camera-card {
+  position: absolute;
+  top: var(--slot-y);
+  right: auto;
+  bottom: auto;
+  left: var(--slot-x);
+  z-index: 5;
+  width: var(--slot-w);
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+.camera-panel[data-dock='slot'] .stage {
+  border-radius: 10px;
+}
+
+.camera-panel[data-dock='slot'] .alarm-banner {
+  display: none;
 }
 
 .camera-panel[data-active='false'] .layout {
@@ -1345,10 +1380,13 @@ h1 {
     padding: 0 16px;
   }
   .tab {
-    flex: 1;
+    flex: none;
     min-width: 0;
-    gap: 10px;
-    padding-right: 8px;
+    gap: 9px;
+    padding-right: 14px;
+  }
+  .tab-meta {
+    max-width: 112px;
   }
   .tab-index {
     width: 28px;
@@ -1954,4 +1992,8 @@ h1 {
   .grid-legend-axis {
     margin-left: 0;
   }
+}
+
+.wb-play {
+  justify-self: start;
 }
