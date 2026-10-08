@@ -106,7 +106,7 @@ Status key: `[ ]` not started, `[~]` in progress, `[x]` done and approved.
 | Demo topics | Stacks and queues kept as `dsa.stack` and `dsa.queue`. OOP and databases need new seed concept IDs first (seed PR) |
 | C2 cognitive load | Stub only; no contract exists for C4 yet |
 | C1 review notification | Recorded in `viva`; publishing a `viva.v_review_flags` view needs a contracts PR |
-| PP1 demo (11 Oct) | Run from the original `adaptlearn-c4` folder while the port continues |
+| PP1 demo (21 Oct) | Run from the original `adaptlearn-c4` folder while the port continues |
 
 ## Log
 

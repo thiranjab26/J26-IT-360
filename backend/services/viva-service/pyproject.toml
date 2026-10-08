@@ -15,6 +15,7 @@ dependencies = [
     "python-multipart>=0.0.12",
     "scikit-learn>=1.5",
     "pypdf>=5.0",
+    "websockets>=13",
 ]
 
 [project.optional-dependencies]

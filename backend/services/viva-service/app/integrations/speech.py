@@ -25,10 +25,8 @@ _inference_lock = threading.Lock()
 _model_lock = threading.Lock()
 
 
-def pause_metrics(intervals, sample_count, sample_rate=SAMPLE_RATE):
-    """Summarize VAD intervals without counting leading/trailing silence."""
-    if sample_rate <= 0 or sample_count < 0:
-        raise ValueError("Invalid audio duration.")
+def pause_spans(intervals, sample_count, sample_rate=SAMPLE_RATE):
+    """Internal VAD gaps of at least MIN_PAUSE_MS as (start s, end s, ms)."""
     merged = []
     for interval in sorted(intervals, key=lambda x: x["start"]):
         start, end = max(0, interval["start"]), min(sample_count, interval["end"])
@@ -38,11 +36,21 @@ def pause_metrics(intervals, sample_count, sample_rate=SAMPLE_RATE):
             merged[-1]["end"] = max(end, merged[-1]["end"])
         else:
             merged.append({"start": start, "end": end})
-    pauses = []
+    spans = []
     for previous, current in zip(merged, merged[1:], strict=False):
         duration_ms = max(0, current["start"] - previous["end"]) * 1000 / sample_rate
         if duration_ms >= MIN_PAUSE_MS:
-            pauses.append(duration_ms)
+            spans.append(
+                (previous["end"] / sample_rate, current["start"] / sample_rate, duration_ms)
+            )
+    return spans
+
+
+def pause_metrics(intervals, sample_count, sample_rate=SAMPLE_RATE):
+    """Summarize VAD intervals without counting leading/trailing silence."""
+    if sample_rate <= 0 or sample_count < 0:
+        raise ValueError("Invalid audio duration.")
+    pauses = [ms for _, _, ms in pause_spans(intervals, sample_count, sample_rate)]
     return {
         "pause_count": len(pauses),
         "total_pause_ms": round(sum(pauses), 1),
@@ -137,25 +145,78 @@ def cloud_transcribe(content, suffix):
                 "model": cfg.speech_model,
                 "prompt": FILLER_PROMPT,
                 "response_format": "verbose_json",
+                "timestamp_granularities[]": ["segment", "word"],
                 "language": cfg.whisper_language or "en",
                 "temperature": "0",
             },
         )
         response.raise_for_status()
-        return [
+        body = response.json()
+        segments = [
             {"start": s["start"], "end": s["end"], "text": s["text"].strip(), "words": []}
-            for s in response.json().get("segments", [])
+            for s in body.get("segments", [])
         ]
+        if segments:
+            # Word timings come at the top level; they only feed the pause display.
+            segments[0]["words"] = [
+                {"start": w["start"], "end": w["end"], "word": w["word"]}
+                for w in body.get("words") or []
+            ]
+        return segments
     except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
         raise ProviderUnavailable(f"Cloud transcription failed ({type(exc).__name__}).") from exc
 
 
+def pause_marks(transcript, words, spans):
+    """Character positions in the transcript where each measured pause ends, for display only.
+
+    Words are matched to the transcript in order. Whisper stretches the word before a silence
+    over the gap, so the pause goes before the first word starting at or after the pause start.
+    Pauses without word timings are left out.
+    """
+    offsets, cursor, lower = [], 0, transcript.lower()
+    for w in words:
+        token = w["word"].strip().lower()
+        index = lower.find(token, cursor) if token else -1
+        offsets.append(index)
+        if index >= 0:
+            cursor = index + len(token)
+    timed = [(w["start"], index) for w, index in zip(words, offsets, strict=True) if index >= 0]
+    marks = []
+    for start, _, ms in spans:
+        after = [index for begin, index in timed if begin >= start - 0.05]
+        if after:
+            marks.append({"char": after[0], "ms": round(ms)})
+    return marks
+
+
+def deepgram_ready():
+    cfg = settings()
+    return bool(cfg.allow_cloud_llm and cfg.deepgram_api_key)
+
+
 @lru_cache(maxsize=128)
 def synthesize(text):
-    """Human-sounding question audio (WAV). Cached so replays cost no provider call."""
+    """Question audio as (bytes, media type, provider). Cached so replays cost nothing."""
     import httpx
 
     cfg = settings()
+    if deepgram_ready() and cfg.deepgram_tts_daily_chars:
+        from app.core.limits import reserve_voice
+
+        try:
+            reserve_voice(len(text))
+            response = httpx.post(
+                "https://api.deepgram.com/v1/speak",
+                params={"model": cfg.deepgram_tts_model, "encoding": "mp3"},
+                timeout=20,
+                headers={"Authorization": f"Token {cfg.deepgram_api_key}"},
+                json={"text": text},
+            )
+            response.raise_for_status()
+            return response.content, "audio/mpeg", "deepgram:" + cfg.deepgram_tts_model
+        except (httpx.HTTPError, HTTPException):
+            pass  # budget used up or Deepgram failed: try Groq, then the browser voice
     if not cfg.allow_cloud_llm or not cfg.speech_api_key:
         raise ProviderUnavailable(
             "Cloud voice is not configured; the browser voice is used instead."
@@ -173,14 +234,44 @@ def synthesize(text):
             },
         )
         response.raise_for_status()
-        return response.content
+        return response.content, "audio/wav", "groq:" + cfg.tts_model
     except httpx.HTTPError as exc:
         raise ProviderUnavailable(
             f"Cloud voice failed ({type(exc).__name__}); the browser voice is used instead."
         ) from exc
 
 
-def transcribe(content, suffix):
+_voice_locks = {}
+_voice_guard = threading.Lock()
+
+
+def voice(text):
+    """synthesize() with one provider call per text: a warm-up and the student's request share it."""
+    with _voice_guard:
+        if len(_voice_locks) > 512:
+            _voice_locks.clear()
+        lock = _voice_locks.setdefault(text, threading.Lock())
+    with lock:
+        return synthesize(text)
+
+
+def warm(texts):
+    """Prepare upcoming question audio in the background so it plays without waiting."""
+    cfg = settings()
+    if not cfg.allow_cloud_llm or not (cfg.speech_api_key or cfg.deepgram_api_key):
+        return
+
+    def run():
+        for text in texts:
+            try:
+                voice(" ".join(text.split()))
+            except (ProviderUnavailable, HTTPException):
+                return  # the browser voice remains the fallback
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def transcribe(content, suffix, live=None):
     # Fail fast instead of queuing unlimited expensive inference requests.
     if not _inference_lock.acquire(blocking=False):
         raise HTTPException(
@@ -189,14 +280,15 @@ def transcribe(content, suffix):
             headers={"Retry-After": "5"},
         )
     try:
-        return _transcribe(content, suffix)
+        return _transcribe(content, suffix, live)
     finally:
         _inference_lock.release()
 
 
-def _transcribe(content, suffix):
+def _transcribe(content, suffix, live=None):
+    """live: (transcript, provider) already streamed by Deepgram; only pauses are measured here."""
     started = time.monotonic()
-    if settings().speech_provider not in ("faster_whisper", "groq"):
+    if not live and settings().speech_provider not in ("faster_whisper", "groq"):
         raise ProviderUnavailable(
             "Transcription is disabled. Set SPEECH_PROVIDER=groq or faster_whisper, or use typed input."
         )
@@ -218,7 +310,10 @@ def _transcribe(content, suffix):
         # Quiet fillers can fall below the VAD threshold; still recognise the whole clip instead of rejecting it.
         cfg = settings()
         provider, segments = None, None
-        if cfg.speech_provider == "groq":
+        if live:
+            segments = [{"start": 0, "end": len(audio) / SAMPLE_RATE, "text": live[0], "words": []}]
+            provider = live[1]
+        elif cfg.speech_provider == "groq":
             try:
                 segments, provider = cloud_transcribe(content, suffix), "groq:" + cfg.speech_model
             except ProviderUnavailable:
@@ -280,6 +375,11 @@ def _transcribe(content, suffix):
             "lexical_metrics": lexical_metrics(transcript),
             "processing_ms": round((time.monotonic() - started) * 1000),
             "metrics": pause_metrics(intervals, len(audio)),
+            "pause_marks": pause_marks(
+                transcript,
+                [w for s in segments for w in s["words"]],
+                pause_spans(intervals, len(audio)),
+            ),
             "speech_intervals": [
                 {
                     "start": round(x["start"] / SAMPLE_RATE, 3),
@@ -302,7 +402,7 @@ def _transcribe(content, suffix):
                 "Audio is processed in memory and is not retained by this endpoint."
                 + (
                     " It is sent to the configured cloud transcription service."
-                    if provider.startswith("groq")
+                    if provider.startswith(("groq", "deepgram"))
                     else ""
                 ),
             ],

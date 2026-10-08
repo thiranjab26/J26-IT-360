@@ -75,6 +75,8 @@ export type Summary = {
   created_at: string;
   completed_at?: string;
   turn_count: number;
+  questions_asked?: number;
+  answered_count?: number;
   outcome?: string;
 };
 export type Report = {
@@ -126,6 +128,7 @@ export type Report = {
     explanation: string;
   }[];
   limitations: string[];
+  transcript?: { concept: string; question: string; answer: string; skipped: boolean; follow_up: boolean }[];
 };
 export type BankQuestion = {
   id: string;
@@ -187,6 +190,8 @@ export type Health = {
   database: string;
   assessment_provider: string;
   speech_provider: string;
+  live_speech_provider?: string | null;
+  voice_provider?: string;
   integration_mode: string;
   demo_mode: boolean;
 };

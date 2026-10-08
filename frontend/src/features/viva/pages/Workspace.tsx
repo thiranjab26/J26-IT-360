@@ -13,7 +13,7 @@ import {
 import { api, label } from "../api/client";
 import type { AudioMetrics, Auth, Context, Report, Session, Topic } from "../api/types";
 import { Busy, ErrorNotice, Integrations, integrationLabel } from "../components/components";
-import { useSpeech } from "../hooks/useSpeech";
+import { providerName, useSpeech, type Heard } from "../hooks/useSpeech";
 import { Mascot } from "../components/Mascot";
 import "../styles/student.css";
 
@@ -225,15 +225,19 @@ function LiveSession({
   const [answer, setAnswer] = useState(""),
     [busy, setBusy] = useState(false),
     [mode, setMode] = useState<"text" | "speech">(session.input_mode),
-    [audioEvidence, setAudioEvidence] = useState<{ metrics: AudioMetrics; latency: number | null } | null>(null),
+    [audioEvidence, setAudioEvidence] = useState<{ metrics: AudioMetrics; latency: number | null; provider: string; text: string; heard: Heard } | null>(null),
     [autoRead, setAutoRead] = useState(true),
     [finishConfirm, setFinishConfirm] = useState(false),
     [nodding, setNodding] = useState(false),
     [ready, setReady] = useState(session.turns.length > 0);
-  const speech = useSpeech(auth.token, (text, metrics, latency) => {
-    setAnswer(text);
-    setAudioEvidence({ metrics, latency });
-  });
+  const speech = useSpeech(
+    auth.token,
+    (text, metrics, latency, provider, heard) => {
+      setAnswer(text);
+      setAudioEvidence({ metrics, latency, provider, text, heard });
+    },
+    session.topic_id,
+  );
   const q = session.current_question;
   const submission = useRef<{ key: string; id: string } | null>(null);
   useEffect(() => {
@@ -261,7 +265,7 @@ function LiveSession({
   }
   async function submit() {
     if (!q || !answer.trim()) return;
-    const key = JSON.stringify([q.id, answer.trim(), audioEvidence]);
+    const key = JSON.stringify([q.id, answer.trim(), audioEvidence?.metrics, audioEvidence?.latency]);
     if (submission.current?.key !== key) submission.current = { key, id: crypto.randomUUID() };
     setBusy(true);
     speech.stopSpeaking();
@@ -391,6 +395,11 @@ function LiveSession({
               />
               Read questions aloud
             </label>
+            {speech.voiceProvider && (
+              <span className="st-chip" title="Service that speaks the question">
+                Voice: {providerName(speech.voiceProvider)}
+              </span>
+            )}
           </div>
 
           {mode === "speech" && (
@@ -411,10 +420,17 @@ function LiveSession({
             </>
           )}
           <p className="st-status">{status}</p>
+          {speech.recording && speech.liveProvider && (
+            <div className="st-live" aria-live="polite">
+              <div className="st-label">Live transcript · {providerName(speech.liveProvider)}</div>
+              <p>{speech.liveText || "Listening…"}</p>
+            </div>
+          )}
           <ErrorNotice message={speech.speechError} />
 
           {(mode === "text" || answer || audioEvidence) && (
             <div className="st-answer">
+              {audioEvidence && <HeardView text={audioEvidence.text} heard={audioEvidence.heard} />}
               <label htmlFor="answer" className="st-label">
                 {audioEvidence ? "Your answer (check the transcript and fix any mistakes)" : "Your answer"}
               </label>
@@ -429,7 +445,9 @@ function LiveSession({
               />
               <div className="st-row st-between">
                 <span className="st-small st-muted">
-                  {audioEvidence ? "Pauses and timing come from your recording." : "Typed answers have no timing data."}
+                  {audioEvidence
+                    ? `Transcribed by ${providerName(audioEvidence.provider)}. Pauses and timing come from your recording.`
+                    : "Typed answers have no timing data."}
                 </span>
                 <button className="st-btn st-btn-primary" disabled={locked || !answer.trim()} onClick={submit}>
                   {busy ? <Busy text="Thinking…" /> : <>Submit answer <Send size={16} /></>}
@@ -477,6 +495,37 @@ function LiveSession({
           </div>
         </details>
       )}
+    </div>
+  );
+}
+
+/** The recorded answer as heard: fillers highlighted and measured pauses shown where they happened. */
+function HeardView({ text, heard }: { text: string; heard: Heard }) {
+  const cuts = new Set([0, text.length]);
+  heard.pauses.forEach((p) => cuts.add(p.char));
+  heard.fillers.forEach((f) => { cuts.add(f.start_char); cuts.add(f.end_char); });
+  const points = [...cuts].filter((c) => c >= 0 && c <= text.length).sort((a, b) => a - b);
+  const pieces: React.ReactNode[] = [];
+  points.forEach((start, i) => {
+    heard.pauses.filter((p) => p.char === start).forEach((p, j) => pieces.push(
+      <span className="st-pause" key={`p${i}-${j}`} title="Pause measured in your recording">
+        pause {(p.ms / 1000).toFixed(1)}s
+      </span>,
+    ));
+    const end = points[i + 1];
+    if (end === undefined) return;
+    const piece = text.slice(start, end);
+    const filler = heard.fillers.some((f) => f.start_char === start && f.end_char === end);
+    pieces.push(filler ? <mark className="st-filler" key={`t${i}`} title="Filler word">{piece}</mark> : <span key={`t${i}`}>{piece}</span>);
+  });
+  return (
+    <div className="st-heard">
+      <div className="st-label">What we heard</div>
+      <p>{pieces}</p>
+      <div className="st-small st-muted">
+        {heard.fillers.length} filler {heard.fillers.length === 1 ? "word" : "words"} · {heard.pauses.length}{" "}
+        {heard.pauses.length === 1 ? "pause" : "pauses"} over 0.4s. These support the result; they never decide it alone.
+      </div>
     </div>
   );
 }

@@ -51,3 +51,39 @@ def test_real_decoder_and_silero_accept_silence_without_inventing_speech():
     assert (
         get_speech_timestamps(audio, VadOptions(min_silence_duration_ms=400, speech_pad_ms=0)) == []
     )
+
+
+def test_pause_marks_sit_before_the_word_after_each_pause():
+    from app.integrations.speech import pause_marks
+
+    # Real Whisper timing: the word before a silence is stretched over it ("a" ends at 1.9).
+    words = [
+        {"start": 0.0, "end": 0.3, "word": " Um"},
+        {"start": 0.4, "end": 1.9, "word": " a"},
+        {"start": 1.9, "end": 2.4, "word": " stack"},
+    ]
+    marks = pause_marks("Um, a stack.", words, [(0.7, 1.95, 1250.0)])
+    assert marks == [{"char": 6, "ms": 1250}]
+    assert pause_marks("Um, a stack.", [], [(0.7, 1.95, 1250.0)]) == []
+
+
+def test_voice_shares_one_provider_call_per_question(monkeypatch):
+    import threading
+    import time
+
+    from app.integrations import speech
+
+    calls = []
+
+    def slow(text):
+        calls.append(text)
+        time.sleep(0.2)
+        return b"audio", "audio/wav", "test"
+
+    monkeypatch.setattr(speech, "synthesize", __import__("functools").lru_cache(slow))
+    threads = [threading.Thread(target=speech.voice, args=("What is a stack?",)) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert calls == ["What is a stack?"]

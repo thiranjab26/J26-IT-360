@@ -195,6 +195,23 @@ export default function ReportView({
         </div>
       </section>
 
+      {report.transcript && report.transcript.length > 0 && (
+        <section className="st-card">
+          <h2>Questions and your answers</h2>
+          <ol className="st-qa">
+            {report.transcript.map((t, i) => (
+              <li key={i}>
+                <div className="st-small st-muted">
+                  {t.concept} · {t.follow_up ? "Follow-up question" : "Main question"}
+                </div>
+                <p className="st-qa-q">{t.question}</p>
+                <p className="st-qa-a">{t.skipped ? <em>Skipped</em> : t.answer}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
       <section className="st-card">
         <h2>How you spoke</h2>
         <p className="st-muted st-small" style={{ marginTop: 6 }}>

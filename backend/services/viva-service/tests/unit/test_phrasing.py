@@ -62,6 +62,32 @@ def test_phrasing_rejects_leaked_answer_then_accepts(monkeypatch):
     assert text.startswith("You mentioned items stacking up")
 
 
+def test_phrasing_rejects_tasks_a_student_cannot_answer_aloud(monkeypatch):
+    bank = seed_questions()[0]
+    drafts = iter(
+        [
+            {"question": "You said items stack up. Can you show me in a tiny table how pops work?"},
+            {"question": "You said items stack up. If A then B are pushed, which pops first?"},
+        ]
+    )
+    monkeypatch.setattr(providers, "call_llm", lambda *a, **k: next(drafts))
+    text, _ = providers.phrase_follow_up(
+        bank, "ASK_REASONING_OR_EXAMPLE", None, {"misconceptions": []}, "items stack up", [], set()
+    )
+    assert "table" not in text
+
+
+def test_session_history_and_report_list_questions_and_answers(client):
+    user = auth(client)
+    session = start(client, user)
+    answer(client, user, session, "Last in, first out: the newest item is removed first")
+    item = client.get("/api/v1/viva/sessions", headers=user).json()["items"][0]
+    assert item["answered_count"] == 1 and item["questions_asked"] == 2
+    report = client.post(f"/api/v1/viva/sessions/{session['id']}/finish", headers=user).json()
+    first = report["transcript"][0]
+    assert first["answer"].startswith("Last in") and first["question"] and not first["skipped"]
+
+
 def test_phrasing_gives_up_after_two_bad_drafts(monkeypatch):
     bank = seed_questions()[0]
     monkeypatch.setattr(

@@ -183,3 +183,15 @@
 @media (prefers-reduced-motion: reduce) {
   .viva-app .st-mascot * { animation: none !important; transition: none !important; }
 }
+
+.viva-app .st-qa { margin: 14px 0 0; padding-left: 20px; display: grid; gap: 14px; }
+.viva-app .st-qa-q { margin: 4px 0; font-weight: 600; }
+.viva-app .st-qa-a { margin: 0; padding: 8px 12px; border-left: 3px solid var(--st-green); background: rgba(127, 127, 127, 0.06); white-space: pre-wrap; }
+
+.viva-app .st-live { width: 100%; max-width: 640px; padding: 10px 14px; border: 1px dashed var(--st-muted); border-radius: 10px; text-align: left; }
+.viva-app .st-live p { margin: 4px 0 0; min-height: 1.5em; }
+
+.viva-app .st-heard { width: 100%; padding: 10px 14px; margin-bottom: 12px; border-radius: 10px; background: rgba(127, 127, 127, 0.06); text-align: left; }
+.viva-app .st-heard p { margin: 4px 0 6px; line-height: 1.9; }
+.viva-app .st-filler { background: #fde7b0; color: inherit; border-radius: 4px; padding: 0 2px; }
+.viva-app .st-pause { display: inline-block; margin: 0 4px; padding: 0 7px; border-radius: 999px; background: #e3e9f2; color: #4a5b74; font-size: 12px; line-height: 1.6; vertical-align: 1px; }

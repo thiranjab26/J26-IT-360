@@ -94,7 +94,8 @@ def test_early_finish_report_and_persisted_reload(client):
     with SessionLocal() as db:
         record = db.get(VivaSession, session["id"])
         assert record.status == "completed"
-        assert record.data["report"] == report
+        assert record.data["report"] == {k: v for k, v in report.items() if k != "transcript"}
+    assert report["transcript"] == []
     assert answer(client, user, session, "LIFO").status_code == 409
     exported = client.get(f"/api/v1/viva/sessions/{session['id']}/export", headers=user).json()
     assert "policy_version" in exported["session"]

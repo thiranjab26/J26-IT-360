@@ -94,6 +94,29 @@ def reserve_speech(user_id):
     )
 
 
+LIVE_CHUNK_SECONDS = 30
+
+
+def reserve_live(user_id):
+    """Charge one 30-second block of streamed Deepgram audio, before it is sent."""
+    cfg = settings()
+    reserve(
+        [
+            ("deepgram-seconds", 86400, cfg.deepgram_daily_seconds, LIVE_CHUNK_SECONDS),
+            (
+                f"deepgram-user:{user_id}",
+                86400,
+                cfg.deepgram_user_daily_seconds,
+                LIVE_CHUNK_SECONDS,
+            ),
+        ]
+    )
+
+
+def reserve_voice(chars):
+    reserve([("deepgram-tts-chars", 86400, settings().deepgram_tts_daily_chars, chars)])
+
+
 def usage():
     stamp = int(time.time())
     with SessionLocal() as db:
@@ -101,5 +124,13 @@ def usage():
         return [
             {"scope": r.key.rsplit(":", 1)[0], "used": r.used, "resets_at": r.expires}
             for r in rows
-            if r.key.split(":")[0] in ("llm-minute", "llm-day", "llm-tokens", "speech-day")
+            if r.key.split(":")[0]
+            in (
+                "llm-minute",
+                "llm-day",
+                "llm-tokens",
+                "speech-day",
+                "deepgram-seconds",
+                "deepgram-tts-chars",
+            )
         ]

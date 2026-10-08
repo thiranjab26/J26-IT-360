@@ -5,17 +5,24 @@ Status key: `[ ]` open, `[~]` in progress, `[x]` done. Update this file in the s
 
 ## P0: Before the first commit
 
-- [x] Install `uv`, then in `backend/services/viva-service` run `uv sync --extra speech` and `uv lock`
-- [x] Run the checks with uv: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
-- [x] Confirm `git status` lists no `.env` file and only C4 paths, plus `frontend/src/app/router.tsx`, `frontend/package.json` and `pnpm-lock.yaml`
+- [ ] Install `uv`, then in `backend/services/viva-service` run `uv sync --extra speech` and `uv lock`
+- [ ] Run the checks with uv: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
+- [ ] Confirm `git status` lists no `.env` file and only C4 paths, plus `frontend/src/app/router.tsx`, `frontend/package.json` and `pnpm-lock.yaml`
 - [ ] Commit in small steps with `feat(viva): ...` messages; do not push until reviewed
 
-## P1: Before PP1 (11 Oct 2026)
+## P1: Before PP1 (complete by 20 Oct 2026; PP1 on 21 Oct)
 
+The supervisor has changed the research scope; details pending. See [research-scope-change.md](research-scope-change.md).
+
+- [ ] Record the supervisor's changes in research-scope-change.md, then update this list
 - [ ] Run one full spoken session at http://localhost:5173/viva and fix anything confusing
-- [ ] Accept the Groq Orpheus voice terms once in the Groq console, or confirm the browser voice fallback
+- [x] Groq voice: the configured voice `tara` was invalid; now `diana` (8 Oct)
+- [x] Guided editor replaces the JSON box for rubric points, misconceptions and follow-ups (8 Oct)
 - [ ] Prepare a demo script that reliably shows a knowledge gap, a communication difficulty and a strong answer
 - [ ] Decide whether PP1 is demonstrated from this repo or from the original prototype folder
+- [ ] Pilot with at least 10 students (ethics approval and consent first)
+- [ ] Calibrate the hesitation thresholds on pilot data; bump `GAP_VERSION` and add a test
+- [ ] Measure and report results (do not measure on the students used to set the thresholds)
 
 ## P2: Fit the repository fully
 
@@ -36,7 +43,7 @@ Status key: `[ ]` open, `[~]` in progress, `[x]` done. Update this file in the s
 ## P4: Research readiness
 
 - [ ] Expert review of the question bank, rubrics, misconceptions and probes
-- [ ] Pilot study; calibrate the hesitation thresholds, then freeze the gap-rule version
+- [ ] Main study after the pilot (pilot and calibration moved to P1)
 - [ ] Measure transcription accuracy on a sample, including fillers and technical terms
 - [ ] Decide the unit of analysis (concept or session) and how to handle rare communication cases
 - [ ] Ethics: document cloud processing (Groq, Neon) and the consent wording

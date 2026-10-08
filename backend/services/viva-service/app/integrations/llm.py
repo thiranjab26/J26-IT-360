@@ -569,8 +569,8 @@ def generate(topic_id, count, context):
 # The deterministic policy picks the action and target; the model only words a question for that purpose.
 PURPOSES = {
     "PROBE_MISSING_RUBRIC": "The answer is partly right. Build on something specific the student said and ask them to explain the missing idea described in target. Do not state, define or hint at the missing idea itself.",
-    "ASK_REASONING_OR_EXAMPLE": "The answer stayed at surface level. Quote or refer to what the student said and ask why it works that way, or ask them to walk through a concrete example of it.",
-    "PROBE_MISCONCEPTION": "The answer contains the belief described in target. Refer to the student's own claim and ask them to test it on a small concrete case so they can check it themselves. Do not say it is wrong and do not give the correct rule.",
+    "ASK_REASONING_OR_EXAMPLE": "The answer stayed at surface level. Quote or refer to what the student said and ask why it works that way, or ask them to describe in words a concrete example of it.",
+    "PROBE_MISCONCEPTION": "The answer contains the belief described in target. Refer to the student's own claim, describe one small concrete case in words, and ask what their claim predicts would happen in that case. Do not say it is wrong and do not give the correct rule.",
     "ASK_SIMPLER_OR_PREREQUISITE": "The answer was incorrect. Ask one simpler, more basic question about the same concept that the student can reason about from first principles. Do not give the answer.",
     "REPHRASE": 'The student did not answer or said they do not know. Start with a short, kind reassurance (for example "That is okay."), then ask the original question again in different, plainer words.',
     "SIMPLIFY": "The student has not answered twice. Start with a short, kind reassurance, then ask one very easy entry question about the concept that anyone who studied it could start on.",
@@ -606,7 +606,16 @@ FOLLOW_UP_RULES = (
     "If the latest answer has any content, start from one specific thing the student just said, quoting a few of their own words "
     '(for example: You said "...". Why / how / what happens if ...?), and ask them to explain, justify or test that claim. Ask about one thing only. '
     "When a reviewed probe is given, keep its meaning and adapt its wording to the student. "
-    "Never reveal or hint at the answer, no praise or judgement, and never ask about details beyond the original question."
+    "Never reveal or hint at the answer, no praise or judgement, and never ask about details beyond the original question. "
+    "The student can only reply by speaking or typing a few sentences: never ask them to draw, sketch, show, build, "
+    "write code or a query, or make a table or diagram."
+)
+
+# Tasks a student cannot do in a short spoken or typed reply, e.g. "show me in a tiny table".
+IMPOSSIBLE_TASK = re.compile(
+    r"\b(draw|sketch|diagram|show me|write (out |down )?(a |an |the |some |your )?(code|query|program|sql|function)"
+    r"|(make|create|build|fill in|draw up) (a |an |the |your )?(small |tiny |simple |quick )?(table|chart|diagram|schema|list)"
+    r"|in an? (small |tiny |simple |quick )?(table|chart|diagram))\b"
 )
 
 
@@ -674,6 +683,8 @@ def check_phrasing(text, bank, action, target, said, seen, latest=""):
         return "it is longer than 25 words"
     if text.lower() in seen:
         return "it repeats an earlier question"
+    if IMPOSSIBLE_TASK.search(text.lower()):
+        return "it asks for something the student cannot do in a short spoken or typed answer; ask them to explain in words"
     leaks = leaked_terms(text, bank, target if action == "PROBE_MISSING_RUBRIC" else None, said)
     return (
         "it gives away answer terms the student has not used: " + ", ".join(leaks[:3])

@@ -2,7 +2,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, VIVA_API_URL } from "../api/client";
 import type { AudioMetrics } from "../api/types";
 
-export function useSpeech(token: string, onTranscript: (text: string, metrics: AudioMetrics, latency: number | null) => void) {
+/** Human label for a provider id such as "deepgram:nova-3:live" or "groq:whisper-large-v3-turbo". */
+export function providerName(p?: string | null) {
+  if (!p) return "";
+  if (p === "browser") return "Browser voice";
+  if (p === "faster_whisper_local") return "Local Whisper";
+  const [vendor, model, live] = p.split(":");
+  const name = vendor === "deepgram" ? "Deepgram" : vendor === "groq" ? "Groq" : vendor;
+  return `${name} ${model ?? ""}${live === "live" ? " (live)" : ""}`.trim();
+}
+
+export type Heard = { pauses: { char: number; ms: number }[]; fillers: { start_char: number; end_char: number }[] };
+
+type Live = { ws: WebSocket; ready: boolean; complete: boolean; queue: Blob[]; finals: string; done: Promise<string> };
+
+export function useSpeech(
+  token: string,
+  onTranscript: (text: string, metrics: AudioMetrics, latency: number | null, provider: string, heard: Heard) => void,
+  topicId = "",
+) {
   const [recording, setRecording] = useState(false);
   const [starting, setStarting] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -11,6 +29,11 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
   const [hasRecording, setHasRecording] = useState(false);
   const [retryAt, setRetryAt] = useState(0);
   const [seconds, setSeconds] = useState(0);
+  const [liveText, setLiveText] = useState("");
+  const [liveProvider, setLiveProvider] = useState("");
+  const [voiceProvider, setVoiceProvider] = useState("");
+  const live = useRef<Live | null>(null);
+  const liveOff = useRef(false);
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const pending = useRef(false);
@@ -30,14 +53,21 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
   }, []);
   const audio = useRef<HTMLAudioElement | null>(null);
   const cloudVoice = useRef(true);
+  // Question audio already fetched in this tab, so "Listen again" plays instantly.
+  const clips = useRef(new Map<string, { url: string; provider: string }>());
   const stopSpeaking = useCallback(() => {
     window.speechSynthesis?.cancel();
     audio.current?.pause();
     audio.current = null;
     setSpeaking(false);
   }, []);
+  const closeLive = useCallback(() => {
+    live.current?.ws.close();
+    live.current = null;
+  }, []);
   const reset = useCallback(() => {
     generation.current++;
+    closeLive(); setLiveText(""); setLiveProvider("");
     upload.current?.abort();
     upload.current = null;
     if (recorder.current?.state === "recording") recorder.current.stop();
@@ -45,11 +75,12 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
     saved.current = null; ttsEnd.current = null; pending.current = false;
     setRecording(false); setStarting(false); setTranscribing(false);
     setHasRecording(false); setSpeechError(""); setSeconds(0); setRetryAt(0);
-  }, [release, stopSpeaking]);
+  }, [release, stopSpeaking, closeLive]);
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false; generation.current++;
+      live.current?.ws.close();
       upload.current?.abort();
       if (recorder.current?.state === "recording") recorder.current.stop();
       release(); window.speechSynthesis?.cancel();
@@ -63,6 +94,7 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
     const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"));
     const female = /female|aria|jenny|zira|samantha|libby|sonia|natasha|michelle|emma|ava|clara|ana\b|susan|hazel|google uk english female/i;
     utterance.voice = voices.find(v => female.test(v.name) && /natural|neural|online/i.test(v.name)) || voices.find(v => female.test(v.name)) || voices.find(v => v.default) || null;
+    setVoiceProvider("browser");
     utterance.onstart = () => { if (alive.current && version === generation.current) setSpeaking(true); };
     utterance.onend = () => {
       if (!alive.current || version !== generation.current) return;
@@ -76,19 +108,28 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
     const version = generation.current;
     if (cloudVoice.current) {
       try {
-        const response = await fetch(`${VIVA_API_URL}/speech/synthesize`, {
-          method: "POST", signal: AbortSignal.timeout(15000),
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
-        });
-        if (!response.ok) throw new Error("cloud voice unavailable");
-        const url = URL.createObjectURL(await response.blob());
+        let clip = clips.current.get(text);
+        if (!clip) {
+          const response = await fetch(`${VIVA_API_URL}/speech/synthesize`, {
+            method: "POST", signal: AbortSignal.timeout(20000),
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          if (!response.ok) throw new Error("cloud voice unavailable");
+          clip = { url: URL.createObjectURL(await response.blob()), provider: response.headers.get("X-Voice-Provider") || "cloud" };
+          if (clips.current.size >= 20) {
+            const [oldest, old] = clips.current.entries().next().value!;
+            URL.revokeObjectURL(old.url); clips.current.delete(oldest);
+          }
+          clips.current.set(text, clip);
+        }
+        setVoiceProvider(clip.provider);
+        const url = clip.url;
         if (!alive.current || version !== generation.current) return;
         const player = new Audio(url);
         audio.current = player;
         player.onplay = () => { if (alive.current && version === generation.current) setSpeaking(true); };
         player.onended = () => {
-          URL.revokeObjectURL(url);
           if (!alive.current || version !== generation.current) return;
           ttsEnd.current = performance.now(); setSpeaking(false);
         };
@@ -102,7 +143,46 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
     }
     if (alive.current && version === generation.current) browserSpeak(text, version);
   }, [token, stopSpeaking, browserSpeak]);
-  async function transcribe(blob: Blob, version: number) {
+  // Stream audio to Deepgram through the backend; resolves "" when live text is unavailable.
+  function openLive(version: number) {
+    if (liveOff.current) return;
+    let ws: WebSocket;
+    try { ws = new WebSocket(VIVA_API_URL.replace(/^http/, "ws") + "/speech/live"); } catch { return; }
+    let resolve: (text: string) => void = () => {};
+    const state: Live = { ws, ready: false, complete: false, queue: [], finals: "", done: new Promise(r => { resolve = r; }) };
+    const finish = () => resolve(state.complete ? state.finals.trim() : "");
+    live.current = state;
+    ws.onopen = () => ws.send(JSON.stringify({ token, topic_id: topicId }));
+    ws.onmessage = event => {
+      const m = JSON.parse(event.data);
+      const current = alive.current && version === generation.current;
+      if (m.type === "ready") {
+        state.ready = true;
+        state.queue.forEach(b => ws.send(b)); state.queue = [];
+        if (current) setLiveProvider(m.provider);
+      } else if (m.type === "transcript") {
+        if (m.final && m.text) state.finals += " " + m.text;
+        if (current) setLiveText((state.finals + (m.final ? "" : " " + m.text)).trim());
+      } else if (m.type === "closed") { state.complete = true; finish(); }
+      else if (m.type === "error") {
+        state.ready = false; finish();
+        if (current) setLiveProvider("");
+        // Deepgram is switched off on the server: stop trying for this tab.
+        if (/not configured/.test(m.message)) liveOff.current = true;
+      }
+    };
+    ws.onclose = finish;
+  }
+  async function stopLive() {
+    const state = live.current;
+    if (!state) return "";
+    if (state.ready && state.ws.readyState === WebSocket.OPEN) state.ws.send("stop");
+    const text = await Promise.race([state.done, new Promise<string>(r => setTimeout(() => r(""), 6000))]);
+    state.ws.close();
+    if (live.current === state) live.current = null;
+    return text;
+  }
+  async function transcribe(blob: Blob, version: number, liveTranscript = "") {
     if (upload.current) return;
     if (Date.now() < retryAt) { setSpeechError(`Please wait ${Math.ceil((retryAt - Date.now()) / 1000)} seconds before retrying.`); return; }
     setSpeechError(""); setTranscribing(true);
@@ -110,13 +190,20 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
     const timeout = setTimeout(() => controller.abort(), 120000);
     const form = new FormData();
     form.append("audio", blob, blob.type.includes("mp4") ? "answer.mp4" : "answer.webm");
+    if (liveTranscript) form.append("live_transcript", liveTranscript);
     try {
-      const result = await api<{ transcript: string; metrics: AudioMetrics; speech_intervals?: { start: number; end: number }[] }>(
+      const result = await api<{
+        transcript: string; metrics: AudioMetrics; provider: string;
+        speech_intervals?: { start: number; end: number }[];
+        pause_marks?: Heard["pauses"]; lexical_metrics?: { filler_events?: Heard["fillers"] };
+      }>(
         "/speech/transcribe", token, form, "POST", controller.signal);
       if (!alive.current || version !== generation.current) return;
       const onset = result.speech_intervals?.[0]?.start;
       const latency = onset !== undefined ? Math.max(0, Math.round(onset * 1000)) : null;
-      callback.current(result.transcript, result.metrics, latency);
+      callback.current(result.transcript, result.metrics, latency, result.provider, {
+        pauses: result.pause_marks ?? [], fillers: result.lexical_metrics?.filler_events ?? [],
+      });
       saved.current = null; setHasRecording(false);
     } catch (error) {
       if (!alive.current || version !== generation.current) return;
@@ -142,7 +229,13 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
       const rec = new MediaRecorder(media, mime ? { mimeType: mime, audioBitsPerSecond: 64000 } : undefined);
       recorder.current = rec;
       const chunks: BlobPart[] = [];
-      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      rec.ondataavailable = e => {
+        if (!e.data.size) return;
+        chunks.push(e.data);
+        const state = live.current;
+        if (state?.ready && state.ws.readyState === WebSocket.OPEN) state.ws.send(e.data);
+        else if (state && state.ws.readyState <= WebSocket.OPEN) state.queue.push(e.data);
+      };
       rec.onerror = () => {
         if (alive.current && version === generation.current) { generation.current++; pending.current = false; setStarting(false); setSpeechError("Recording failed. Check the microphone or type your answer."); release(); setRecording(false); }
       };
@@ -150,12 +243,15 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
         if (!alive.current || version !== generation.current) return;
         release(); setRecording(false);
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        if (!blob.size) { setSpeechError("The recording was empty. Try again."); return; }
-        saved.current = blob; setHasRecording(true); void transcribe(blob, version);
+        if (!blob.size) { closeLive(); setSpeechError("The recording was empty. Try again."); return; }
+        saved.current = blob; setHasRecording(true); setTranscribing(true);
+        void stopLive().then(text => { if (alive.current && version === generation.current) void transcribe(blob, version, text); });
       };
-      saved.current = null; setHasRecording(false); setSeconds(0);
+      saved.current = null; setHasRecording(false); setSeconds(0); setLiveText("");
+      openLive(version);
       recordingStart.current = performance.now();
-      rec.start(1000); setRecording(true);
+      // Short slices keep the live transcript close to real time.
+      rec.start(250); setRecording(true);
       timer.current = setInterval(() => {
         const elapsed = Math.floor((performance.now() - recordingStart.current) / 1000);
         setSeconds(elapsed);
@@ -170,5 +266,5 @@ export function useSpeech(token: string, onTranscript: (text: string, metrics: A
   }
   function stop() { if (recorder.current?.state === "recording") recorder.current.stop(); }
   function retry() { if (saved.current && !pending.current && recorder.current?.state !== 'recording') void transcribe(saved.current, generation.current); }
-  return { recording, starting, transcribing, speaking, speechError, hasRecording, seconds, start, stop, retry, speak, reset, stopSpeaking };
+  return { recording, starting, transcribing, speaking, speechError, hasRecording, seconds, liveText, liveProvider, voiceProvider, start, stop, retry, speak, reset, stopSpeaking };
 }

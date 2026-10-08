@@ -12,6 +12,7 @@ structure and technology, by Claude Code or by a person, without copying the old
 | [spec-backend.md](spec-backend.md) | viva-service: technology, folders, `VIVA_` config, `viva` schema tables, API routes, integrations, tests |
 | [spec-frontend.md](spec-frontend.md) | The viva feature: folders, screens, behaviour, style, acceptance |
 | [migration-plan.md](migration-plan.md) | The step checklist (Steps 0 to 8) and progress log |
+| [research-scope-change.md](research-scope-change.md) | Pending change of research scope by the supervisor; PP1 pilot requirements |
 
 ## What the recreation needs
 
@@ -33,7 +34,7 @@ structure and technology, by Claude Code or by a person, without copying the old
 - Topics: `dsa.stack` and `dsa.queue` now. OOP and databases wait for new seed concept IDs.
 - C2 cognitive load is a stub until a C2 to C4 contract exists.
 - AI and speech: Groq first (`gpt-oss-120b`, then `gpt-oss-20b`), Gemini as backup, Groq Whisper and the Orpheus voice. Cloud use needs `VIVA_ALLOW_CLOUD_LLM=true`.
-- The PP1 demo on 11 Oct runs from the old demo folder while the recreation continues.
+- The PP1 demo is on 21 Oct 2026 (work complete by 20 Oct). Where it runs from is still open; see TODO.md.
 
 ## How to start a recreation with Claude Code
 

@@ -33,6 +33,7 @@ import {
   PageTitle,
 } from "../components/components";
 import Workspace from "../pages/Workspace";
+import { providerName } from "../hooks/useSpeech";
 import ReportView from "../pages/ReportView";
 import { Bank, Research } from "../pages/Staff";
 const STORAGE = "adaptlearn-auth-v1";
@@ -333,7 +334,7 @@ export default function App() {
             </span>
             <span>
               {health
-                ? `Assessment: ${health.assessment_provider} · Integrations: ${health.integration_mode}`
+                ? `Assessment: ${health.assessment_provider} · Live speech: ${providerName(health.live_speech_provider) || "off"} · Voice: ${providerName(health.voice_provider) || "browser"} · Integrations: ${health.integration_mode}`
                 : "Research prototype"}
             </span>
           </footer>
@@ -369,6 +370,14 @@ export default function App() {
             <div>
               <dt>Speech provider</dt>
               <dd>{health?.speech_provider || "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt>Live transcription</dt>
+              <dd>{providerName(health?.live_speech_provider) || "Off"}</dd>
+            </div>
+            <div>
+              <dt>Question voice</dt>
+              <dd>{providerName(health?.voice_provider) || "Browser voice"}</dd>
             </div>
             <div>
               <dt>Course integrations</dt>
@@ -706,7 +715,10 @@ function SessionHistory({
                   </Badge>
                 </div>
                 <p className="small muted">
-                  {date(s.created_at)} · {s.turn_count} answers
+                  {date(s.created_at)} ·{" "}
+                  {s.questions_asked != null
+                    ? `${s.questions_asked} questions asked · ${s.answered_count} answered`
+                    : `${s.turn_count} answers`}
                   {s.outcome ? ` · ${gapLabels[s.outcome] || s.outcome}` : ""}
                 </p>
               </div>

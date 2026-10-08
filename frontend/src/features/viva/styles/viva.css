@@ -2569,3 +2569,32 @@
 .viva-app .course-studio label { display: grid; gap: 8px; margin: 16px 0; }
 .viva-app .course-studio details { margin: 14px 0; }
 .viva-app .source-preview { max-height: 360px; overflow: auto; padding: 12px; background: var(--surface, #f8fafc); }
+
+.viva-app .bank-flow { display: flex; flex-wrap: wrap; gap: 8px 22px; list-style: none; padding: 0; margin: 0 0 20px; color: #5b6f8c; font-size: 14px; }
+.viva-app .bank-flow li { display: flex; align-items: center; gap: 8px; }
+.viva-app .bank-flow span, .viva-app .bank-step-n { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #e8eefa; color: #416bca; font-weight: 700; font-size: 13px; flex: none; }
+.viva-app .bank-step-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 14px; }
+.viva-app .bank-step-head h2 { margin: 0; font-size: 18px; }
+.viva-app .bank-step-head p { margin: 2px 0 0; }
+.viva-app .bank-step.done .bank-step-n { background: #e3f4ea; color: #24804a; }
+.viva-app .bank-step-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.viva-app .field-inline { display: grid; gap: 6px; font-size: 14px; min-width: 220px; flex: 1; max-width: 420px; }
+.viva-app .bank-form { display: grid; gap: 12px; margin-top: 14px; max-width: 640px; }
+.viva-app .bank-form label { display: grid; gap: 6px; font-size: 14px; }
+.viva-app .bank-materials { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 8px; }
+.viva-app .bank-materials li { display: flex; align-items: center; gap: 8px; }
+.viva-app .bank-step .filter-bar { justify-content: space-between; }
+.viva-app .bank-step .filter-bar .tab-bar { margin: 0; border: 0; flex-wrap: wrap; gap: 18px; }
+.viva-app .qe { display: grid; gap: 22px; }
+.viva-app .qe-section { display: grid; gap: 12px; }
+.viva-app .qe-section h3 { margin: 0; font-size: 16px; }
+.viva-app .qe-section > .field-help { margin-top: -6px; }
+.viva-app .qe label { display: grid; gap: 6px; font-size: 14px; }
+.viva-app .qe-item { border: 1px solid #e3e9f2; border-radius: 10px; padding: 14px 16px; margin: 0; display: grid; gap: 10px; min-width: 0; }
+.viva-app .qe-item legend { padding: 0 6px; font-weight: 600; font-size: 13px; color: #416bca; }
+.viva-app .qe-item .field-help { margin-top: -4px; }
+.viva-app .qe-sources { display: grid; gap: 6px; margin-top: 8px; }
+.viva-app .qe .qe-check { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.viva-app .qe-check input { width: auto; }
+.viva-app .qe-remove { justify-self: start; display: inline-flex; gap: 6px; align-items: center; }
+.viva-app .qe details > summary { cursor: pointer; font-size: 14px; }

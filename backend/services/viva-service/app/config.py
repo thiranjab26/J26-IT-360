@@ -38,7 +38,18 @@ class Settings(BaseSettings):
     speech_model: str = "whisper-large-v3-turbo"
     # Cloud text-to-speech on the same provider; the browser's female voice is the fallback.
     tts_model: str = "canopylabs/orpheus-v1-english"
-    tts_voice: str = "tara"
+    # Groq Orpheus voices: autumn, diana, hannah, austin, daniel, troy.
+    tts_voice: str = "diana"
+    # Deepgram: live transcription (Nova-3, keeps fillers) and the examiner voice (Aura-2).
+    # Empty key turns both off; Groq or the browser voice is used instead.
+    deepgram_api_key: str = ""
+    deepgram_stt_model: str = "nova-3"
+    deepgram_tts_model: str = "aura-2-thalia-en"
+    # Strict UTC-day budgets: streamed audio seconds and spoken characters. 0 disables that feature.
+    deepgram_daily_seconds: int = Field(default=3600, ge=0)
+    deepgram_user_daily_seconds: int = Field(default=900, ge=0)
+    deepgram_tts_daily_chars: int = Field(default=20000, ge=0)
+    deepgram_max_streams: int = Field(default=2, ge=1, le=20)
     whisper_model: str = "base.en"
     whisper_device: str = "cpu"
     max_audio_bytes: int = 20 * 1024 * 1024

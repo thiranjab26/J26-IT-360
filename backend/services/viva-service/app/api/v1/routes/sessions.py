@@ -33,6 +33,7 @@ from app.domain.logic import (
     next_question,
     policy,
 )
+from app.integrations import speech
 from app.integrations.llm import (
     PURPOSES,
     ProviderUnavailable,
@@ -67,6 +68,23 @@ def public_assessment(assessment, completed=False):
         "missing_points": [],
         "misconceptions": [],
         "reason": "Response recorded. Detailed rubric feedback is available after completion.",
+    }
+
+
+def report_view(data):
+    """Stored report plus the questions asked and the student's own answers, in order."""
+    return {
+        **data["report"],
+        "transcript": [
+            {
+                "concept": data["snapshots"][t["concept_index"]]["concept"],
+                "question": t["question"],
+                "answer": "" if t.get("skipped") else t["transcript"],
+                "skipped": bool(t.get("skipped")),
+                "follow_up": t["depth"] > 0,
+            }
+            for t in data["turns"]
+        ],
     }
 
 
@@ -122,7 +140,7 @@ def session_view(session):
         }
     )
     if session.status == "completed":
-        view["report"] = data["report"]
+        view["report"] = report_view(data)
     return view
 
 
@@ -223,6 +241,18 @@ def phrase(data, index, prior, next_q, assessment, transcript, action, draft=Non
     return {"source": source, "stored_prompt": stored}
 
 
+def upcoming_voices(data):
+    """The current question and the next concept's main question, voiced ahead of time."""
+    current = data["current_question"]
+    if not current:
+        return []
+    texts = [current["question"]]
+    following = current["_concept_index"] + 1
+    if following < len(data["snapshots"]):
+        texts.append(data["snapshots"][following]["question"])
+    return texts
+
+
 def complete(db, session, data):
     data["completed_at"] = now()
     data["current_question"] = None
@@ -296,6 +326,7 @@ def start_session(
     session = VivaSession(id=uid(), user_id=user.id, status="active", data=data)
     db.add(session)
     db.commit()
+    speech.warm(upcoming_voices(data))
     return session_view(session)
 
 
@@ -317,6 +348,8 @@ def list_sessions(user: User = Depends(current_user), db: Session = Depends(get_
                 "created_at": s.data["created_at"],
                 "completed_at": s.data["completed_at"],
                 "turn_count": len(s.data["turns"]),
+                "questions_asked": len(s.data["turns"]) + bool(s.data.get("current_question")),
+                "answered_count": sum(not t.get("skipped") for t in s.data["turns"]),
                 "outcome": s.data.get("report", {}).get("outcome"),
             }
             for s in sessions
@@ -400,6 +433,7 @@ def submit_answer(
         data["turns"].append(turn)
         next_q, _ = next_question(data, current, turn["assessment"], "SKIPPED_NEXT_CONCEPT")
         data["current_question"] = next_q
+        speech.warm(upcoming_voices(data))
         status = "active" if next_q else "completed"
         if not next_q:
             complete(db, session, data)
@@ -465,6 +499,8 @@ def submit_answer(
         next_q["question"] if next_q and next_q["_concept_index"] == index else None
     )
     data["current_question"] = next_q
+    # Start voicing the next question now, while the answer is still being saved.
+    speech.warm(upcoming_voices(data))
     if next_q is None:
         complete(db, session, data)
         status = "completed"
@@ -513,15 +549,15 @@ def finish_session(
 ):
     session = owned(db, session_id, user, write=True)
     if session.status == "completed":
-        return session.data["report"]
+        return report_view(session.data)
     data = deepcopy(session.data)
     data["ended_early"] = True
     data["completed_concepts"] = data["current_question"]["_concept_index"]
-    report = complete(db, session, data)
+    complete(db, session, data)
     save_session(db, session, data, "completed")
     db.commit()
     background_tasks.add_task(deliver_review_notifications, session.id)
-    return report
+    return report_view(data)
 
 
 @router.get("/sessions/{session_id}/report")
@@ -529,7 +565,7 @@ def report(session_id: str, user: User = Depends(current_user), db: Session = De
     session = owned(db, session_id, user)
     if session.status != "completed":
         raise HTTPException(409, "Finish the session before viewing its report.")
-    return session.data["report"]
+    return report_view(session.data)
 
 
 @router.get("/sessions/{session_id}/export")

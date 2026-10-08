@@ -6,16 +6,17 @@ import {
   Download,
   FlaskConical,
   Pencil,
-  Plus,
   RefreshCw,
   Save,
   ShieldCheck,
+  Sparkles,
   X,
 } from "lucide-react";
 import { api, downloadJson, gapLabels, label } from "../api/client";
 import type { Auth, BankQuestion, Case, Metrics, Rating, Topic } from "../api/types";
 import { Badge, Busy, Empty, Modal, PageTitle } from "../components/components";
-import Courses from '../pages/Courses';
+import Courses, { Step } from "../pages/Courses";
+import { QuestionEditor } from "../components/QuestionEditor";
 export function Bank({
   auth,
   topics,
@@ -28,24 +29,22 @@ export function Bank({
   onTopicsChanged: () => Promise<void>;
 }) {
   const [topic, setTopic] = useState(topics[0]?.id || ""),
-    [status, setStatus] = useState("all"),
+    [status, setStatus] = useState<"draft" | "approved" | "rejected" | "all">("draft"),
+    [count, setCount] = useState(3),
     [items, setItems] = useState<BankQuestion[]>([]),
     [loading, setLoading] = useState(false),
     [working, setWorking] = useState(false),
     [edit, setEdit] = useState<BankQuestion | null>(null),
-    [nested, setNested] = useState(""),
+    [saved, setSaved] = useState(""),
     [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!topic && topics[0]) setTopic(topics[0].id);
+  }, [topics]);
   async function load() {
+    if (!topic) return setItems([]);
     setLoading(true);
     try {
-      setItems(
-        (
-          await api<{ items: BankQuestion[] }>(
-            `/bank?status=${status}${topic ? `&topic_id=${topic}` : ""}`,
-            auth.token,
-          )
-        ).items,
-      );
+      setItems((await api<{ items: BankQuestion[] }>(`/bank?status=all&topic_id=${topic}`, auth.token)).items);
     } catch (e) {
       onError((e as Error).message);
     } finally {
@@ -53,8 +52,11 @@ export function Bank({
     }
   }
   useEffect(() => {
+    setMessage("");
     void load();
-  }, [topic, status, auth.token]);
+  }, [topic, auth.token]);
+  const tally = (s: string) => items.filter((q) => q.status === s).length;
+  const shown = status === "all" ? items : items.filter((q) => q.status === status);
   async function generate() {
     setWorking(true);
     setMessage("");
@@ -62,11 +64,12 @@ export function Bank({
       const result = await api<{ items: BankQuestion[]; provider: string }>(
         "/bank/generate",
         auth.token,
-        { topic_id: topic, count: 2 },
+        { topic_id: topic, count },
       );
       setMessage(
-        `${result.items.length} draft questions created · Provider: ${result.provider}. Review source material and every rubric before approval.`,
+        `${result.items.length} new questions are waiting for your review in step 4.`,
       );
+      setStatus("draft");
       await load();
       await onTopicsChanged();
     } catch (e) {
@@ -90,31 +93,13 @@ export function Bank({
       setWorking(false);
     }
   }
-  function open(q: BankQuestion) {
-    setEdit({ ...q });
-    setNested(
-      JSON.stringify(
-        {
-          rubric_points: q.rubric_points,
-          misconceptions: q.misconceptions,
-          follow_ups: q.follow_ups,
-          sources: q.sources,
-        },
-        null,
-        2,
-      ),
-    );
-  }
-  async function save() {
-    if (!edit) return;
+  async function save(question: BankQuestion) {
     setWorking(true);
     try {
-      const parsed = JSON.parse(nested);
-      await api(`/bank/${edit.id}`, auth.token, { ...edit, ...parsed }, "PUT");
+      await api(`/bank/${question.id}`, auth.token, question, "PUT");
       setEdit(null);
-      setMessage(
-        "Revision saved. Edited questions require approval before use in new sessions.",
-      );
+      setSaved(`"${question.concept}" saved. It is back in Waiting for review; approve it again before students get it.`);
+      setStatus("draft");
       await load();
     } catch (e) {
       onError((e as Error).message);
@@ -125,66 +110,82 @@ export function Bank({
   return (
     <>
       <PageTitle
-        eyebrow="CONTENT STUDIO · ADMIN"
-        title="A bank of better questions."
-        description="Review the question, the evidence, and the next step before it reaches a learner."
-        action={
-          <button
-            className="button primary"
-            disabled={working || !topic}
-            onClick={generate}
-          >
-            <Plus size={17} />
-            {working ? "Working…" : "Generate 2 drafts"}
-          </button>
-        }
+        eyebrow="QUESTION BANK · ADMIN"
+        title="Create viva questions"
+        description="Four steps: choose a course, add its material, generate questions, then approve the ones students should get."
       />
-      <div className="notice">
-        <ShieldCheck size={19} />
-        <span>
-          Only approved questions are used in new sessions. Sample seeds are
-          explicitly identified; generated content always starts as a draft.
-        </span>
-      </div>
-      <Courses auth={auth} onChanged={onTopicsChanged} onError={onError} />
-      {message && (
-        <div className="notice success" role="status">
-          {message}
+      <ol className="bank-flow" aria-label="Steps">
+        {["Course", "Material", "Generate", "Review and approve"].map((t, i) => (
+          <li key={t}><span>{i + 1}</span>{t}</li>
+        ))}
+      </ol>
+      <Courses
+        auth={auth}
+        topics={topics}
+        selected={topic}
+        onSelect={setTopic}
+        onChanged={onTopicsChanged}
+        onError={onError}
+      />
+      <Step
+        n={3}
+        title="Generate questions"
+        hint="AI writes draft questions, model answers and marking points from the course material. Nothing reaches students yet."
+        done={items.length > 0}
+      >
+        <div className="bank-step-row">
+          <label className="field-inline">
+            How many
+            <select value={count} onChange={(e) => setCount(Number(e.target.value))}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+          <button className="button primary" disabled={working || !topic} onClick={generate}>
+            <Sparkles size={17} />
+            {working ? "Generating, this can take a minute…" : `Generate ${count} question${count > 1 ? "s" : ""} from course material`}
+          </button>
         </div>
-      )}
-      <div className="filter-bar">
-        <label>
-          Topic
-          <select value={topic} onChange={(e) => setTopic(e.target.value)}>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
+        {message && (
+          <div className="notice success" role="status">
+            {message}
+          </div>
+        )}
+      </Step>
+      <Step
+        n={4}
+        title="Review and approve"
+        hint="Read each question and its marking points. Only approved questions are asked in new vivas."
+        done={tally("approved") > 0 && tally("draft") === 0}
+      >
+        {saved && (
+          <div className="notice success" role="status">
+            {saved}
+          </div>
+        )}
+        <div className="filter-bar">
+          <div className="tab-bar">
+            {([
+              ["draft", `Waiting for review (${tally("draft")})`],
+              ["approved", `Approved (${tally("approved")})`],
+              ["rejected", `Rejected (${tally("rejected")})`],
+              ["all", `All (${items.length})`],
+            ] as const).map(([s, l]) => (
+              <button key={s} className={status === s ? "selected" : ""} onClick={() => setStatus(s)}>
+                {l}
+              </button>
             ))}
-          </select>
-        </label>
-        <label>
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            {["all", "draft", "approved", "rejected"].map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
-        <span className="small muted">{items.length} questions</span>
-        <button
-          className="icon-button"
-          aria-label="Refresh question bank"
-          onClick={load}
-        >
-          <RefreshCw size={17} />
-        </button>
-      </div>
+          </div>
+          <button className="icon-button" aria-label="Refresh questions" onClick={load}>
+            <RefreshCw size={17} />
+          </button>
+        </div>
       {loading ? (
         <Busy />
-      ) : items.length ? (
+      ) : shown.length ? (
         <div className="bank-list">
-          {items.map((q) => (
+          {shown.map((q) => (
             <article className="panel bank-card" key={q.id}>
               <div className="section-heading">
                 <div className="tag-row">
@@ -207,7 +208,7 @@ export function Bank({
               <h2>{q.question}</h2>
               <details>
                 <summary>
-                  Review answer, rubric, follow-ups & sources
+                  Show model answer, marking points and sources
                   <ChevronDown size={16} />
                 </summary>
                 <h3>Reference answer</h3>
@@ -273,9 +274,9 @@ export function Bank({
                 )}
               </details>
               <div className="card-actions">
-                <button className="button secondary" onClick={() => open(q)}>
+                <button className="button secondary" onClick={() => { setSaved(""); setEdit(q); }}>
                   <Pencil size={15} />
-                  Edit & annotate
+                  Edit question
                 </button>
                 <div className="button-row">
                   {q.status !== "rejected" && (
@@ -315,77 +316,15 @@ export function Bank({
       ) : (
         <Empty
           icon={<BookOpenCheck size={28} />}
-          title="No questions in this view"
+          title={status === "draft" ? "Nothing waiting for review" : "No questions here"}
         >
-          Generate drafts or choose a different topic or status.
+          {items.length ? "Try another tab above." : "Generate questions in step 3."}
         </Empty>
       )}
+      </Step>
       {edit && (
-        <Modal title="Review question revision" onClose={() => setEdit(null)}>
-          <div className="notice">
-            Saving changes invalidates approval for future sessions. Existing
-            session snapshots stay unchanged.
-          </div>
-          <div className="field">
-            <label htmlFor="edit-concept">Concept</label>
-            <input
-              id="edit-concept"
-              value={edit.concept}
-              onChange={(e) => setEdit({ ...edit, concept: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-question">Question</label>
-            <textarea
-              id="edit-question"
-              rows={3}
-              value={edit.question}
-              onChange={(e) => setEdit({ ...edit, question: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-answer">Reference answer</label>
-            <textarea
-              id="edit-answer"
-              rows={4}
-              value={edit.reference_answer}
-              onChange={(e) =>
-                setEdit({ ...edit, reference_answer: e.target.value })
-              }
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-criteria">
-              Rubrics, misconceptions, follow-ups and sources · JSON
-            </label>
-            <textarea
-              className="code-input"
-              id="edit-criteria"
-              rows={16}
-              value={nested}
-              onChange={(e) => setNested(e.target.value)}
-              spellCheck={false}
-            />
-            <p className="field-help">
-              Preserve field names and valid JSON. Every nested field is
-              editable.
-            </p>
-          </div>
-          <div className="field">
-            <label htmlFor="edit-notes">Review notes</label>
-            <textarea
-              id="edit-notes"
-              rows={3}
-              value={edit.review_notes || ""}
-              onChange={(e) =>
-                setEdit({ ...edit, review_notes: e.target.value })
-              }
-            />
-          </div>
-          <button className="button primary" disabled={working} onClick={save}>
-            <Save size={17} />
-            Save draft revision
-          </button>
+        <Modal title="Edit question" onClose={() => setEdit(null)}>
+          <QuestionEditor question={edit} working={working} onSave={save} />
         </Modal>
       )}
     </>

@@ -110,7 +110,7 @@ def create_app() -> FastAPI:
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT"],
         allow_headers=["Authorization", "Content-Type"],
-        expose_headers=["Retry-After"],
+        expose_headers=["Retry-After", "X-Voice-Provider"],
     )
     install_error_handlers(app)
 
