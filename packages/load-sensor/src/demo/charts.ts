@@ -85,6 +85,13 @@ export interface StripChartOptions {
   readonly include?: readonly number[];
   readonly hover?: HoverBus;
   readonly compact?: boolean;
+  /**
+   * Continuous scrolling: between data updates the time axis keeps moving with
+   * the wall clock for up to this long (ms), so the chart glides instead of
+   * jumping once per update. Set it to about one update interval. Display only:
+   * points stay at their own frame times.
+   */
+  readonly liveLeadMs?: number;
 }
 
 export class StripChart {
@@ -101,6 +108,9 @@ export class StripChart {
   #markers: readonly number[] = [];
   #threshold: number | null = null;
   #now = 0;
+  /** Wall time (performance.now) of the last update, and the time the axis last showed. */
+  #anchor = 0;
+  #viewNow = 0;
   #width = 0;
   #height: number;
   #dirty = true;
@@ -144,7 +154,7 @@ export class StripChart {
     this.#canvas.addEventListener('pointermove', (e) => {
       const rect = this.#canvas.getBoundingClientRect();
       const frac = (e.clientX - rect.left) / rect.width;
-      options.hover?.set(this.#now - options.spanMs * (1 - frac));
+      options.hover?.set(this.#viewNow - options.spanMs * (1 - frac));
     });
     this.#canvas.addEventListener('pointerleave', () => options.hover?.set(null));
     options.hover?.subscribe(() => {
@@ -167,6 +177,7 @@ export class StripChart {
   }): void {
     this.#points = data.points;
     this.#now = data.now;
+    this.#anchor = performance.now();
     this.#bands = data.bands ?? [];
     this.#markers = data.markers ?? [];
     this.#threshold = data.threshold ?? null;
@@ -179,7 +190,31 @@ export class StripChart {
     this.#frame = requestAnimationFrame(() => {
       this.#frame = 0;
       if (this.#dirty) this.#draw();
+      // Keep gliding while the lead window is open; idle charts stop redrawing.
+      if (this.#gliding()) this.invalidate();
     });
+  }
+
+  #gliding(): boolean {
+    const lead = this.#opts.liveLeadMs ?? 0;
+    return (
+      lead > 0 &&
+      this.#width > 0 &&
+      !document.hidden &&
+      this.#points.length > 0 &&
+      performance.now() - this.#anchor < lead
+    );
+  }
+
+  /** Right-edge time: the newest data time plus wall time since it arrived, capped. */
+  #axisNow(): number {
+    const lead = this.#opts.liveLeadMs ?? 0;
+    let now = this.#now + Math.min(Math.max(0, performance.now() - this.#anchor), lead);
+    // Never step backwards by less than one lead (jitter in update timing);
+    // a bigger step back is a reset and is followed.
+    if (now < this.#viewNow && this.#viewNow - now <= lead) now = this.#viewNow;
+    this.#viewNow = now;
+    return now;
   }
 
   #resize(): void {
@@ -200,7 +235,8 @@ export class StripChart {
     if (!this.#theme?.line) this.#theme = readTheme(this.element);
     const th = this.#theme;
     const span = this.#opts.spanMs;
-    const t0 = this.#now - span;
+    const now = this.#axisNow();
+    const t0 = now - span;
     ctx.clearRect(0, 0, w, h);
     if (w <= 0) return;
 
@@ -258,30 +294,30 @@ export class StripChart {
     }
     ctx.stroke();
 
-    // Area wash + 2 px line, broken at gaps.
+    // Area wash + 2 px line, broken at gaps. Monotone curve through every
+    // point: smooth, but never overshoots, so a blink dip or a peak is drawn
+    // exactly as deep as the data (a plain spline would exaggerate it).
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.strokeStyle = th.line;
     ctx.fillStyle = th.lineSoft;
     let run: ChartPoint[] = [];
     const flush = (): void => {
       if (run.length === 0) return;
-      const first = run[0];
-      const last = run[run.length - 1];
-      if (!first || !last) return;
+      const xs = run.map((p) => x(p.t));
+      const ys = run.map((p) => y(p.v ?? 0));
+      const firstX = xs[0] ?? 0;
+      const lastX = xs[xs.length - 1] ?? 0;
       ctx.beginPath();
-      run.forEach((p, i) => {
-        const px = x(p.t);
-        const py = y(p.v ?? 0);
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      });
       if (run.length === 1) {
-        ctx.arc(x(first.t), y(first.v ?? 0), 1.5, 0, Math.PI * 2);
+        ctx.arc(firstX, ys[0] ?? 0, 1.5, 0, Math.PI * 2);
+      } else {
+        traceMonotone(ctx, xs, ys);
       }
       ctx.stroke();
-      ctx.lineTo(x(last.t), h);
-      ctx.lineTo(x(first.t), h);
+      ctx.lineTo(lastX, h);
+      ctx.lineTo(firstX, h);
       ctx.closePath();
       ctx.fill();
       run = [];
@@ -295,7 +331,7 @@ export class StripChart {
     // Hover crosshair, and the header value follows it.
     const hoverT = this.#opts.hover?.t ?? null;
     let shown: ChartPoint | undefined;
-    if (hoverT !== null && hoverT >= t0 && hoverT <= this.#now) {
+    if (hoverT !== null && hoverT >= t0 && hoverT <= now) {
       ctx.strokeStyle = th.crosshair;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -315,6 +351,61 @@ export class StripChart {
     const text = shown?.v != null ? this.#format(shown.v) : '–';
     if (this.#value.textContent !== text) this.#value.textContent = text;
     this.#value.dataset.hover = String(hoverT !== null);
+  }
+}
+
+/**
+ * Monotone cubic through (xs, ys) (Fritsch & Carlson 1980): passes through
+ * every point and adds no extrema between them. Assumes xs increasing.
+ */
+export function monotoneTangents(xs: readonly number[], ys: readonly number[]): number[] {
+  const n = xs.length;
+  const d: number[] = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    const dx = (xs[i + 1] ?? 0) - (xs[i] ?? 0);
+    d.push(dx > 0 ? ((ys[i + 1] ?? 0) - (ys[i] ?? 0)) / dx : 0);
+  }
+  const m: number[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = d[i - 1];
+    const b = d[i];
+    if (a === undefined) m.push(b ?? 0);
+    else if (b === undefined) m.push(a);
+    else m.push(a * b <= 0 ? 0 : (a + b) / 2);
+  }
+  for (let i = 0; i < n - 1; i += 1) {
+    const di = d[i] ?? 0;
+    if (di === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    const a = (m[i] ?? 0) / di;
+    const b = (m[i + 1] ?? 0) / di;
+    const s = a * a + b * b;
+    if (s > 9) {
+      const t = 3 / Math.sqrt(s);
+      m[i] = t * a * di;
+      m[i + 1] = t * b * di;
+    }
+  }
+  return m;
+}
+
+function traceMonotone(
+  ctx: CanvasRenderingContext2D,
+  xs: readonly number[],
+  ys: readonly number[],
+): void {
+  const m = monotoneTangents(xs, ys);
+  ctx.moveTo(xs[0] ?? 0, ys[0] ?? 0);
+  for (let i = 0; i < xs.length - 1; i += 1) {
+    const x0 = xs[i] ?? 0;
+    const x1 = xs[i + 1] ?? 0;
+    const y0 = ys[i] ?? 0;
+    const y1 = ys[i + 1] ?? 0;
+    const h = (x1 - x0) / 3;
+    ctx.bezierCurveTo(x0 + h, y0 + h * (m[i] ?? 0), x1 - h, y1 - h * (m[i + 1] ?? 0), x1, y1);
   }
 }
 

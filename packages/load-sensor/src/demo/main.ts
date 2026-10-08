@@ -1,7 +1,9 @@
-// Demo and debug page for the load sensor (TODO A2–A4), in two tabs:
-// - Camera: camera control, a live landmark overlay with fps, backend and
-//   frame time, and (dev builds) the fixture recorder.
+// Demo and debug page for the load sensor (TODO A2–A4), in three tabs:
+// - Camera: camera control, the live landmark overlay, the Wellbeing panel
+//   (away/asleep alarm, screen time, health tips) and, in dev builds, the
+//   fixture recorder.
 // - Signals: calibration, KPIs, EAR trace and the per-second features.
+// - Performance: fps, backend, frame time and pipeline read-outs.
 // The consent screen comes with TODO A6.
 //
 // Sensing is off until the user presses "Turn sensing on" (invariant 4).
@@ -14,10 +16,20 @@ import {
   UnsupportedBackendError,
 } from '../core/landmarks/index.js';
 import { FeaturePipeline } from '../core/window/index.js';
+import { AlarmSound, AttentionMonitor, type AlarmReason } from './attention-alarm.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
 import { SignalsPanel } from './signals-panel.js';
 import { Tabs, type TabTone } from './tabs.js';
+import { WellbeingPanel } from './wellbeing-panel.js';
+
+/** localStorage key for the alarm switch (a per-viewer preference only). */
+const ALARM_PREF_KEY = 'adaptlearn.c2.alarm';
+
+const ALARM_BANNER: Record<AlarmReason, string> = {
+  absent: 'No one at the screen',
+  asleep: 'Eyes closed — wake up',
+};
 
 const STATUS_TEXT: Record<CameraStatus, string> = {
   idle: 'Sensing is off.',
@@ -48,6 +60,7 @@ const ICONS = {
   power: '<path d="M12 3v8"/><path d="M6.4 6.4a8 8 0 1 0 11.2 0"/>',
   shield:
     '<path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3z"/><path d="m9 12 2 2 4-4"/>',
+  bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   expand: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
 } as const;
 
@@ -129,7 +142,19 @@ function mount(root: HTMLElement): void {
   expandBtn.setAttribute('aria-label', 'Open the camera view');
   expandBtn.append(icon(ICONS.expand));
 
-  stage.append(video, canvas, corners, empty, hud, privacy, expandBtn);
+  const scan = el('div');
+  scan.className = 'scan';
+  scan.setAttribute('aria-hidden', 'true');
+
+  // Alarm banner over the video (also visible in the docked mini preview).
+  const alarmBanner = el('div');
+  alarmBanner.className = 'alarm-banner';
+  alarmBanner.dataset.testid = 'alarm-banner';
+  alarmBanner.setAttribute('aria-hidden', 'true');
+  const alarmText = el('span', '');
+  alarmBanner.append(icon(ICONS.bell), alarmText);
+
+  stage.append(video, canvas, scan, corners, empty, hud, privacy, alarmBanner, expandBtn);
 
   // ── Controls ──
   const enableBtn = button('Turn sensing on', 'enable', ICONS.camera, 'btn-primary');
@@ -149,7 +174,11 @@ function mount(root: HTMLElement): void {
   cameraCard.setAttribute('aria-label', 'Camera');
   cameraCard.append(stage, controls);
 
-  // ── Side panel ──
+  // ── Wellbeing panel (right of the camera) ──
+  const wellbeing = new WellbeingPanel();
+  wellbeing.alarmSwitch.checked = readAlarmPref();
+
+  // ── Performance read-outs (own tab) ──
   const stats = new StatsPanel();
 
   const perfCard = card('Performance');
@@ -177,14 +206,14 @@ function mount(root: HTMLElement): void {
     { testId: 'errors', label: 'Inference errors' },
   ]);
 
-  const side = el('aside');
-  side.className = 'side';
-  side.setAttribute('aria-label', 'Debug read-out');
-  side.append(perfCard, cameraInfo, pipelineInfo);
+  const perfGrid = el('div');
+  perfGrid.className = 'perf-grid';
+  perfGrid.setAttribute('aria-label', 'Debug read-out');
+  perfGrid.append(perfCard, cameraInfo, pipelineInfo);
 
   const layout = el('div');
   layout.className = 'layout';
-  layout.append(cameraCard, side);
+  layout.append(cameraCard, wellbeing.element);
 
   const footer = el(
     'p',
@@ -210,12 +239,29 @@ function mount(root: HTMLElement): void {
   signalsPanel.id = 'panel-signals';
   signalsPanel.className = 'panel';
   signalsPanel.append(signals.element);
+  const perfPanel = el('section');
+  perfPanel.id = 'panel-performance';
+  perfPanel.className = 'panel';
+  const perfHead = el('header');
+  perfHead.className = 'section-head';
+  const perfTitles = el('div');
+  const perfTitle = el('h2', 'Performance');
+  perfTitle.className = 'section-title';
+  const perfSub = el(
+    'p',
+    'Live read-outs for debugging. Frame time here is time inside the face model; the latency benchmark (TODO A7) measures end to end.',
+  );
+  perfSub.className = 'section-sub';
+  perfTitles.append(perfTitle, perfSub);
+  perfHead.append(perfTitles);
+  perfPanel.append(perfHead, perfGrid);
   const tabs = new Tabs(
     [
-      // Kept rendered so the video keeps producing frames; on the Signals tab
-      // it shrinks to a mini preview in the corner (styles.css, "Dock").
+      // Kept rendered so the video keeps producing frames; on the
+      // other tabs it shrinks to a mini preview in the corner (styles.css, "Dock").
       { id: 'camera', index: '01', label: 'Camera', panel: cameraPanel, keepRendered: true },
       { id: 'signals', index: '02', label: 'Signals', panel: signalsPanel },
+      { id: 'performance', index: '03', label: 'Performance', panel: perfPanel },
     ],
     'Views',
   );
@@ -227,7 +273,7 @@ function mount(root: HTMLElement): void {
     tabs.select('camera', true);
   });
 
-  root.append(topbar, tabs.element, cameraPanel, signalsPanel, footer);
+  root.append(topbar, tabs.element, cameraPanel, signalsPanel, perfPanel, footer);
 
   // ── Pipeline ──
   const camera = new Camera({ video });
@@ -237,19 +283,34 @@ function mount(root: HTMLElement): void {
   });
   const tracker = new LandmarkTracker(camera, provider);
   const overlay = new LandmarkOverlay(canvas);
+  const attention = new AttentionMonitor();
+  const alarmSound = new AlarmSound();
   let pipeline = createPipeline(true);
 
   function createPipeline(useExpressionFeatures: boolean): FeaturePipeline {
     const p = new FeaturePipeline({ useExpressionFeatures });
     p.onFrame((f) => {
       signals.pushFrame(f);
+      attention.update({ tMs: f.tMs, faceFound: f.signals !== null, eyesClosed: f.eyesClosed });
+      renderAlarm();
     });
     p.onSecond((s) => {
       signals.pushSecond(s);
+      wellbeing.pushSecond(s);
       signals.setState(p.state);
     });
     return p;
   }
+
+  wellbeing.alarmSwitch.addEventListener('change', () => {
+    writeAlarmPref(wellbeing.alarmSwitch.checked);
+    // A click is a user gesture: the browser now allows audio.
+    if (wellbeing.alarmSwitch.checked) alarmSound.unlock();
+    renderAlarm();
+  });
+  wellbeing.testButton.addEventListener('click', () => {
+    alarmSound.test();
+  });
 
   pointsSwitch.input.addEventListener('change', () => {
     overlay.featurePoints = pointsSwitch.input.checked;
@@ -271,8 +332,12 @@ function mount(root: HTMLElement): void {
   });
 
   tracker.onSample((sample) => {
-    face = sample.face ? 'found' : 'none';
-    overlay.draw(sample.face, video.videoWidth, video.videoHeight);
+    const next = sample.face ? 'found' : 'none';
+    if (next !== face) {
+      face = next;
+      renderFaceChip();
+    }
+    overlay.update(sample.face, video.videoWidth, video.videoHeight, sample.tMs);
     const aspect = video.videoWidth > 0 ? video.videoWidth / video.videoHeight : 4 / 3;
     const landmarks = sample.face?.landmarks ?? null;
     pipeline.push(sample.tMs, landmarks, aspect);
@@ -290,13 +355,19 @@ function mount(root: HTMLElement): void {
       // Sensing ended: the next session gets a fresh baseline.
       pipeline.reset();
       signals.reset();
+      wellbeing.reset();
     }
+    // No frames while paused: start the away/asleep timers again on resume.
+    if (next !== 'active') attention.reset();
+    renderAlarm();
     if (next === 'active' && !pipeline.baseline.ready) signals.setState(pipeline.state);
     if (error) console.info(`Camera ${error.status}: ${error.name} — ${error.message}`);
     render();
   });
 
   enableBtn.addEventListener('click', () => {
+    // Unlock audio inside the click, before any await (autoplay policy).
+    alarmSound.unlock();
     void enable();
   });
   pauseBtn.addEventListener('click', () => {
@@ -377,6 +448,23 @@ function mount(root: HTMLElement): void {
     renderFaceChip();
   }
 
+  function renderAlarm(): void {
+    const sensing = camera.status === 'active';
+    const reason = sensing && wellbeing.alarmSwitch.checked ? attention.state.reason : null;
+    if (reason) alarmSound.start(reason);
+    else alarmSound.stop();
+    wellbeing.setAlarm(
+      reason ??
+        (!sensing ? 'sensing-off' : wellbeing.alarmSwitch.checked ? 'watching' : 'disabled'),
+    );
+    if (reason) {
+      stage.dataset.alarm = reason;
+      alarmText.textContent = ALARM_BANNER[reason];
+    } else {
+      delete stage.dataset.alarm;
+    }
+  }
+
   function renderFaceChip(): void {
     const text =
       modelState === 'loading'
@@ -384,10 +472,13 @@ function mount(root: HTMLElement): void {
         : face === 'found'
           ? 'Face detected'
           : face === 'none'
-            ? 'No face in view'
+            ? 'Scanning for a face'
             : 'Waiting for frames';
     if (faceChip.textContent !== text) faceChip.textContent = text;
     faceChip.dataset.face = face;
+    // Scan-line sweep while the model loads or no face has been found yet.
+    const running = camera.status === 'active' || camera.status === 'paused';
+    stage.dataset.scan = String(running && (modelState === 'loading' || face !== 'found'));
   }
 
   function renderStats(): void {
@@ -413,6 +504,7 @@ function mount(root: HTMLElement): void {
     stats.set('errors', String(st.errors));
     renderFaceChip();
     renderTabMeta();
+    wellbeing.tick(camera.status === 'active', face === 'found');
   }
 
   function renderTabMeta(): void {
@@ -433,6 +525,17 @@ function mount(root: HTMLElement): void {
               ? 'Needs attention'
               : 'Off',
       camTone,
+    );
+    const alarm = attention.state.reason;
+    if (alarm && stage.dataset.alarm) {
+      tabs.setMeta('camera', alarm === 'absent' ? 'Alarm · away' : 'Alarm · eyes closed', 'error');
+    }
+    tabs.setMeta(
+      'performance',
+      tracker.running && Number.isFinite(tracker.stats.inferenceP95)
+        ? `p95 ${formatMs(tracker.stats.inferenceP95)}`
+        : (provider.backend ?? 'Idle'),
+      tracker.running ? 'live' : 'idle',
     );
     const state = pipeline.state;
     const running = s === 'active' || s === 'paused';
@@ -457,6 +560,22 @@ function mount(root: HTMLElement): void {
   renderStats();
   // The read-out refreshes twice a second; it is for humans, not measurement.
   window.setInterval(renderStats, 500);
+}
+
+function readAlarmPref(): boolean {
+  try {
+    return localStorage.getItem(ALARM_PREF_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+function writeAlarmPref(on: boolean): void {
+  try {
+    localStorage.setItem(ALARM_PREF_KEY, on ? 'on' : 'off');
+  } catch {
+    // Storage blocked (private window): the switch still works for this visit.
+  }
 }
 
 function toneFor(status: CameraStatus, loading: boolean, failed: boolean): Tone {

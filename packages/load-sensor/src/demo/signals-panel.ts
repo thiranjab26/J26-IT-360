@@ -170,6 +170,8 @@ export class SignalsPanel {
       description: 'Eye aspect ratio per frame over the last 20 seconds, with the blink threshold.',
       spanMs: EAR_SPAN_MS,
       height: 120,
+      // Frames arrive every ~67 ms at 15 fps; a little more covers jitter.
+      liveLeadMs: 200,
       format: (v) => v.toFixed(3),
       hover: new HoverBus(),
     });
@@ -200,6 +202,8 @@ export class SignalsPanel {
         spanMs: FEATURE_SPAN_MS,
         height: 46,
         compact: true,
+        // One update per second.
+        liveLeadMs: 1000,
         hover: this.#hover,
         format: formatter(f.unit),
       });

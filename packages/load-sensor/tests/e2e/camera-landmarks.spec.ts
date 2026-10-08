@@ -68,6 +68,20 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
     await expect(page.getByTestId('tab-camera')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('dock-expand')).toBeHidden();
 
+    // Demo away alarm: with no face in view it fires after 5 s, and the switch silences it.
+    await expect(page.getByTestId('alarm-state')).toHaveText('Not at the screen', {
+      timeout: 20_000,
+    });
+    await expect(page.getByTestId('alarm-banner')).toBeVisible();
+    await page.locator('label.switch', { has: page.getByTestId('toggle-alarm') }).click();
+    await expect(page.getByTestId('alarm-state')).toHaveText('Off');
+    await expect(page.getByTestId('alarm-banner')).toBeHidden();
+
+    // Performance read-outs live on their own tab.
+    await page.getByTestId('tab-performance').click();
+    await expect(page.getByTestId('backend')).toBeVisible();
+    await page.getByTestId('tab-camera').click();
+
     // FR7 / NFR2: everything the page loaded came from its own origin…
     const origin = new URL(baseURL ?? '').origin;
     const foreign = requests.map((r) => r.url()).filter((u) => new URL(u).origin !== origin);

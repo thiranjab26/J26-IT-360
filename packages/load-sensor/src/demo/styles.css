@@ -434,6 +434,14 @@ h1 {
   padding: 10px;
 }
 
+/* Wide screens: the camera stays in view while the Wellbeing column scrolls. */
+@media (min-width: 981px) {
+  .camera-panel[data-active='true'] .camera-card {
+    position: sticky;
+    top: 96px;
+  }
+}
+
 .stage {
   position: relative;
   overflow: hidden;
@@ -472,6 +480,63 @@ h1 {
 
 .stage[data-active='true'][data-paused='true'] video {
   filter: grayscale(0.8) brightness(0.5);
+}
+
+/* Scanning: a soft line sweeps the frame while the model loads or looks for a face. */
+.scan {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.scan::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 38%;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(212, 255, 58, 0.04) 70%,
+    rgba(212, 255, 58, 0.16) 97%,
+    rgba(212, 255, 58, 0.7) 100%
+  );
+  transform: translateY(-100%);
+  animation: scan 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.scan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(212, 255, 58, 0.18) 1px, transparent 1.4px);
+  background-size: 18px 18px;
+  mask-image: radial-gradient(60% 55% at 50% 50%, #000, transparent);
+  animation: scan-grid 2.4s ease-in-out infinite;
+}
+
+.stage[data-scan='true'] .scan {
+  opacity: 1;
+}
+
+.stage[data-scan='true'][data-paused='true'] .scan {
+  opacity: 0;
+}
+
+@keyframes scan {
+  to {
+    transform: translateY(265%);
+  }
+}
+
+@keyframes scan-grid {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 /* Viewfinder corner brackets. */
@@ -622,6 +687,73 @@ h1 {
   display: none;
 }
 
+/* Alarm banner: shown over the video while the away/asleep alarm sounds. */
+.alarm-banner {
+  position: absolute;
+  inset: auto 22px 60px;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid #ff5a4f;
+  border-radius: var(--radius-md);
+  background: rgba(40, 8, 6, 0.82);
+  backdrop-filter: blur(8px);
+  color: #ffe1dd;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 650;
+  pointer-events: none;
+}
+
+.alarm-banner svg {
+  width: 20px;
+  height: 20px;
+  color: #ff5a4f;
+  animation: ring 0.9s ease-in-out infinite;
+}
+
+.stage[data-alarm] .alarm-banner {
+  display: flex;
+}
+
+/* Pulsing red frame around the camera view while alarming. */
+.stage[data-alarm]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border: 3px solid #ff5a4f;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: alarm-pulse 1.1s ease-in-out infinite;
+}
+
+.stage[data-alarm] .viewfinder {
+  --vf: #ff5a4f;
+}
+
+@keyframes alarm-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes ring {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-14deg);
+  }
+  75% {
+    transform: rotate(14deg);
+  }
+}
+
 /* ── Controls ───────────────────────────────────────────────────────── */
 
 .controls {
@@ -696,6 +828,25 @@ h1 {
   background: color-mix(in srgb, var(--accent) 88%, #ffffff);
 }
 
+.btn-small {
+  height: 30px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 .btn-danger {
   border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   background: transparent;
@@ -709,10 +860,12 @@ h1 {
 
 /* ── Side panel ─────────────────────────────────────────────────────── */
 
-.side {
+.perf-grid {
   display: grid;
-  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
+  align-items: start;
+  margin-top: 16px;
 }
 
 .metrics {
@@ -795,6 +948,293 @@ h1 {
   text-align: center;
 }
 
+/* ── Wellbeing panel (right of the camera) ──────────────────────────── */
+
+.wellbeing {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.wb-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.wb-card > .card-title {
+  margin-bottom: 2px;
+}
+
+.wb-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+}
+
+.wb-hint {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* Alarm */
+.wb-alarm {
+  --tone: var(--idle);
+}
+
+.wb-alarm[data-state='watching'] {
+  --tone: var(--accent-text);
+}
+
+.wb-alarm[data-state='absent'],
+.wb-alarm[data-state='asleep'] {
+  --tone: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+}
+
+.wb-alarm-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wb-alarm-dot {
+  position: relative;
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+.wb-alarm[data-state='watching'] .wb-alarm-dot::after,
+.wb-alarm[data-state='absent'] .wb-alarm-dot::after,
+.wb-alarm[data-state='asleep'] .wb-alarm-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--tone);
+  animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.wb-alarm[data-state='absent'] .wb-alarm-dot::after,
+.wb-alarm[data-state='asleep'] .wb-alarm-dot::after {
+  animation-duration: 0.9s;
+}
+
+.wb-alarm-label {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.wb-alarm[data-state='absent'] .wb-alarm-label,
+.wb-alarm[data-state='asleep'] .wb-alarm-label {
+  color: var(--danger);
+}
+
+.wb-alarm .btn-small {
+  justify-self: start;
+}
+
+/* Screen time */
+.wb-big {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.wb-meter {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.wb-meter-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.wb-meter-label {
+  color: var(--text-muted);
+}
+
+.wb-meter-value {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.wb-meter-track {
+  overflow: hidden;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+}
+
+.wb-meter-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-text);
+  transition: width 0.5s linear;
+}
+
+.wb-meter[data-due='true'] .wb-meter-bar {
+  background: var(--warn);
+}
+
+.wb-meter[data-due='true'] .wb-meter-value {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* Featured tip */
+.wb-tip-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.wb-tip-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.wb-tip-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.wb-featured[data-suggested='true'] .wb-tip-icon {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  color: var(--warn);
+}
+
+.wb-tip-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wb-tip-reason {
+  margin: 0;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.wb-featured[data-suggested='true'] .wb-tip-reason {
+  color: var(--warn);
+}
+
+.wb-tip-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.wb-tip-body {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.wb-swap .wb-tip-row {
+  animation: tip-in 0.35s ease both;
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+}
+
+/* All tips */
+.wb-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wb-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease;
+}
+
+.wb-item[data-current='true'] {
+  background: var(--surface-2);
+}
+
+.wb-item-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.wb-item[data-current='true'] .wb-item-icon {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+}
+
+.wb-item-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.wb-item-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.wb-item-text strong {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.wb-item-text span {
+  color: var(--text-faint);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
 /* ── Dock: the camera as a mini preview while another tab is open ───── */
 
 /* Room at the bottom so the docked preview never covers the last content. */
@@ -806,7 +1246,7 @@ h1 {
   display: block;
 }
 
-.camera-panel[data-active='false'] .side,
+.camera-panel[data-active='false'] .wellbeing,
 .camera-panel[data-active='false'] .controls,
 .camera-panel[data-active='false'] .dev-tools,
 .camera-panel[data-active='false'][data-running='false'] .camera-card {
@@ -837,6 +1277,17 @@ h1 {
 .camera-panel[data-active='false'] .hud .chip:last-child,
 .camera-panel[data-active='false'] .privacy-chip {
   display: none;
+}
+
+.camera-panel[data-active='false'] .alarm-banner {
+  inset: auto 6px 6px;
+  padding: 4px 6px;
+  font-size: 11px;
+}
+
+.camera-panel[data-active='false'] .alarm-banner svg {
+  width: 13px;
+  height: 13px;
 }
 
 .camera-panel[data-active='false'] .chip {
