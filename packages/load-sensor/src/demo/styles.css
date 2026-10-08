@@ -132,6 +132,17 @@ body {
   margin-bottom: 18px;
 }
 
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-link {
+  text-decoration: none;
+}
+
 .brand {
   display: flex;
   align-items: center;

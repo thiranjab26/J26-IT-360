@@ -143,6 +143,8 @@ export class AlarmSound {
   #timer = 0;
   #reason: AlarmReason | null = null;
   #startedAt = 0;
+  /** 0–1, scales the whole ramp (admin panel). 0 leaves the alarm visual only. */
+  volume = 1;
 
   get playing(): AlarmReason | null {
     return this.#reason;
@@ -169,7 +171,7 @@ export class AlarmSound {
     const play = (): void => {
       const elapsed = ctx.currentTime - this.#startedAt;
       const gain = START_GAIN + (MAX_GAIN - START_GAIN) * Math.min(1, elapsed / RAMP_S);
-      this.#burst(ctx, pattern.tones, gain);
+      this.#burst(ctx, pattern.tones, gain * this.volume);
     };
     play();
     this.#timer = window.setInterval(play, pattern.period * 1000);
@@ -184,10 +186,12 @@ export class AlarmSound {
   /** One short pattern, e.g. for a "Test sound" button. Call from a user gesture. */
   test(reason: AlarmReason = 'absent'): void {
     this.unlock();
-    if (this.#ctx) this.#burst(this.#ctx, PATTERNS[reason].tones, START_GAIN * 1.5);
+    if (this.#ctx) this.#burst(this.#ctx, PATTERNS[reason].tones, START_GAIN * 1.5 * this.volume);
   }
 
   #burst(ctx: AudioContext, tones: readonly [number, number, number][], gain: number): void {
+    // exponentialRamp cannot reach 0, and a silent alarm needs no oscillators.
+    if (gain <= 0.0001) return;
     const t0 = ctx.currentTime + 0.02;
     for (const [freq, offset, dur] of tones) {
       const osc = ctx.createOscillator();

@@ -65,9 +65,9 @@ const TIPS: readonly Tip[] = [
   },
 ];
 
-/** Break intervals (wall clock, while sensing is on and a face is present). */
+/** Default break intervals (wall clock, while sensing is on and a face is present); set from the admin panel. */
 const EYE_BREAK_MS = 20 * 60_000; // the 20-20-20 rule's 20 minutes
-const MOVE_BREAK_MS = 30 * 60_000; // a common desk-work reminder interval; adjustable
+const MOVE_BREAK_MS = 30 * 60_000; // a common desk-work reminder interval
 /** Being away from the screen this long counts as a break and resets both timers. */
 const AWAY_IS_BREAK_MS = 2 * 60_000;
 /** Featured tip rotation when nothing more specific applies. */
@@ -81,10 +81,8 @@ export type AlarmView = 'sensing-off' | 'disabled' | 'watching' | AlarmReason;
 const ALARM_TEXT: Record<AlarmView, { label: string; hint: string }> = {
   'sensing-off': { label: 'Inactive', hint: 'Starts when sensing is on.' },
   disabled: { label: 'Off', hint: 'Turn on to get a beep when you leave or fall asleep.' },
-  watching: {
-    label: 'Watching',
-    hint: 'Beeps after 5 s with no face or 3 s with eyes closed, until you are back.',
-  },
+  // Hint filled in from the alarm timings (setAlarmTimes).
+  watching: { label: 'Watching', hint: '' },
   absent: { label: 'Not at the screen', hint: 'Come back to the screen to stop the beep.' },
   asleep: { label: 'Eyes closed — wake up', hint: 'Open your eyes to stop the beep.' },
 };
@@ -96,7 +94,10 @@ export class WellbeingPanel {
 
   readonly #alarm: { root: HTMLElement; label: HTMLElement; hint: HTMLElement };
   readonly #screenTime: HTMLElement;
-  readonly #meters: Record<'eyes' | 'move', { bar: HTMLElement; text: HTMLElement }>;
+  readonly #meters: Record<
+    'eyes' | 'move',
+    { bar: HTMLElement; label: HTMLElement; text: HTMLElement }
+  >;
   readonly #featured: {
     root: HTMLElement;
     icon: HTMLElement;
@@ -119,6 +120,9 @@ export class WellbeingPanel {
   #rotateAt = 0;
   #manual: TipId | null = null;
   #featuredId: TipId | null = null;
+  #eyeBreakMs = EYE_BREAK_MS;
+  #moveBreakMs = MOVE_BREAK_MS;
+  #watchingHint = 'Beeps after 5 s with no face or 3 s with eyes closed, until you are back.';
 
   constructor() {
     this.element = el('aside', 'wellbeing');
@@ -166,8 +170,8 @@ export class WellbeingPanel {
     this.#screenTime = el('p', 'wb-big', '0:00');
     this.#screenTime.dataset.testid = 'screen-time';
     const caption = el('p', 'wb-hint', 'At the screen with sensing on, this session');
-    const eyes = meter('Eye break', 'every 20 min');
-    const move = meter('Movement break', 'every 30 min');
+    const eyes = meter('Eye break');
+    const move = meter('Movement break');
     this.#meters = { eyes, move };
     timeCard.append(timeHead, this.#screenTime, caption, eyes.root, move.root);
 
@@ -232,8 +236,36 @@ export class WellbeingPanel {
     this.#renderTimes();
   }
 
+  /** Screen time with a face present, this session (ms). */
+  get onScreenMs(): number {
+    return this.#onScreenMs;
+  }
+
+  get sinceEyeBreakMs(): number {
+    return this.#sinceEyeBreakMs;
+  }
+
+  get sinceMoveBreakMs(): number {
+    return this.#sinceMoveBreakMs;
+  }
+
+  /** Break reminder intervals in minutes. */
+  setBreakIntervals(eyeMin: number, moveMin: number): void {
+    this.#eyeBreakMs = eyeMin * 60_000;
+    this.#moveBreakMs = moveMin * 60_000;
+    this.#renderTimes();
+    this.#renderFeatured();
+  }
+
+  /** Alarm timings in seconds, for the "watching" hint. */
+  setAlarmTimes(absentS: number, asleepS: number): void {
+    this.#watchingHint = `Beeps after ${String(absentS)} s with no face or ${String(asleepS)} s with eyes closed, until you are back.`;
+    if (this.#alarm.root.dataset.state === 'watching') this.setAlarm('watching');
+  }
+
   setAlarm(view: AlarmView): void {
-    const text = ALARM_TEXT[view];
+    const text =
+      view === 'watching' ? { ...ALARM_TEXT.watching, hint: this.#watchingHint } : ALARM_TEXT[view];
     if (this.#alarm.label.textContent !== text.label) this.#alarm.label.textContent = text.label;
     if (this.#alarm.hint.textContent !== text.hint) this.#alarm.hint.textContent = text.hint;
     this.#alarm.root.dataset.state = view;
@@ -300,11 +332,14 @@ export class WellbeingPanel {
     if (this.#tiredEvents() >= TIRED_EVENTS) {
       return { id: 'walk', reason: 'Suggested · signs of tiredness in the last 5 min' };
     }
-    if (this.#sinceMoveBreakMs >= MOVE_BREAK_MS) {
-      return { id: 'stretch', reason: 'Suggested · 30 min since your last break' };
+    if (this.#sinceMoveBreakMs >= this.#moveBreakMs) {
+      return {
+        id: 'stretch',
+        reason: `Suggested · ${minutes(this.#moveBreakMs)} min since your last break`,
+      };
     }
-    if (this.#sinceEyeBreakMs >= EYE_BREAK_MS) {
-      return { id: 'eyes', reason: 'Suggested · 20 min of screen time' };
+    if (this.#sinceEyeBreakMs >= this.#eyeBreakMs) {
+      return { id: 'eyes', reason: `Suggested · ${minutes(this.#eyeBreakMs)} min of screen time` };
     }
     if (this.#manual) return { id: this.#manual, reason: 'Reminder' };
     return { id: TIPS[this.#rotateIndex]?.id ?? 'water', reason: 'Reminder' };
@@ -334,8 +369,8 @@ export class WellbeingPanel {
   #renderTimes(): void {
     const t = clock(this.#onScreenMs);
     if (this.#screenTime.textContent !== t) this.#screenTime.textContent = t;
-    setMeter(this.#meters.eyes, this.#sinceEyeBreakMs, EYE_BREAK_MS);
-    setMeter(this.#meters.move, this.#sinceMoveBreakMs, MOVE_BREAK_MS);
+    setMeter(this.#meters.eyes, this.#sinceEyeBreakMs, this.#eyeBreakMs);
+    setMeter(this.#meters.move, this.#sinceMoveBreakMs, this.#moveBreakMs);
   }
 
   #indexOf(id: TipId | null): number {
@@ -346,28 +381,42 @@ export class WellbeingPanel {
   }
 }
 
-function meter(
-  label: string,
-  every: string,
-): { root: HTMLElement; bar: HTMLElement; text: HTMLElement } {
+function meter(label: string): {
+  root: HTMLElement;
+  bar: HTMLElement;
+  label: HTMLElement;
+  text: HTMLElement;
+} {
   const root = el('div', 'wb-meter');
   const top = el('div', 'wb-meter-top');
   const text = el('span', 'wb-meter-value', '');
-  top.append(el('span', 'wb-meter-label', `${label} · ${every}`), text);
+  const labelEl = el('span', 'wb-meter-label', label);
+  labelEl.dataset.name = label;
+  top.append(labelEl, text);
   const track = el('div', 'wb-meter-track');
   const bar = el('div', 'wb-meter-bar');
   track.append(bar);
   root.append(top, track);
-  return { root, bar, text };
+  return { root, bar, label: labelEl, text };
 }
 
-function setMeter(m: { bar: HTMLElement; text: HTMLElement }, ms: number, limit: number): void {
+function setMeter(
+  m: { bar: HTMLElement; label: HTMLElement; text: HTMLElement },
+  ms: number,
+  limit: number,
+): void {
+  const label = `${m.label.dataset.name ?? ''} · every ${minutes(limit)} min`;
+  if (m.label.textContent !== label) m.label.textContent = label;
   const frac = Math.min(1, ms / limit);
   m.bar.style.width = `${(frac * 100).toFixed(1)}%`;
   m.bar.parentElement?.parentElement?.setAttribute('data-due', String(frac >= 1));
   const left = limit - ms;
   const text = left > 0 ? `in ${clock(left, true)}` : 'due now';
   if (m.text.textContent !== text) m.text.textContent = text;
+}
+
+function minutes(ms: number): string {
+  return String(Math.round(ms / 60_000));
 }
 
 /** m:ss, or h:mm:ss past an hour. `ceil` rounds up (countdowns never show 0:00 early). */

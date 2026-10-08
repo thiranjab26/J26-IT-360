@@ -94,6 +94,11 @@ export class LandmarkTracker {
     };
   }
 
+  /** Changes the rate cap; takes effect from the next frame. */
+  set targetFps(fps: number) {
+    this.#gate.targetFps = fps;
+  }
+
   onSample(listener: (sample: LandmarkSample) => void): () => void {
     this.#sampleListeners.add(listener);
     return () => this.#sampleListeners.delete(listener);

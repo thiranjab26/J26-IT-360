@@ -17,16 +17,24 @@ import {
   UnsupportedBackendError,
 } from '../core/landmarks/index.js';
 import { FeaturePipeline } from '../core/window/index.js';
-import { AlarmSound, AttentionMonitor, type AlarmReason } from './attention-alarm.js';
+import {
+  AlarmSound,
+  ATTENTION_DEFAULTS,
+  AttentionMonitor,
+  type AlarmReason,
+} from './attention-alarm.js';
 import { BreakPanel } from './break/break-panel.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
+import {
+  openControlChannel,
+  SettingsStore,
+  type DemoSettings,
+  type SensorStatus,
+} from './settings.js';
 import { SignalsPanel } from './signals-panel.js';
 import { Tabs, type TabTone } from './tabs.js';
 import { WellbeingPanel } from './wellbeing-panel.js';
-
-/** localStorage key for the alarm switch (a per-viewer preference only). */
-const ALARM_PREF_KEY = 'adaptlearn.c2.alarm';
 
 const ALARM_BANNER: Record<AlarmReason, string> = {
   absent: 'No one at the screen',
@@ -64,6 +72,8 @@ const ICONS = {
     '<path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3z"/><path d="m9 12 2 2 4-4"/>',
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   expand: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
+  sliders:
+    '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
 } as const;
 
 const app = document.querySelector<HTMLElement>('#app');
@@ -92,9 +102,20 @@ function mount(root: HTMLElement): void {
   status.setAttribute('role', 'status');
   pill.append(pillDot, status);
 
+  // Settings page; opens in its own named tab so it can sit next to this one.
+  const adminLink = el('a');
+  adminLink.className = 'btn btn-small btn-ghost admin-link';
+  adminLink.href = `${import.meta.env.BASE_URL}cog-admin.html`;
+  adminLink.target = 'adaptlearn-c2-cog-admin';
+  adminLink.dataset.testid = 'open-admin';
+  adminLink.append(icon(ICONS.sliders), el('span', 'Cog admin'));
+  const topActions = el('div');
+  topActions.className = 'top-actions';
+  topActions.append(adminLink, pill);
+
   const topbar = el('header');
   topbar.className = 'topbar';
-  topbar.append(brand, pill);
+  topbar.append(brand, topActions);
 
   // ── Camera stage ──
   const stage = el('div');
@@ -165,7 +186,12 @@ function mount(root: HTMLElement): void {
   const disableBtn = button('Turn sensing off', 'disable', ICONS.power, 'btn-danger');
   const spacer = el('div');
   spacer.className = 'spacer';
-  const pointsSwitch = toggle('Feature points', 'toggle-points', false);
+  const settings = new SettingsStore();
+  const pointsSwitch = toggle(
+    'Feature points',
+    'toggle-points',
+    settings.value.sensing.featurePoints,
+  );
   pointsSwitch.root.title = 'Ring and number every landmark the features use (TODO A4 check).';
   const controls = el('div');
   controls.className = 'controls';
@@ -178,7 +204,7 @@ function mount(root: HTMLElement): void {
 
   // ── Wellbeing panel (right of the camera) ──
   const wellbeing = new WellbeingPanel();
-  wellbeing.alarmSwitch.checked = readAlarmPref();
+  wellbeing.alarmSwitch.checked = settings.value.alarm.enabled;
 
   // ── Performance read-outs (own tab) ──
   const stats = new StatsPanel();
@@ -225,7 +251,11 @@ function mount(root: HTMLElement): void {
 
   // ── Signals dashboard (A4) ──
   const signals = new SignalsPanel();
-  const expressionSwitch = toggle('Expression features', 'toggle-expression', true);
+  const expressionSwitch = toggle(
+    'Expression features',
+    'toggle-expression',
+    settings.value.sensing.expressionFeatures,
+  );
   expressionSwitch.root.title =
     'FR3 ablation: off zeroes mouth-open and lip-thickness. Changing it restarts calibration.';
   signals.toolbar.prepend(expressionSwitch.root);
@@ -311,11 +341,28 @@ function mount(root: HTMLElement): void {
     modelBaseUrl: `${import.meta.env.BASE_URL}models/`,
     wasmBaseUrl: `${import.meta.env.BASE_URL}wasm/`,
   });
-  const tracker = new LandmarkTracker(camera, provider);
+  const tracker = new LandmarkTracker(camera, provider, {
+    targetFps: settings.value.sensing.targetFps,
+  });
   const overlay = new LandmarkOverlay(canvas);
-  const attention = new AttentionMonitor();
+  overlay.featurePoints = settings.value.sensing.featurePoints;
+  let attention = createAttention(settings.value);
   const alarmSound = new AlarmSound();
-  let pipeline = createPipeline(true);
+  alarmSound.volume = settings.value.alarm.volume / 100;
+  wellbeing.setAlarmTimes(settings.value.alarm.absentS, settings.value.alarm.asleepS);
+  wellbeing.setBreakIntervals(
+    settings.value.wellbeing.eyeBreakMin,
+    settings.value.wellbeing.moveBreakMin,
+  );
+  let pipeline = createPipeline(settings.value.sensing.expressionFeatures);
+
+  function createAttention(s: DemoSettings): AttentionMonitor {
+    return new AttentionMonitor({
+      absentMs: s.alarm.absentS * 1000,
+      asleepMs: s.alarm.asleepS * 1000,
+      reopenMs: ATTENTION_DEFAULTS.reopenMs,
+    });
+  }
 
   function createPipeline(useExpressionFeatures: boolean): FeaturePipeline {
     const p = new FeaturePipeline({ useExpressionFeatures });
@@ -337,24 +384,101 @@ function mount(root: HTMLElement): void {
   }
 
   wellbeing.alarmSwitch.addEventListener('change', () => {
-    writeAlarmPref(wellbeing.alarmSwitch.checked);
     // A click is a user gesture: the browser now allows audio.
     if (wellbeing.alarmSwitch.checked) alarmSound.unlock();
-    renderAlarm();
+    settings.update({ alarm: { enabled: wellbeing.alarmSwitch.checked } });
   });
   wellbeing.testButton.addEventListener('click', () => {
     alarmSound.test();
   });
 
   pointsSwitch.input.addEventListener('change', () => {
-    overlay.featurePoints = pointsSwitch.input.checked;
+    settings.update({ sensing: { featurePoints: pointsSwitch.input.checked } });
   });
   expressionSwitch.input.addEventListener('change', () => {
-    // A different feature definition needs a fresh baseline (FeaturePipelineOptions).
-    pipeline = createPipeline(expressionSwitch.input.checked);
+    settings.update({ sensing: { expressionFeatures: expressionSwitch.input.checked } });
+  });
+
+  /** Starts a fresh baseline: after a feature-definition change, or on request. */
+  function recalibrate(useExpressionFeatures: boolean): void {
+    pipeline = createPipeline(useExpressionFeatures);
     signals.reset();
     if (camera.status === 'active' || camera.status === 'paused') signals.setState(pipeline.state);
+  }
+
+  // Settings change here (the switches above) or in the admin panel (another tab).
+  settings.onChange((s, prev) => {
+    pointsSwitch.input.checked = s.sensing.featurePoints;
+    overlay.featurePoints = s.sensing.featurePoints;
+    tracker.targetFps = s.sensing.targetFps;
+    if (s.sensing.expressionFeatures !== prev.sensing.expressionFeatures) {
+      expressionSwitch.input.checked = s.sensing.expressionFeatures;
+      // A different feature definition needs a fresh baseline (FeaturePipelineOptions).
+      recalibrate(s.sensing.expressionFeatures);
+    }
+    wellbeing.alarmSwitch.checked = s.alarm.enabled;
+    alarmSound.volume = s.alarm.volume / 100;
+    if (s.alarm.absentS !== prev.alarm.absentS || s.alarm.asleepS !== prev.alarm.asleepS) {
+      attention = createAttention(s);
+    }
+    wellbeing.setAlarmTimes(s.alarm.absentS, s.alarm.asleepS);
+    wellbeing.setBreakIntervals(s.wellbeing.eyeBreakMin, s.wellbeing.moveBreakMin);
+    renderAlarm();
   });
+
+  // Cog admin link: status out; pause, resume, stop and recalibrate in.
+  const control = openControlChannel((m) => {
+    if (m.type === 'hello') {
+      publishStatus();
+      return;
+    }
+    if (m.type !== 'command') return;
+    switch (m.command) {
+      case 'pause':
+        if (camera.status === 'active') camera.pause('user');
+        break;
+      case 'resume':
+        if (camera.status === 'paused') camera.resume('user');
+        break;
+      case 'stop':
+        disable();
+        break;
+      case 'recalibrate':
+        recalibrate(settings.value.sensing.expressionFeatures);
+        break;
+      case 'break-taken':
+        wellbeing.markBreak();
+        break;
+    }
+    publishStatus();
+  });
+
+  function publishStatus(): void {
+    if (!control) return;
+    const st = tracker.stats;
+    const ps = pipeline.state;
+    const status: SensorStatus = {
+      camera: camera.status,
+      modelState,
+      backend: provider.backend ?? null,
+      fps: tracker.running ? st.fps : 0,
+      targetFps: st.targetFps,
+      inferenceP50: st.inferenceP50,
+      inferenceP95: st.inferenceP95,
+      face: face === 'found' || face === 'none' ? face : 'not tracking',
+      phase: ps.phase,
+      calibrationProgress: ps.calibrationProgress,
+      classifiable: ps.classifiable,
+      windowInvalidFraction: ps.windowInvalidFraction,
+      alarm: stage.dataset.alarm ? attention.state.reason : null,
+      onScreenMs: wellbeing.onScreenMs,
+      sinceEyeBreakMs: wellbeing.sinceEyeBreakMs,
+      sinceMoveBreakMs: wellbeing.sinceMoveBreakMs,
+      tensors: provider.numTensors ?? null,
+      errors: st.errors,
+    };
+    control.post({ type: 'status', status });
+  }
 
   let cameraFrames = 0;
   let face = 'not tracking';
@@ -397,6 +521,7 @@ function mount(root: HTMLElement): void {
     if (next === 'active' && !pipeline.baseline.ready) signals.setState(pipeline.state);
     if (error) console.info(`Camera ${error.status}: ${error.name} — ${error.message}`);
     render();
+    publishStatus();
   });
 
   enableBtn.addEventListener('click', () => {
@@ -570,6 +695,7 @@ function mount(root: HTMLElement): void {
     renderFaceChip();
     renderTabMeta();
     wellbeing.tick(camera.status === 'active', face === 'found');
+    publishStatus();
   }
 
   function renderTabMeta(): void {
@@ -635,22 +761,6 @@ function mount(root: HTMLElement): void {
   renderStats();
   // The read-out refreshes twice a second; it is for humans, not measurement.
   window.setInterval(renderStats, 500);
-}
-
-function readAlarmPref(): boolean {
-  try {
-    return localStorage.getItem(ALARM_PREF_KEY) !== 'off';
-  } catch {
-    return true;
-  }
-}
-
-function writeAlarmPref(on: boolean): void {
-  try {
-    localStorage.setItem(ALARM_PREF_KEY, on ? 'on' : 'off');
-  } catch {
-    // Storage blocked (private window): the switch still works for this visit.
-  }
 }
 
 function toneFor(status: CameraStatus, loading: boolean, failed: boolean): Tone {

@@ -29,5 +29,12 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rollupOptions: {
+      // Two pages: the sensor demo and its cog-admin settings panel.
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        'cog-admin': fileURLToPath(new URL('./cog-admin.html', import.meta.url)),
+      },
+    },
   },
 });
