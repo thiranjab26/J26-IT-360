@@ -18,11 +18,33 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | GET | `/health`, `/api/v1/curriculum/health` | public | Liveness | done |
 | GET | `/api/v1/curriculum/graph?module=dsa` | signed in | Prerequisite graph: concepts with depth, edges, stats; a module view keeps its cross-module prerequisites | done |
 | GET | `/api/v1/curriculum/me/mastery?module=prog` | signed in | My BKT mastery per concept (`null` = no evidence yet) | done |
-| GET | `/api/v1/curriculum/me/recommendation?module=dsa` | signed in | Next concept, one-sentence explanation, locked concepts and their weak prerequisite (`rules-v1`) | done |
+| GET | `/api/v1/curriculum/me/recommendation?module=dsa` | signed in | Next concept, one-sentence explanation, locked concepts and their weak prerequisite (`rules-v1`); syllabus order for the comparison group | done |
+| GET | `/api/v1/curriculum/me/tests?module=prog` | signed in | Current phase, which test is open, my results (never my group) | done |
+| POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/start?module=prog` | signed in | Start or resume my test; questions without answers | done |
+| POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/submit?module=prog` | signed in | Submit once, scored on the server; a repeat returns the stored result | done |
+| GET | `/api/v1/curriculum/me/gain?module=prog` | signed in | My normalised gain overall, per topic and per concept | done |
+| GET, PUT | `/api/v1/curriculum/study/{module}/window` | lecturer, admin | Read or set the phase: closed, pretest, learning, posttest, finished | done |
+| GET | `/api/v1/curriculum/study/{module}/gain` | lecturer, admin | Gain per learner and per group (mean g and class g) | done |
+| GET | `/api/v1/curriculum/study/{module}/snapshot-validation` | lecturer, admin | Mastery at post-test start vs post-test answers: AUC, Brier, accuracy at 0.70 | done |
 | POST | `/api/v1/curriculum/dev/attempts` | signed in, dev + stub only | C3 stand-in: record one practice answer for me and update my mastery | done |
 
-Arriving next: assessments, gain, feedback, and the lecturer cohort and
-graph-edit routes.
+Arriving next: feedback, the lecturer cohort and graph-edit routes, GAT inference.
+
+## Pre/post tests and gain
+
+- `app/domain/assessment.py`: counterbalancing (2 groups x 2 form orders, each new
+  learner fills a least-used cell at random), scoring, normalised gain
+  `g = (post - pre) / (100 - pre)` (`null` when pre = 100), BKT validity metrics,
+  item bank checks.
+- `app/domain/study.py`: the rules. A test opens only in its phase; one attempt per
+  learner, module and kind; the post-test needs a submitted pre-test; starting the
+  post-test freezes mastery in `mastery_snapshot` first. Answered items become BKT
+  evidence (`source` = `pretest` or `posttest`, no learning step); blanks score as
+  wrong but are not evidence.
+- The DSA papers carry a PF prerequisite section (`section = prereq`). It is served
+  only on the pre-test, sets starting mastery, and never counts towards a score or gain.
+- Item banks contain answer keys, so they stay in `item_bank/` (gitignored);
+  `item_bank/example.json` shows the format. Answer keys never leave the service.
 
 ## Mastery and recommendations
 
@@ -92,6 +114,13 @@ Load the graph into Neo4j (needs the Neo4j settings and the migration above):
 ```bash
 uv run python -m scripts.import_graph --dry-run      # validate core, write nothing
 uv run python -m scripts.import_graph --version v0   # writes Neo4j, snapshot and audit row
+```
+
+Load test papers (refuses to replace a paper that learners have already sat):
+
+```bash
+uv run python -m scripts.import_tests item_bank/dsa.json --dry-run   # validate, write nothing
+uv run python -m scripts.import_tests item_bank/dsa.json             # writes test_paper, test_item
 ```
 
 ## Tests
