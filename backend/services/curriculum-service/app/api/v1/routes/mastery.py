@@ -11,6 +11,7 @@ from app.domain.graph_loader import GraphCache
 from app.domain.learner import Learner
 from app.domain.mastery import MASTERY_THRESHOLD, MasteryRecord
 from app.domain.recommend import Plan
+from app.domain.study import Study
 from app.models.mastery import (
     ConceptMastery,
     ConceptRef,
@@ -25,6 +26,10 @@ router = APIRouter(prefix="/me", tags=["mastery"])
 
 def get_learner(request: Request) -> Learner:
     return request.app.state.learner
+
+
+def get_study(request: Request) -> Study:
+    return request.app.state.study
 
 
 def concept_mastery(
@@ -72,10 +77,13 @@ def read_my_recommendation(
     caller: CurrentUser = Depends(current_user),
     cache: GraphCache = Depends(get_graph_cache),
     learner: Learner = Depends(get_learner),
+    study: Study = Depends(get_study),
 ) -> PlanResponse:
     graph = load_graph(cache).graph
     module_view(graph, module)  # 404 for an unknown module
-    plan = learner.plan(caller.user_id, graph, module)
+    # Comparison-group learners follow the syllabus; everyone else gets the adaptive order.
+    fixed = study.group_of(caller.user_id, module) == "comparison"
+    plan = learner.plan(caller.user_id, graph, module, fixed=fixed)
     return plan_response(graph, plan)
 
 

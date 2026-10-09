@@ -9,6 +9,7 @@ from app.domain.graph import PrerequisiteGraph
 from app.domain.mastery import MASTERY_THRESHOLD
 
 MODEL_VERSION = "rules-v1"
+FIXED_ORDER_VERSION = "fixed-order-v1"
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class Recommendation:
     target_concept_id: str | None  # set when next_concept_id is a prerequisite to fix first
     weak_prerequisite_id: str | None
     readiness: float
-    explanation: str
+    explanation: str | None  # None for the comparison group (contract v_next_topic)
     reason: str
     model_version: str
 
@@ -112,6 +113,39 @@ def recommend(
             model_version=MODEL_VERSION,
         ),
         locked,
+    )
+
+
+def fixed_order(
+    graph: PrerequisiteGraph,
+    module_id: str,
+    mastery: Mapping[str, float],
+    threshold: float = MASTERY_THRESHOLD,
+) -> Plan:
+    """Comparison group: the first unmastered concept in syllabus position, no explanation."""
+    view = graph.for_module(module_id)
+    syllabus = sorted(
+        (c for c in view.concepts if c.module_id == module_id),
+        key=lambda c: (c.position, c.concept_id),
+    )
+    upcoming = next((c for c in syllabus if mastery.get(c.concept_id, 0.0) < threshold), None)
+    if upcoming is None:
+        return Plan(module_id, None, ())
+    prerequisites = graph.prerequisites_of(upcoming.concept_id)
+    return Plan(
+        module_id,
+        Recommendation(
+            module_id=module_id,
+            next_concept_id=upcoming.concept_id,
+            next_topic_id=upcoming.topic_id,
+            target_concept_id=None,
+            weak_prerequisite_id=None,
+            readiness=min((mastery.get(p, 0.0) for p in prerequisites), default=1.0),
+            explanation=None,
+            reason="fixed_order",
+            model_version=FIXED_ORDER_VERSION,
+        ),
+        (),
     )
 
 

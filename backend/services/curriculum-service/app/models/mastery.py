@@ -39,7 +39,7 @@ class RecommendationOut(BaseModel):
     target_concept: ConceptRef | None
     weak_prerequisite: ConceptRef | None
     readiness: float
-    explanation: str
+    explanation: str | None  # None when reason is fixed_order
     reason: str
     model_version: str
 

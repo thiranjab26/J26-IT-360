@@ -18,10 +18,12 @@ from app.api.v1.routes import dev, health
 from app.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
+from app.db.assessment_store import AssessmentStore
 from app.db.graph_wiring import build_graph_runtime
 from app.db.mastery_store import MasteryStore
 from app.db.session import get_engine
 from app.domain.learner import Learner
+from app.domain.study import Study
 from app.integrations.attempts import attempts_relation
 
 SERVICE_NAME = "curriculum-service"
@@ -56,6 +58,7 @@ def create_app() -> FastAPI:
     app.state.learner = Learner(
         MasteryStore(get_engine(), attempts_relation(settings.integration_mode))
     )
+    app.state.study = Study(AssessmentStore(get_engine()), app.state.learner)
 
     app.add_middleware(RequestContextMiddleware)
     install_error_handlers(app)
