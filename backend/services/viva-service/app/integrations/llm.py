@@ -392,17 +392,49 @@ def call_llm(provider, instruction, payload, schema, max_tokens=None):
     )
 
 
+CREDIT = {"full": 1.0, "partial": 0.5, "none": 0.0}
+PARTIAL_NOTE = " (idea shown; name it precisely)"
+ASSESS_RULES = (
+    "Assess only the provided rubric. The transcript is automatic speech recognition of a "
+    "second-language English speaker answering aloud: judge what the student meant, and ignore "
+    "grammar, fillers and words the recognizer clearly misheard (a word that sounds like the "
+    "expected term, such as 'decibel' for 'decimal', counts as that term). The current follow-up "
+    "may target a subset: grade every rubric point the transcript demonstrates, even when it "
+    "addresses a different part of the original question than current_prompt asked, and combine "
+    "uncontradicted evidence from earlier answers. For each rubric point set level: full when "
+    "the idea is correct and stated with the point's key technical term or an exact synonym; "
+    "partial when the idea is right or close but only in everyday words or an analogy (for "
+    "example 'a labelled box that keeps data' for a variable), or only part of the point is "
+    "correct; none when it is missing or wrong. Never give full for everyday wording alone. "
+    "List a misconception only when the current answer states it, and copy the student's exact "
+    "words that state it into quote. Use non_answer only when the transcript has no substantive "
+    "content about the concept. Do not penalize absent facts not in the rubric. Return exactly "
+    "one rubric_hits entry per rubric point. Never choose an action. All six states are "
+    "permitted; complete needs every point at level full. Do not infer confidence from fluency."
+)
+
+
+def credit(hit):
+    """Rubric credit of one hit: full 1, partial 0.5; demo and older hits have only covered."""
+    return CREDIT[hit["level"]] if hit.get("level") else float(hit["covered"])
+
+
+def quoted(quote, transcript):
+    """True when quote (two words or more) is the student's own words in this transcript."""
+    words = normalize(quote or "").split()
+    return len(words) >= 2 and " ".join(words) in " ".join(normalize(transcript).split())
+
+
 @bounded_operation
 def assess(question, current_prompt, transcript, prior_turns, plans=None):
     cfg = settings()
-    previous_hits = sorted(
-        {
-            h["id"]
-            for t in prior_turns
-            for h in t["assessment"]["rubric_hits"]
-            if h["covered"] and not t["assessment"]["misconceptions"]
-        }
-    )
+    # The best credit each point earned in earlier answers that held no misconception.
+    previous = {}
+    for t in prior_turns:
+        if not t["assessment"]["misconceptions"]:
+            for h in t["assessment"]["rubric_hits"]:
+                previous[h["id"]] = max(previous.get(h["id"], 0.0), credit(h))
+    previous_hits = sorted(k for k, v in previous.items() if v == 1.0)
     if cfg.assessment_provider == "demo":
         return demo_assess(question, transcript, previous_hits)
     points = {p["id"]: p["point"] for p in question["rubric_points"]}
@@ -427,8 +459,28 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
         ],
     }
     schema = Assessment.model_json_schema()
-    schema["$defs"]["Hit"]["properties"]["id"] = {"type": "string", "enum": list(points)}
+    # The model grades each point (full, partial, none); the server derives covered and coverage.
+    schema["$defs"]["Hit"] = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["id", "point", "level"],
+        "properties": {
+            "id": {"type": "string", "enum": list(points)},
+            "point": {"type": "string"},
+            "level": {"type": "string", "enum": list(CREDIT)},
+        },
+    }
     schema["properties"]["rubric_hits"].update(minItems=len(points), maxItems=len(points))
+    # A misconception must quote the current answer; the server drops any it cannot find there.
+    schema["properties"]["misconceptions"] = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["description", "quote"],
+            "properties": {"description": {"type": "string"}, "quote": {"type": "string"}},
+        },
+    }
     instruction = ""
     if plans:
         # One call: assess, then word the follow-up the fixed policy assigns to the chosen state. The server re-checks both.
@@ -445,23 +497,31 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
         schema["required"] = [*schema.get("required", []), "follow_up"]
         instruction = (
             " Then fill follow_up using follow_up_plan.by_state[the state you chose]: if its purpose is null, set question to null. "
-            "Otherwise write the question for that purpose. For PROBE_MISSING_RUBRIC target the first rubric point you marked not covered "
+            "Otherwise write the question for that purpose. For PROBE_MISSING_RUBRIC target the first rubric point you marked below full "
             "whose id is not in already_probed, set target_rubric_id to it and adapt its reviewed_probe; otherwise target_rubric_id is null. "
             + FOLLOW_UP_RULES
         )
     try:
-        result, last = None, None
+        result, last, dropped = None, None, 0
         for _ in range(2):
             try:
                 raw = call_llm(
                     cfg.assessment_provider,
-                    "Assess only the provided rubric. The current follow-up may target a subset: credit every rubric point the transcript demonstrates, even when it addresses a different part of the original question than current_prompt asked, and combine uncontradicted evidence from earlier answers. Judge misconceptions from the current answer. Use non_answer only when the transcript has no substantive content about the concept. Do not penalize absent facts not in the rubric. Accept correct paraphrases. Return exactly one rubric_hits entry per rubric point. Never choose an action. All six states are permitted. Do not infer confidence from fluency."
-                    + instruction,
+                    ASSESS_RULES + instruction,
                     payload,
                     schema,
                     max_tokens=2048,
                 )
                 draft = raw.pop("follow_up", None) if isinstance(raw, dict) else None
+                if isinstance(raw, dict):
+                    claimed = [m for m in raw.get("misconceptions") or [] if isinstance(m, dict)]
+                    raw["misconceptions"] = [
+                        m["description"] for m in claimed if quoted(m.get("quote"), transcript)
+                    ]
+                    dropped = len(claimed) - len(raw["misconceptions"])
+                    for h in raw.get("rubric_hits") or []:
+                        if isinstance(h, dict):
+                            h["covered"] = h.get("level") == "full"
                 result = Assessment.model_validate(raw).model_dump()
                 if len(result["rubric_hits"]) != len(points) or {
                     h["id"] for h in result["rubric_hits"]
@@ -473,15 +533,27 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
         if result is None:
             raise last
         misconceptions = result["misconceptions"]
+        if dropped:
+            result["reason"] += (
+                " A suggested misconception was not counted: it was not in the answer's own words."
+            )[: 4000 - len(result["reason"])]
         for hit in result["rubric_hits"]:
             hit["point"] = points[hit["id"]]
-            # Same rule as the demo assessor: earlier correct evidence counts unless the current answer contradicts it.
-            if hit["id"] in previous_hits and not misconceptions:
-                hit["covered"] = True
+            # Same rule as the demo assessor: earlier evidence counts unless the current answer
+            # contradicts it, and a point keeps the best level it reached.
+            if not misconceptions and previous.get(hit["id"], 0.0) > credit(hit):
+                hit["level"] = "full" if previous[hit["id"]] == 1.0 else "partial"
+                hit["covered"] = hit["level"] == "full"
         result["coverage"] = round(
-            100 * sum(h["covered"] for h in result["rubric_hits"]) / len(points), 1
+            100 * sum(credit(h) for h in result["rubric_hits"]) / len(points), 1
         )
-        result["missing_points"] = [h["point"] for h in result["rubric_hits"] if not h["covered"]]
+        result["missing_points"] = [
+            h["point"] + (PARTIAL_NOTE if h["level"] == "partial" else "")
+            for h in result["rubric_hits"]
+            if not h["covered"]
+        ]
+        if result["state"] == "misconception_bearing" and not misconceptions:
+            result["state"] = "partial" if result["coverage"] else "incorrect"
         if (
             result["coverage"] == 100
             and not misconceptions
@@ -491,7 +563,8 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
         if clear_non_answer(transcript):
             result["state"] = "non_answer"
         if result["state"] == "complete" and (result["coverage"] < 100 or misconceptions):
-            raise ValueError("Provider complete classification contradicts its rubric.")
+            # Full marks need every point at full: an idea without its technical term is partial.
+            result["state"] = "misconception_bearing" if misconceptions else "partial"
         result["provider"] = _last_call.get() or cfg.assessment_provider
         if isinstance(draft, dict):
             result["_draft"] = draft

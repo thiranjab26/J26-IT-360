@@ -1,0 +1,299 @@
+/* Staff dashboard, charts and the speech lab. Loaded only with those staff pages.
+   Animations use keyframes from motion.css and stop for reduced motion there. */
+
+.viva-app .dash {
+  --ch-accent: #315bd6;
+  --ch-track: #edf1f7;
+  display: grid;
+  gap: 22px;
+}
+.viva-app .dash > .page-title { margin-bottom: 0; }
+.viva-app .dash-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* KPI tiles */
+.viva-app .kpi-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1100px) {
+  .viva-app .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .viva-app .kpi-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.viva-app .kpi {
+  background: #fff;
+  border: 1px solid #e3e9f2;
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  box-shadow: 0 3px 9px #1c365005;
+  animation: viva-rise 0.45s backwards;
+  transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s;
+}
+.viva-app .kpi:nth-child(2) { animation-delay: 40ms; }
+.viva-app .kpi:nth-child(3) { animation-delay: 80ms; }
+.viva-app .kpi:nth-child(4) { animation-delay: 120ms; }
+.viva-app .kpi:nth-child(5) { animation-delay: 160ms; }
+.viva-app .kpi:nth-child(6) { animation-delay: 200ms; }
+.viva-app .kpi > span,
+.viva-app .kpi-ring > div > span {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #7a8ba3;
+  font-weight: 650;
+}
+.viva-app .kpi strong { font-size: 30px; line-height: 1.15; letter-spacing: -0.8px; color: #16294a; }
+.viva-app .kpi small { font-size: 12px; color: #7a8ba3; line-height: 1.45; }
+.viva-app .kpi-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #edf2ff;
+  color: #315bd6;
+  margin-bottom: 4px;
+}
+.viva-app .kpi-ring { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.viva-app .kpi-ring > div:first-child { display: grid; gap: 6px; }
+.viva-app .kpi-ring strong { font-size: 22px; letter-spacing: -0.4px; }
+.viva-app .kpi-grid > .kpi-ring:not(:only-child) strong { font-size: 30px; }
+.viva-app .kpi-grid > .kpi-ring strong.kpi-name { font-size: 19px; letter-spacing: -0.2px; }
+.viva-app .kpi-link { cursor: pointer; }
+.viva-app .kpi-link:hover { border-color: #c9d6f5; transform: translateY(-2px); box-shadow: 0 10px 22px #1c36500f; }
+.viva-app .kpi-split { display: flex; gap: 2px; height: 6px; border-radius: 999px; overflow: hidden; background: var(--ch-track); }
+.viva-app .kpi-split span:first-child { background: #315bd6; }
+.viva-app .kpi-split span:last-child { background: #9db4f0; }
+.viva-app .kpi-bar { height: 6px; border-radius: 999px; background: var(--ch-track); overflow: hidden; }
+.viva-app .kpi-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4f7be0, #315bd6);
+  transform-origin: left;
+  animation: viva-grow-x 0.9s 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Rows of cards */
+.viva-app .dash-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.viva-app .dash-row-wide { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); }
+.viva-app .dash-card {
+  margin-bottom: 0;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+  animation: viva-rise 0.5s 0.1s backwards;
+}
+.viva-app .dash-card > header { display: grid; gap: 2px; }
+.viva-app .dash-card > header h2 { font-size: 15px; margin: 0; }
+@media (max-width: 1100px) {
+  .viva-app .dash-row,
+  .viva-app .dash-row-wide { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Donut and legend */
+.viva-app .dash-donut { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.viva-app .ch-donut { position: relative; flex: none; }
+.viva-app .ch-donut svg { animation: ch-donut-in 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+@keyframes ch-donut-in {
+  from { opacity: 0; transform: rotate(-60deg) scale(0.92); }
+}
+.viva-app .ch-donut-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1.1; }
+.viva-app .ch-donut-center strong { font-size: 26px; color: #16294a; }
+.viva-app .ch-donut-center small { font-size: 11px; color: #7a8ba3; }
+.viva-app .ch-track-stroke { stroke: var(--ch-track, #edf1f7); }
+.viva-app .ch-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; flex: 1; min-width: 210px; }
+.viva-app .ch-legend li { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto 38px; gap: 10px; align-items: center; font-size: 13px; }
+.viva-app .ch-swatch { width: 12px; height: 12px; border-radius: 4px; }
+.viva-app .ch-legend-label { color: #42567a; }
+.viva-app .ch-legend strong { font-size: 13px; color: #16294a; }
+.viva-app .ch-legend small { color: #9aa8bc; font-size: 11px; text-align: right; }
+
+/* Columns over time */
+.viva-app .ch-columns { display: grid; gap: 6px; align-items: end; }
+.viva-app .ch-col { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100%; gap: 6px; min-width: 0; }
+.viva-app .ch-bars { display: flex; align-items: flex-end; gap: 2px; height: 100%; border-bottom: 1px solid #e3e9f2; }
+.viva-app .ch-bars span.is-zero { min-height: 0; }
+.viva-app .ch-bars span {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  transform-origin: bottom;
+  animation: ch-grow-y 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+@keyframes ch-grow-y {
+  from { transform: scaleY(0); }
+}
+.viva-app .ch-col small { font-size: 10px; color: #9aa8bc; text-align: center; }
+.viva-app .ch-series { display: flex; gap: 16px; font-size: 12px; color: #6a7d97; margin-top: 10px; }
+.viva-app .ch-series i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+/* Horizontal bars */
+.viva-app .ch-barlist { display: grid; gap: 12px; }
+.viva-app .ch-barrow-head { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-bottom: 5px; color: #42567a; }
+.viva-app .ch-barrow-head strong { color: #16294a; }
+.viva-app .ch-track { height: 8px; border-radius: 999px; background: var(--ch-track, #edf1f7); overflow: hidden; }
+.viva-app .ch-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transform-origin: left;
+  animation: viva-grow-x 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Progress ring */
+.viva-app .ch-ring { position: relative; flex: none; }
+.viva-app .ch-ring-value { transition: stroke-dasharray 0.6s; animation: ch-ring-draw 1s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+@keyframes ch-ring-draw {
+  from { stroke-dasharray: 0 999; }
+}
+.viva-app .ch-ring-center { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12px; }
+.viva-app .ch-ring-center b { font-weight: 700; color: #16294a; }
+
+/* Tables */
+.viva-app .dash-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.viva-app .dash-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8a9ab0;
+  font-weight: 650;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e3e9f2;
+  white-space: nowrap;
+}
+.viva-app .dash-table td { padding: 10px; border-bottom: 1px solid #f0f3f8; vertical-align: middle; color: #2b4063; }
+.viva-app .dash-table tbody tr { transition: background 0.15s; }
+.viva-app .dash-table tbody tr:hover { background: #f8faff; }
+.viva-app .dash-table tbody tr:last-child td { border-bottom: 0; }
+.viva-app .dash-table code { font-size: 12px; background: #f1f4f9; padding: 2px 6px; border-radius: 5px; color: #42567a; }
+.viva-app .dash-cover { display: flex; align-items: center; gap: 8px; }
+.viva-app .dash-cover > div { flex: 1; min-width: 60px; height: 6px; border-radius: 999px; background: var(--ch-track); overflow: hidden; }
+.viva-app .dash-cover > div span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #4f7be0;
+  transform-origin: left;
+  animation: viva-grow-x 0.8s backwards;
+}
+.viva-app .dash-cover small { font-size: 12px; color: #6a7d97; width: 36px; text-align: right; }
+.viva-app .dash-outcome { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.viva-app .dash-outcome i { width: 8px; height: 8px; border-radius: 999px; flex: none; }
+
+/* Quick links */
+.viva-app .dash-quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.viva-app .dash-quick-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  background: linear-gradient(135deg, #fff, #f5f8ff);
+  border: 1px solid #e3e9f2;
+  border-radius: 14px;
+  padding: 16px 18px;
+  color: #1b304b;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.viva-app .dash-quick-card:hover { transform: translateY(-2px); box-shadow: 0 10px 22px #1c36500f; border-color: #c9d6f5; }
+.viva-app .dash-quick-card > svg:first-child { color: #315bd6; flex: none; }
+.viva-app .dash-quick-card > span { flex: 1; display: grid; gap: 2px; }
+.viva-app .dash-quick-card strong { font-size: 14px; }
+.viva-app .dash-quick-card small { font-size: 12px; color: #7a8ba3; }
+.viva-app .dash-quick-card > svg:last-child { color: #9aa8bc; flex: none; transition: transform 0.2s, color 0.2s; }
+.viva-app .dash-quick-card:hover > svg:last-child { transform: translateX(3px); color: #315bd6; }
+
+/* Speech lab */
+.viva-app .lab-upload { display: grid; gap: 18px; margin-bottom: 0; }
+.viva-app .lab-drops { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.viva-app .lab-drop {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+  padding: 26px 18px;
+  border: 1.5px dashed #c9d6ec;
+  border-radius: 14px;
+  background: #fafcff;
+  color: #5f7392;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.viva-app .lab-drop:hover,
+.viva-app .lab-drop.is-over { border-color: #315bd6; background: #f2f6ff; }
+.viva-app .lab-drop.is-over { transform: scale(1.01); }
+.viva-app .lab-drop.has-file { border-style: solid; border-color: #b9caf0; background: #f5f8ff; color: #315bd6; }
+.viva-app .lab-drop strong { color: #1b304b; font-size: 14px; }
+.viva-app .lab-clear { position: absolute; top: 8px; right: 8px; }
+.viva-app .lab-controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; justify-content: space-between; }
+.viva-app .lab-progress { height: 4px; border-radius: 999px; background: var(--ch-track); overflow: hidden; }
+.viva-app .lab-progress span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, #315bd6, transparent);
+  animation: lab-indeterminate 1.2s ease-in-out infinite;
+}
+@keyframes lab-indeterminate {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+.viva-app .lab-results { display: grid; gap: 18px; }
+.viva-app .lab-verdict {
+  display: grid;
+  gap: 14px;
+  padding: 22px 24px;
+  border-radius: 14px;
+  border: 1px solid #cfe9dc;
+  background: linear-gradient(135deg, #fff, #effaf4);
+  animation: viva-rise 0.45s backwards;
+}
+.viva-app .lab-verdict.is-flagged { border-color: #f6d9a8; background: linear-gradient(135deg, #fff, #fff7e9); }
+.viva-app .lab-verdict h2 { font-size: 22px; margin: 4px 0 6px; letter-spacing: -0.4px; }
+.viva-app .lab-verdict .eyebrow { margin-bottom: 0; }
+.viva-app .lab-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.viva-app .lab-chips span { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid #e3e9f2; color: #5f7392; }
+.viva-app .lab-core { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.viva-app .lab-measure strong small { font-size: 12px; color: #7a8ba3; letter-spacing: 0; font-weight: 500; }
+.viva-app .lab-measure.is-flagged { border-color: #f3c9a0; background: linear-gradient(180deg, #fff, #fffaf2); }
+.viva-app .ch-meter { position: relative; height: 10px; border-radius: 999px; background: var(--ch-track); margin: 6px 0 2px; }
+.viva-app .ch-meter-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: repeating-linear-gradient(135deg, #fde2c0 0 4px, #fff3e2 4px 8px);
+}
+.viva-app .ch-meter-fill {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 999px;
+  background: #315bd6;
+  transform-origin: left;
+  animation: viva-grow-x 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.viva-app .ch-meter.is-flagged .ch-meter-fill { background: #e3803f; }
+.viva-app .ch-meter-mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: #1b304b; border-radius: 2px; transform: translateX(-1px); }
+.viva-app .lab-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.viva-app .lab-more > div { background: #f7f9fc; border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; }
+.viva-app .lab-more span { font-size: 12px; color: #6a7d97; }
+.viva-app .lab-more strong { font-size: 20px; color: #16294a; }
+.viva-app .lab-more small { font-size: 11px; color: #9aa8bc; }
+.viva-app .ch-timeline svg { width: 100%; height: 150px; display: block; }
+.viva-app .ch-tl-bar { fill: #7f9de8; transform-origin: bottom; transform-box: fill-box; animation: ch-grow-y 0.6s backwards; }
+.viva-app .ch-tl-bar.is-low { fill: #e3803f; }
+.viva-app .ch-tl-heat { fill: #315bd6; }
+.viva-app .ch-tl-threshold { stroke: #1b304b; stroke-dasharray: 4 4; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.viva-app .ch-tl-axis { display: flex; justify-content: space-between; font-size: 11px; color: #9aa8bc; margin-top: 4px; }
+.viva-app .lab-transcript { line-height: 2; font-size: 15px; margin: 0; }
+
+@media (max-width: 700px) {
+  .viva-app .kpi strong { font-size: 24px; }
+  .viva-app .lab-verdict h2 { font-size: 19px; }
+}

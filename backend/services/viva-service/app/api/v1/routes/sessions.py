@@ -351,6 +351,8 @@ def list_sessions(user: User = Depends(current_user), db: Session = Depends(get_
                 "questions_asked": len(s.data["turns"]) + bool(s.data.get("current_question")),
                 "answered_count": sum(not t.get("skipped") for t in s.data["turns"]),
                 "outcome": s.data.get("report", {}).get("outcome"),
+                "coverage": s.data.get("report", {}).get("rubric_coverage"),
+                "strong": bool(s.data.get("report", {}).get("strong_answers")),
             }
             for s in sessions
         ]

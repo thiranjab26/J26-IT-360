@@ -73,6 +73,7 @@ Service (all `VIVA_`):
 | `VIVA_TTS_MODEL` / `VIVA_TTS_VOICE` | `canopylabs/orpheus-v1-english` / `tara` | Needs the model's terms accepted once in the Groq console |
 | `VIVA_WHISPER_MODEL`, `_DEVICE`, `_COMPUTE_TYPE`, `_CPU_THREADS`, `_BEAM_SIZE`, `_LANGUAGE` | base.en, cpu, int8, 4, 1, en | Local fallback |
 | `VIVA_SPEECH_WARMUP`, `VIVA_MAX_AUDIO_BYTES`, `VIVA_SPEECH_DAILY_CALLS`, `VIVA_SPEECH_USER_DAILY_CALLS` | false, 20971520, 1000, 100 | |
+| `VIVA_SEED_DEMO_BANK` | true | Adds the stacks, queues and OOP demo questions at startup. `false` in the owner's `.env` since 9 Oct 2026: the live bank is the C3 catalogue (`app/domain/c3_bank.py`: 10 courses, one per C3 topic, 24 questions, one per C3 concept), loaded by `uv run python scripts/load_c3_bank.py --apply`, which backs up every viva table to `../C4-db-backups/` and then replaces all sessions, participants, courses and questions (staff stay). Tests keep it `true` |
 
 Never commit `.env`. Tests set every key to empty so they can never reach a real provider.
 
@@ -104,15 +105,17 @@ Roles: `student` takes vivas; `lecturer` does what the demo's admin and evaluato
 | `GET /topics` | any | Concepts that have approved questions, with names from `core.concepts` |
 | `GET /context?concept_id=` | any | C1 and C3 context (stub or live), C2 stub |
 | `POST /sessions` | student | Body: `concept_ids` or a module, `input_mode`, `max_depth`. Builds snapshots and the first question |
-| `GET /sessions`, `GET /sessions/{id}` | owner, lecturer read | |
+| `GET /sessions`, `GET /sessions/{id}` | owner, lecturer read | List items include `coverage` and `strong` for completed sessions |
 | `POST /sessions/{id}/answers` | owner | Body: `question_id`, `transcript`, `input_mode`, `response_latency_ms`, `audio_metrics`, `request_id`, `skip`. Handles skip and spoken stop. Idempotent on `request_id`. Hides rubric detail until the session completes |
 | `POST /sessions/{id}/finish` | owner | Early finish |
 | `GET /sessions/{id}/report`, `GET /sessions/{id}/export` | owner, lecturer | Completed sessions only |
-| `POST /speech/transcribe` | student | Multipart audio (webm, wav, mp3, mp4, ogg, flac), max 20 MB and 180 s. Returns transcript, segments, metrics, lexical metrics, speech intervals. Audio is not stored |
+| `POST /speech/transcribe` | student | Multipart audio (webm, wav, mp3, mp4, ogg, flac), max 20 MB and 180 s. Returns transcript, segments, metrics, lexical metrics, speech intervals. `metrics.fluency` holds the answer's literature-profile measures (250 ms pauses, transcript syllables; null without word timings); the frontend sends `metrics` back as `audio_metrics`, whose schema validates it. Audio is not stored |
 | `POST /speech/synthesize` | any | Body `{text}`, at most 600 characters. Returns `audio/wav`. Cached; 503 means the frontend falls back to the browser voice |
 | `GET /bank`, `POST /bank/generate`, `PUT /bank/{id}`, `POST /bank/{id}/review` | lecturer | Generation grounded in C3 passages; approval re-validates quotes |
 | `GET /evaluation/cases?condition=`, `POST /evaluation/ratings`, `GET /evaluation/metrics`, `GET /evaluation/export` | lecturer | Blinded A/B/C cases |
 | `GET /usage` | lecturer | Budget counters |
+| `GET /overview` | admin only (evaluators get 403, so they stay blinded) | Read-only dashboard totals: participants, sessions, answers (spoken or typed), coverage, bank status, ratings, outcomes, answer states, 14 days of activity, topics and the 8 newest sessions |
+| `POST /lab/analyse` | admin only | Multipart `audio` (the student's track), optional `examiner` (splits the track per question), `transcriber` = `auto`, `groq` or `none`. M4A, MP3, WAV, WebM, MP4, OGG or FLAC, max 20 MB and 30 min. Returns the fluency measures (session, per answer, 15 s windows), the literature profile, words, pauses and notes. Audio is analysed in memory and not stored. Shares `app/integrations/recording.py` with `scripts/analyze_recordings.py`; 503 when the `speech` extra is missing |
 
 Request rate limiting is the gateway's job. viva-service keeps only the LLM and speech budgets.
 

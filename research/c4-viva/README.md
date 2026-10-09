@@ -1,24 +1,62 @@
-# C4 research: A/B/C evaluation
+# C4 research: communication difficulty in L2 technical vivas
 
-Research material for the C4 Intelligent Viva System. Nothing here is imported by `viva-service`.
+PP1 pilot (October 2026). The question: when knowledge is controlled, which speech fluency
+measures separate Sri Lankan undergraduates who have communication difficulty in English
+technical vivas from those who do not, and at what thresholds? Background, decisions and the
+literature are in `docs/c4/research-scope-change.md`; the day plan is `docs/c4/PP1-TODO.md`.
 
-## Study design
+## Design
 
-- Design Science Research with a controlled quantitative evaluation, about 20 to 30 IT/CS undergraduates, subject to ethics approval.
-- Two independent human raters label each answer's state (6 classes) and each concept's gap outcome (3 classes), without seeing the system's decision. C1 mastery is shown to raters as reference only.
-- The same recordings are scored under three evidence conditions: **A** first answer only, **B** answers plus follow-ups, **C** answers, follow-ups and hesitation signals.
-- Metrics per condition: accuracy, macro F1 and Cohen's kappa against the raters, inter-rater kappa, follow-up appropriateness (1 to 5) and feedback usefulness (1 to 5).
+- 5 + 5 students (communication difficulty vs comfortable, by their own self-report), all with
+  at least 60% on a 10-question MCQ, so weak answers are not knowledge gaps.
+- A scripted 10-minute viva on Zoom: the researcher asks five DSA questions with fixed
+  follow-ups; an observer rates each answer. Zoom saves each voice in its own file.
+- Measures from the student's voice: silent pauses (250 ms or more), speech and articulation
+  rate, mean length of run, share of mid-clause pauses, filled pauses, response latency.
+- Primary measures (hypothesis H1): speech rate, mean length of run, mean silent pause, silent
+  pauses per minute. Everything else is exploratory, including the share of mid-clause pauses,
+  which depends on the transcript (transcribers put commas exactly where people pause).
+- Thresholds: a literature profile for PP1, compared with cut-offs derived from the pilot;
+  leave-one-out accuracy now, new students in PP2.
 
-## Where the data comes from
+## Folders
 
-- Rater cases and ratings: `GET /api/v1/viva/evaluation/cases?condition=A|B|C`, `POST /api/v1/viva/evaluation/ratings` (evaluator login).
-- Metrics: `GET /api/v1/viva/evaluation/metrics`. Pseudonymised export: `GET /api/v1/viva/evaluation/export` (admin login).
-- Every session stores its policy and gap-rule versions (`c04-policy-1.3-skip-stop`, `c04-gap-1.3-verbal-signal`).
+| Folder | Contents |
+|---|---|
+| `study/` | Viva script, MCQ, Google Form text, observer form, Zoom set-up, ethics form draft, participants template |
+| `analysis/` | `run_stats.py` (statistics and charts) and `crisperwhisper_colab.ipynb` (filler-aware transcripts) |
 
-## Before the main study
+The measurement code lives in viva-service so the system can use the same thresholds:
+`app/domain/fluency.py` (measures and the literature profile), `app/integrations/syllables.py`
+(syllable detection) and `scripts/analyze_recordings.py` (the command below).
 
-1. A lecturer reviews the question bank, rubrics, misconceptions and probes.
-2. Pilot with a few students, calibrate the hesitation thresholds (`app/domain/logic.py`, `HESITATION_SIGNALS`), then freeze the rule version.
-3. Keep pilot data separate from the main evaluation data.
+## Running the analysis
 
-Put notebooks, rater instructions and analysis scripts in this folder.
+Keep the recordings and `participants.csv` **outside this repository**, for example in
+`Documents/viva-study/recordings`. Never commit recordings or participant data.
+
+```bash
+cd backend/services/viva-service
+uv sync --extra speech --extra research
+
+# 1. Optional, best filler detection: run analysis/crisperwhisper_colab.ipynb on Colab and
+#    unzip the *.words.json files next to the recordings.
+
+# 2. Measures for every participant (writes RECORDINGS/results/*.csv)
+uv run --extra speech --extra research python scripts/analyze_recordings.py "C:/Users/MSII/Documents/viva-study/recordings"
+#    without CrisperWhisper files: add --transcriber groq (fast, cloud) or keep local (private)
+#    with a warm-up question: add --warmup
+
+# 3. Counting check: fill your_fillers and your_pauses in results/count_check.csv
+
+# 4. Statistics, charts and report.md
+uv run --extra research python ../../../research/c4-viva/analysis/run_stats.py \
+    "C:/Users/MSII/Documents/viva-study/recordings/results" \
+    "C:/Users/MSII/Documents/viva-study/participants.csv"
+```
+
+## The earlier A/B/C design
+
+The system still contains the blinded rater workspace and A/B/C metrics from the September
+proposal (`/api/v1/viva/evaluation/*`). They are not part of the PP1 pilot after the
+supervisor's change of scope on 8 Oct 2026.

@@ -2,6 +2,7 @@ import { ArrowLeft, Download, Printer } from "lucide-react";
 import type { Report } from "../api/types";
 import { api, date, downloadJson, gapLabels, label } from "../api/client";
 import { ResourceLink } from "../components/components";
+import { CountUp } from "../components/charts";
 import "../styles/student.css";
 
 const STRONG = {
@@ -51,7 +52,7 @@ export default function ReportView({
   const h = report.hesitation;
   const coverage = Math.round(report.rubric_coverage);
   return (
-    <div className="st">
+    <div className="st st-report">
       <div className="st-row st-between no-print">
         <button className="st-link" onClick={onBack}>
           <ArrowLeft size={15} style={{ verticalAlign: "-2px" }} /> Back
@@ -80,7 +81,9 @@ export default function ReportView({
         <div className="st-ring" style={{ ["--value" as string]: coverage }} aria-label={`Rubric coverage ${coverage}%`}>
           <div>
             <span>
-              <strong>{coverage}%</strong>
+              <strong>
+                <CountUp value={coverage} />%
+              </strong>
               <br />
               <small>rubric coverage</small>
             </span>

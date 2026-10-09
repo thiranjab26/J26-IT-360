@@ -257,7 +257,8 @@ def test_complete_but_hesitant_speech_is_communication_only_in_c():
 def test_timing_alone_never_gives_communication_for_complete_answer():
     from app.domain.logic import differentiate, hesitation, signal_details
 
-    # The 6 Oct false positive: complete answer, long wait before speaking, normal ~1.1 s pauses, one filler.
+    # The 6 Oct false positive: complete answer, long wait before speaking, slow speech with
+    # long pauses (the fluency signal counts), but only one filler and one "sorry".
     turn = {
         "assessment": {"state": "complete", "coverage": 100, "misconceptions": []},
         "input_mode": "speech",
@@ -271,9 +272,20 @@ def test_timing_alone_never_gives_communication_for_complete_answer():
                 "average_pause_ms": 1173,
                 "long_pause_count": 1,
                 "audio_duration_ms": 36840,
+                "fluency": {
+                    "speaking_time_s": 34.0,
+                    "speech_rate_syll_s": 0.62,
+                    "articulation_rate_syll_s": 1.9,
+                    "mean_length_of_run_syll": 1.4,
+                    "mean_silent_pause_ms": 1173,
+                    "silent_pauses": 15,
+                    "syllables": 21,
+                },
             },
         ),
     }
     assert differentiate([turn], "C")[0] == "MIXED_INSUFFICIENT_EVIDENCE"
     rows = {r["signal"].split(" ")[0]: r for r in signal_details(turn)}
-    assert rows["Delay"]["counted"] and not rows["Pauses"]["counted"]
+    assert rows["Speech"]["counted"] and not rows["Fillers"]["counted"]
+    assert "4 of 4 beyond" in rows["Speech"]["value"]
+    assert "speech rate < 1.97 syll/s" in rows["Speech"]["threshold"]

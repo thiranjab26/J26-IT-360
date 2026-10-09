@@ -8,7 +8,8 @@ Source of truth for the current behaviour: the standalone demo at
 `Desktop/Research Project/Astra Prototype/Astra version 2/adaptlearn-c4`
 (`backend/services/viva-service/app/logic.py`, `providers.py`, `disfluency.py`, `research.py`, `seed.py`).
 
-Versions to record on every session: policy `c04-policy-1.3-skip-stop`, gap rules `c04-gap-1.3-verbal-signal`.
+Versions to record on every session: policy `c04-policy-1.3-skip-stop`, gap rules `c04-gap-1.4-literature-profile`
+(1.3 `c04-gap-1.3-verbal-signal` until 9 Oct 2026).
 
 ## 1. Research purpose
 
@@ -56,32 +57,47 @@ Every rubric point has a hand-written probe. Examples: "What rule determines whi
 
 ## 3. Answer assessment
 
-The AI marks each rubric point `covered` true or false and picks one of six states.
+The AI grades each rubric point `full`, `partial` or `none` (since 9 Oct 2026; see
+MARKING-UPGRADE-2026-10-09.md) and picks one of six states:
+
+- `full`: the idea is correct and stated with the point's key technical term or an exact synonym.
+- `partial`: the idea is right or close but only in everyday words or an analogy ("a labelled box
+  that keeps data"), or only part of the point is correct. Counts half.
+- `none`: missing or wrong.
+
 The server then enforces these rules, whatever the model returned:
 
 1. `rubric_hits` must contain exactly one entry per rubric point, using the bank's IDs (the JSON schema constrains IDs with an enum). Otherwise retry once, then fail.
-2. Coverage carries forward: a point covered in an earlier answer stays covered unless the current answer contains a misconception.
-3. `coverage = 100 * covered / total`, rounded to 1 decimal.
-4. If coverage is 100 with no misconception and the state is `partial` or `superficial`, upgrade it to `complete`.
-5. If the answer is a clear non-answer (see below), force `non_answer`.
-6. `complete` with coverage below 100 or with a misconception is invalid. Reject it.
+2. `covered` is true only for `full`; follow-up targeting and the report's strengths use it.
+3. A misconception counts only with a quote of at least two words that appears in the current answer; others are dropped and the reason says so. A `misconception_bearing` state with every misconception dropped becomes `partial` (or `incorrect` at 0 coverage).
+4. Credit carries forward: each point keeps the best level it reached in earlier answers that held no misconception, unless the current answer contains a misconception.
+5. `coverage = 100 * (full + 0.5 * partial) / total`, rounded to 1 decimal. Demo and older results without a level count `covered` as 1.
+6. If coverage is 100 with no misconception and the state is `partial` or `superficial`, upgrade it to `complete`.
+7. If the answer is a clear non-answer (see below), force `non_answer`.
+8. `complete` needs every point at `full` and no misconception; otherwise it becomes `partial` (or `misconception_bearing`). Full marks therefore need the technical terms.
+9. Missing points that were `partial` carry the note "(idea shown; name it precisely)" in `missing_points`, so the report shows the student had the idea.
 
 Clear non-answer: after removing fillers and hedges (`um`, `uh`, `erm`, `hmm`, `mmm`, `ah`, `so`, `like`, `well`, `okay`, `maybe`, `perhaps`, `I think`, `I guess`, `you know`), the text is empty or matches
 "(i) don't know / not sure / no idea / have no idea / no clue / pass / skip / idk / cannot answer / can't answer / cannot remember / don't remember".
 A bare "No." is **not** a non-answer, because it can answer a yes/no probe.
 
-Instruction to the model (keep the meaning): assess only the provided rubric; credit every rubric point
-the transcript demonstrates even if it answers a different part of the original question than the
-current prompt asked; combine uncontradicted earlier evidence; judge misconceptions from the current
-answer; use `non_answer` only when there is no substantive content; never choose an action; accept
-paraphrases; never infer confidence from fluency.
+Instruction to the model (keep the meaning; `ASSESS_RULES` in `llm.py`): the transcript is speech
+recognition of a second-language English speaker, so judge what the student meant and ignore
+grammar, fillers and words the recognizer clearly misheard (a word that sounds like the expected
+term, such as "decibel" for "decimal", counts as that term); assess only the provided rubric; grade
+every rubric point the transcript demonstrates even if it answers a different part of the original
+question than the current prompt asked; combine uncontradicted earlier evidence; grade each point
+`full`, `partial` or `none` as above and never give `full` for everyday wording alone; list a
+misconception only when the current answer states it, with the student's exact words as the quote;
+use `non_answer` only when there is no substantive content; never choose an action; `complete` needs
+every point at `full`; never infer confidence from fluency.
 
 The six states:
 
 | State | Meaning |
 |---|---|
-| `complete` | All rubric points covered, no misconception |
-| `partial` | Some points covered |
+| `complete` | Every rubric point at `full`, no misconception |
+| `partial` | Some points `full` or `partial` |
 | `superficial` | Names the idea, explains nothing |
 | `incorrect` | Wrong, no known misconception |
 | `misconception_bearing` | Contains a listed misconception |
@@ -146,18 +162,20 @@ Measured only on spoken answers. Typed answers never get acoustic values.
 
 | Signal | Counts when |
 |---|---|
-| `latency` | First word at or after 3,000 ms, measured from pressing record |
-| `pauses` | Average internal pause at least 1,500 ms, or 3 or more pauses longer than 2,000 ms |
+| `fluency` | 2 or more of the 4 literature-profile measures are beyond their thresholds: speech rate below 1.97 syllables/s, articulation rate below 2.83 syllables/s, mean length of run below 3.43 syllables, mean silent pause above 687 ms. Only with 10 s of speech or more |
 | `fillers` | At least 8 per 100 words (`um`, `uh`, `erm`, `er`, `hmm`, `mmm`, `ahh`, with elongations) |
 | `restarts` | At least 2 ("I mean", "sorry", "let me start again") |
 | `hedges` | At least 2 ("maybe", "perhaps", "I think", "I guess", "I'm not sure") |
 
-- Pauses come from Silero VAD: internal gaps of at least 400 ms between speech intervals, merging overlaps and excluding leading and trailing silence. Record `pause_count`, `total_pause_ms`, `average_pause_ms`, `long_pause_count` (pauses of 2,000 ms or more) and `audio_duration_ms`.
+- Gap rules 1.4 (9 Oct 2026): `fluency` replaces the prototype `latency` (3,000 ms) and `pauses` (average 1,500 ms) signals of 1.3, so the system and the research use the same measures and thresholds.
+- Fluency measures come from `fluency.answer_profile`, the code the research tool uses: silent pauses of 250 ms or more (Silero VAD, threshold 0.5), syllables counted from the transcript's words with fillers left out. The transcriber returns them as `metrics.fluency`. Without word timings, or under 10 s of speech, the signal stays off.
+- The thresholds are `GAP_PROFILE` in `logic.py`, now the literature profile. After the pilot statistics (16 Oct), point it at the pilot profile; the report text follows automatically.
+- The report's pause figures still come from a 400 ms VAD pass: `pause_count`, `total_pause_ms`, `average_pause_ms`, `long_pause_count` (pauses of 2,000 ms or more) and `audio_duration_ms`. Response latency is recorded and shown but is no longer a signal.
 - "like", "so", "well" and "you know" are counted separately as ambiguous markers, not fillers.
-- `high_hesitation`: 2 or more signals.
+- `high_hesitation`: 2 or more signals. `fluency` is the only timing signal, so 2 signals always include one heard in the words: timing alone never decides.
 - `audible_hesitation`: `high_hesitation` and at least one of `fillers`, `hedges` or `restarts`.
 
-All thresholds are prototype hypotheses to calibrate on pilot data.
+The filler, restart and hedge thresholds are prototype hypotheses to calibrate on pilot data.
 
 ## 7. Gap rules (`differentiate(turns, condition)`)
 

@@ -4,9 +4,12 @@ import re
 from statistics import mean
 
 from app.db.tables import now, uid
+from app.domain import fluency
 
 POLICY_VERSION = "c04-policy-1.3-skip-stop"
-GAP_VERSION = "c04-gap-1.3-verbal-signal"
+GAP_VERSION = "c04-gap-1.4-literature-profile"
+# The research's fluency thresholds; switch to the pilot profile after the 16 Oct statistics.
+GAP_PROFILE = fluency.LITERATURE_PROFILE
 MIXED = "MIXED_INSUFFICIENT_EVIDENCE"
 KNOWLEDGE = "LIKELY_KNOWLEDGE_GAP"
 COMMUNICATION = "LIKELY_COMMUNICATION_DIFFICULTY"
@@ -42,6 +45,7 @@ def hesitation(transcript, input_mode, latency=None, audio=None):
         "average_pause_ms": metrics.get("average_pause_ms"),
         "audio_duration_ms": metrics.get("audio_duration_ms"),
         "long_pause_count": metrics.get("long_pause_count"),
+        "fluency": metrics.get("fluency"),
         "filler_count": fillers,
         "fillers_per_100_words": round(fillers / max(len(words), 1) * 100, 2),
         "hedge_count": hedges,
@@ -132,12 +136,19 @@ def next_question(data, current, assessment, action):
     return issued, action
 
 
-HESITATION_SIGNALS = {  # prototype thresholds; calibrate on pilot data before the main study
-    "latency": lambda h: (h.get("response_latency_ms") or 0) >= 3000,
-    # Judged by pause length, not total: a total grows with answer length (gap rules 1.3).
-    "pauses": lambda h: (
-        (h.get("average_pause_ms") or 0) >= 1500 or (h.get("long_pause_count") or 0) >= 3
-    ),
+def fluency_flags(h):
+    """Profile measures beyond their threshold; None when unmeasured or under 10 s of speech."""
+    f = h.get("fluency")
+    if not f or (f.get("speaking_time_s") or 0) < fluency.MIN_PROFILE_SPEECH_S:
+        return None
+    return fluency.flags(f, GAP_PROFILE)
+
+
+HESITATION_SIGNALS = {
+    # Speed and pausing, judged by the published thresholds the research uses (gap rules 1.4).
+    # It replaces the prototype delay and pause thresholds of 1.3, which had no research basis.
+    "fluency": lambda h: len(fluency_flags(h) or []) >= GAP_PROFILE["min_flags"],
+    # Prototype thresholds for the words; calibrate on pilot data before the main study.
     "fillers": lambda h: h.get("fillers_per_100_words", 0) >= 8,
     "restarts": lambda h: h.get("restart_count", 0) >= 2,
     "hedges": lambda h: h.get("hedge_count", 0) >= 2,
@@ -154,7 +165,8 @@ VERBAL_SIGNALS = ("fillers", "hedges", "restarts")
 
 
 def high_hesitation(turn):
-    # Two independent signals are required: one slow start or a single 'um' is not evidence on its own.
+    # Two independent signals are required. Fluency is the only timing signal, so two signals
+    # always include something heard in the words: timing alone never decides.
     return len(hesitation_signals(turn)) >= 2
 
 
@@ -163,13 +175,41 @@ def audible_hesitation(turn):
     return high_hesitation(turn) and any(s in VERBAL_SIGNALS for s in hesitation_signals(turn))
 
 
+MEASURES = {  # report wording for the profile measures: label, unit, number format
+    "speech_rate_syll_s": ("speech rate", "syll/s", ".2f"),
+    "articulation_rate_syll_s": ("articulation rate", "syll/s", ".2f"),
+    "mean_length_of_run_syll": ("run length", "syll", ".1f"),
+    "mean_silent_pause_ms": ("mean pause", "ms", ".0f"),
+}
+FLUENCY_THRESHOLD = (
+    f"{GAP_PROFILE['min_flags']} or more of: "
+    + ", ".join(
+        f"{MEASURES[m][0]} {'<' if d == 'below' else '>'} {cut:g} {MEASURES[m][1]}"
+        for m, (d, cut) in GAP_PROFILE["rules"].items()
+    )
+    + f"; needs {fluency.MIN_PROFILE_SPEECH_S:g} s of speech"
+)
 SIGNAL_INFO = [  # report labels and thresholds, kept beside the tests they describe
-    ("latency", "Delay before the first word, after pressing record", "3,000 ms or more"),
-    ("pauses", "Pauses", "average 1.5 s or more, or 3+ pauses over 2 s"),
+    ("fluency", "Speech fluency (literature profile)", FLUENCY_THRESHOLD),
     ("fillers", "Fillers (um, uh, erm, hmm)", "8 or more per 100 words"),
     ("restarts", "Restarts (I mean, sorry, let me start again)", "2 or more"),
     ("hedges", "Hedges (maybe, I think, I guess)", "2 or more"),
 ]
+
+
+def fluency_value(h):
+    f = h.get("fluency")
+    if not f:
+        return "not measured"
+    beyond = fluency_flags(h)
+    if beyond is None:
+        return f"not enough speech ({f.get('speaking_time_s') or 0:.0f} s)"
+    parts = [
+        f"{label} {f[m]:{fmt}} {unit}"
+        for m, (label, unit, fmt) in MEASURES.items()
+        if m in GAP_PROFILE["rules"] and f.get(m) is not None
+    ]
+    return ", ".join(parts) + f" ({len(beyond)} of {len(GAP_PROFILE['rules'])} beyond)"
 
 
 def signal_details(turn):
@@ -178,17 +218,7 @@ def signal_details(turn):
         return []
     h, counted = turn["hesitation"], set(hesitation_signals(turn))
     values = {
-        "latency": f"{h['response_latency_ms']:,.0f} ms"
-        if h.get("response_latency_ms") is not None
-        else "not measured",
-        "pauses": (
-            f"average {(h.get('average_pause_ms') or 0) / 1000:.1f} s"
-            + (
-                f", {h['long_pause_count']} over 2 s"
-                if h.get("long_pause_count") is not None
-                else ""
-            )
-        ),
+        "fluency": fluency_value(h),
         "fillers": f"{h.get('fillers_per_100_words', 0)} per 100 words",
         "restarts": str(h.get("restart_count", 0)),
         "hedges": str(h.get("hedge_count", 0)),

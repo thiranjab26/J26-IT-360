@@ -31,12 +31,25 @@ class SessionIn(StrictModel):
     max_depth: int = Field(default=2, ge=0, le=3)
 
 
+class FluencyMetrics(StrictModel):
+    """Literature-profile measures of one spoken answer (app/domain/fluency.answer_profile)."""
+
+    speaking_time_s: float | None = Field(default=None, ge=0, le=900)
+    speech_rate_syll_s: float | None = Field(default=None, ge=0, le=30)
+    articulation_rate_syll_s: float | None = Field(default=None, ge=0, le=30)
+    mean_length_of_run_syll: float | None = Field(default=None, ge=0, le=10000)
+    mean_silent_pause_ms: float | None = Field(default=None, ge=0, le=900000)
+    silent_pauses: int | None = Field(default=None, ge=0, le=10000)
+    syllables: int | None = Field(default=None, ge=0, le=100000)
+
+
 class AudioMetrics(StrictModel):
     pause_count: int | None = Field(default=None, ge=0, le=10000)
     total_pause_ms: float | None = Field(default=None, ge=0, le=900000)
     average_pause_ms: float | None = Field(default=None, ge=0, le=900000)
     long_pause_count: int | None = Field(default=None, ge=0, le=10000)
     audio_duration_ms: float | None = Field(default=None, ge=0, le=900000)
+    fluency: FluencyMetrics | None = None
 
     @model_validator(mode="after")
     def consistency(self):
@@ -142,7 +155,10 @@ class GenerateIn(StrictModel):
 class Hit(StrictModel):
     id: str
     point: str
-    covered: bool
+    covered: bool  # full credit only
+    # AI marking since 9 Oct 2026: "partial" is the right idea in everyday words, or part of
+    # the point, and counts half. Demo and older results have no level.
+    level: Literal["full", "partial", "none"] | None = None
 
 
 class Assessment(StrictModel):

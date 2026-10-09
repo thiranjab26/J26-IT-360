@@ -12,17 +12,13 @@ Status key: `[ ]` open, `[~]` in progress, `[x]` done. Update this file in the s
 
 ## P1: Before PP1 (complete by 20 Oct 2026; PP1 on 21 Oct)
 
-The supervisor has changed the research scope; details pending. See [research-scope-change.md](research-scope-change.md).
+The supervisor changed the research scope on 8 Oct; see [research-scope-change.md](research-scope-change.md).
+The day-by-day checklist is **[PP1-TODO.md](PP1-TODO.md)**.
 
-- [ ] Record the supervisor's changes in research-scope-change.md, then update this list
-- [ ] Run one full spoken session at http://localhost:5173/viva and fix anything confusing
 - [x] Groq voice: the configured voice `tara` was invalid; now `diana` (8 Oct)
 - [x] Guided editor replaces the JSON box for rubric points, misconceptions and follow-ups (8 Oct)
-- [ ] Prepare a demo script that reliably shows a knowledge gap, a communication difficulty and a strong answer
-- [ ] Decide whether PP1 is demonstrated from this repo or from the original prototype folder
-- [ ] Pilot with at least 10 students (ethics approval and consent first)
-- [ ] Calibrate the hesitation thresholds on pilot data; bump `GAP_VERSION` and add a test
-- [ ] Measure and report results (do not measure on the students used to set the thresholds)
+- [x] Analysis tool, statistics, Colab notebook and study materials for the pilot (8 Oct)
+- [ ] Everything else: follow [PP1-TODO.md](PP1-TODO.md)
 
 ## P2: Fit the repository fully
 
@@ -58,6 +54,8 @@ The supervisor has changed the research scope; details pending. See [research-sc
 | Neon database is in US East | 0.3 s per query; session start about 1.6 s | Team Neon project in a closer region |
 | Groq free tier: 8,000 tokens per minute per model | About 4 answers per minute before fallback | One student at a time, or a paid key for the study |
 | `E501` ignored in ruff | Long prompt strings | Wrap when the code is next edited |
+| Live viva feels unnatural: question voice, about 5 s processing per answer, odd or random follow-ups | Not usable for study data collection (owner, 9 Oct) | PP2; study vivas are manual on Zoom |
+| Transcription errors on second-language accents | Wrong words in transcripts | PP2; pause and speed measures do not depend on words |
 
 ## Done
 

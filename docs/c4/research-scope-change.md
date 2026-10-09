@@ -44,14 +44,32 @@ Until the open questions below are settled:
 | "Model" | LLM marks answers | A detector that identifies fillers, pauses (and possibly "jargon") during the viva; trained on public datasets, validated on the collected recordings |
 | Questions | Course-bank questions | The system's technical (DSA) questions, at the MCQ's difficulty |
 
-## Open questions for the supervisor
+## Owner decisions (9 Oct 2026)
 
-- Is the Preliminary Ethics Review Form enough, or is formal clearance needed before recording?
-- Is self-report, checked by the observer, acceptable for placing students in groups?
-- "Analyse the video": audio only, or video too?
-- "Jargon": technical vocabulary use, or unclear speech?
-- Is "existing detectors checked against hand labels" enough for PP1, with training in PP2?
-- Which year group and topics; does the knowledge-gap part stay in C4?
+- 5 + 5 students for PP1 (communication difficulty vs comfortable); more in PP2.
+- English only (no Sinhala or Tamil measures); "jargon" dropped; voice only, no video.
+- Groups come from the students' own answers (self-report), checked by an observer.
+- SLIIT Preliminary Ethics Review Form, plus written consent that names Groq transcription.
+- Data structures questions (stacks, queues); the project title stays the same (the work
+  deepens proposal objective 3).
+- Study vivas are run **manually** by the owner on Zoom from a fixed script (5 questions, scripted
+  follow-ups A and B chosen by the deterministic rule), with an observer in the call. Zoom local
+  recording saves each participant's audio separately; "Original sound" stays on. Reason: the
+  live system's delays, voice and follow-ups would add pauses of their own to the data.
+- No study mode is needed; the Zoom files are the saved recordings (owner's laptop only).
+- A simple counting check (1 minute per student, tally of fillers and silences) replaces
+  Audacity labelling for PP1.
+- Build instead: an analysis tool for the recordings, the literature threshold profile, a
+  statistics notebook, and a counting-check helper.
+- Keep the knowledge-gap part; keep data export small.
+- Deepgram stays switched off, not deleted.
+- Transcription: Groq Whisper live; CrisperWhisper offline re-run on saved study recordings.
+
+## Remaining choices (owner, 9 Oct 2026)
+
+No further supervisor input is available. The owner decided: existing detectors (Whisper,
+CrisperWhisper, voice activity detection), checked against the counting check, for PP1; a trained
+detector in PP2. The warm-up question stays optional and is not analysed separately.
 
 ## What exists today that the change may affect
 

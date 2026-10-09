@@ -60,6 +60,15 @@ come later in the same feature folder under `pages/lecturer/`.
 - "How you spoke": time to first word, pauses, total pause time and fillers per 100 words, marked as supporting information only.
 - "About this report": limitations and the mastery-mismatch note.
 
+### Staff screens and polish (added 8 Oct 2026, see UI-UPGRADE-2026-10.md)
+
+- **Overview** (admin home): six tiles (participants, sessions with a completion ring, answers split spoken and typed, average rubric coverage, approved questions, blinded ratings), sessions per day for 14 days, an outcomes donut, answer states, a topics table, the newest sessions with a Report button, and quick links. Data from `GET /viva/overview`.
+- **Rating queue** (evaluator home): A, B and C progress rings from `GET /viva/evaluation/cases`, then **Open blind review**. System decisions stay hidden.
+- **Speech lab** (admin): drop the student's recording and, optionally, the examiner's; choose the transcription; see the four core measures against the literature thresholds, other measures, a 15-second timeline, a per-answer table, the transcript with fillers and pauses, and a JSON download. Uses `POST /viva/lab/analyse`.
+- **Session history**: summary tiles, a filter (All, In progress, Completed), an outcome colour per card, relative dates and a coverage bar.
+- Live viva shortcuts: Space starts or stops recording (speech mode, outside text fields); Ctrl or Cmd + Enter submits.
+- Motion: short entrance animations and skeleton loaders, all switched off under `prefers-reduced-motion` and when printing. Staff pages load on demand (code splitting).
+
 ## 4. Visual style
 
 Soft indigo, pink and violet background glows on student pages, translucent white cards, indigo

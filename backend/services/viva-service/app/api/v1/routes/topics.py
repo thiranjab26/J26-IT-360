@@ -1,5 +1,7 @@
 """C4 topics routes, mounted under /api/v1/viva."""
 
+from collections import Counter
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,13 +11,14 @@ from app.core.auth import current_user
 from app.db.repositories.materials import course_context, topic_catalog
 from app.db.session import get_db
 from app.db.tables import Bank, User
+from app.integrations.context import TOPICS
 
 router = APIRouter()
 
 
 @router.get("/topics")
 def topics(db: Session = Depends(get_db)):
-    approved = list(db.scalars(select(Bank).where(Bank.status == "approved")))
+    approved = Counter(db.scalars(select(Bank.topic_id).where(Bank.status == "approved")))
     return {
         "items": [
             {
@@ -23,9 +26,11 @@ def topics(db: Session = Depends(get_db)):
                 "name": n,
                 "course_id": c,
                 "description": d,
-                "question_count": sum(q.topic_id == id for q in approved),
+                "question_count": approved[id],
             }
             for id, (n, c, d) in topic_catalog(db).items()
+            # Built-in demo topics drop out once they have no approved questions; courses stay.
+            if approved[id] or id not in TOPICS
         ]
     }
 

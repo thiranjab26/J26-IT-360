@@ -12,7 +12,10 @@ structure and technology, by Claude Code or by a person, without copying the old
 | [spec-backend.md](spec-backend.md) | viva-service: technology, folders, `VIVA_` config, `viva` schema tables, API routes, integrations, tests |
 | [spec-frontend.md](spec-frontend.md) | The viva feature: folders, screens, behaviour, style, acceptance |
 | [migration-plan.md](migration-plan.md) | The step checklist (Steps 0 to 8) and progress log |
-| [research-scope-change.md](research-scope-change.md) | Pending change of research scope by the supervisor; PP1 pilot requirements |
+| [research-scope-change.md](research-scope-change.md) | The supervisor's change of research scope (8 Oct 2026) and the owner's decisions |
+| [PP1-TODO.md](PP1-TODO.md) | Day-by-day checklist to PP1 on 21 Oct 2026 |
+| [UI-UPGRADE-2026-10.md](UI-UPGRADE-2026-10.md) | What the 8 Oct 2026 UI upgrade changed (Overview, Speech lab, history, motion, faster loading) and how it was tested |
+| [MARKING-UPGRADE-2026-10-09.md](MARKING-UPGRADE-2026-10-09.md) | Fairer marking (9 Oct 2026): partial credit, speech-tolerant rules, quoted misconceptions, rewritten questions, results and undo |
 
 ## What the recreation needs
 

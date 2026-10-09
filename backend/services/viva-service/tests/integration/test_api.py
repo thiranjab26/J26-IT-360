@@ -190,3 +190,27 @@ def test_ownership_generation_drafts_and_validation(client):
         ).status_code
         == 503
     )
+
+
+def test_spoken_answer_keeps_fluency_measures_and_rejects_unknown_fields(client):
+    headers = auth(client)
+    session = start(client, headers, input_mode="speech")
+    profile = {
+        "speaking_time_s": 12.0,
+        "speech_rate_syll_s": 2.0,
+        "articulation_rate_syll_s": 2.143,
+        "mean_length_of_run_syll": 8.0,
+        "mean_silent_pause_ms": 400,
+        "silent_pauses": 2,
+        "syllables": 24,
+    }
+    metrics = {"pause_count": 1, "total_pause_ms": 500, "average_pause_ms": 500, "fluency": profile}
+    bad = dict(metrics, fluency=dict(profile, made_up=1))
+    text = "LIFO: last in, first out. B is removed first."
+    extra = {"input_mode": "speech", "response_latency_ms": 900}
+    assert answer(client, headers, session, text, audio_metrics=bad, **extra).status_code == 422
+    response = answer(client, headers, session, text, audio_metrics=metrics, **extra)
+    assert response.status_code == 200, response.text
+    with SessionLocal() as db:
+        turn = db.get(VivaSession, session["id"]).data["turns"][0]
+    assert turn["hesitation"]["fluency"] == profile

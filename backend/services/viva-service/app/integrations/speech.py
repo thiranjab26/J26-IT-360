@@ -5,6 +5,7 @@ algorithmic observations, not validated psychological measures.
 """
 
 import io
+import logging
 import threading
 import time
 from functools import lru_cache
@@ -60,7 +61,38 @@ def pause_metrics(intervals, sample_count, sample_rate=SAMPLE_RATE):
     }
 
 
-def decode_bounded(content):
+def research_intervals(audio):
+    """Speech intervals with the research tool's VAD settings: pauses count from 250 ms."""
+    from faster_whisper.vad import VadOptions, get_speech_timestamps
+
+    from app.domain.fluency import SILENT_PAUSE_S
+
+    options = VadOptions(
+        threshold=0.5,
+        min_speech_duration_ms=100,
+        min_silence_duration_ms=int(SILENT_PAUSE_S * 1000),
+        speech_pad_ms=0,
+    )
+    stamps = get_speech_timestamps(audio, vad_options=options, sampling_rate=SAMPLE_RATE)
+    return [(x["start"] / SAMPLE_RATE, x["end"] / SAMPLE_RATE) for x in stamps]
+
+
+def answer_fluency(audio, words):
+    """The research's literature-profile measures for one answer (fluency.answer_profile, the
+    research tool's own code). None without word timings; a failure never blocks the transcript."""
+    if not words:
+        return None
+    from app.domain import fluency
+
+    try:
+        timed = [fluency.Word(w["start"], w["end"], w["word"]) for w in words]
+        return fluency.answer_profile(research_intervals(audio), timed)
+    except Exception:  # noqa: BLE001 - supplementary evidence only
+        logging.getLogger(__name__).warning("Fluency measures failed", exc_info=True)
+        return None
+
+
+def decode_bounded(content, max_seconds=MAX_AUDIO_SECONDS):
     """Decode in bounded chunks so compressed files cannot allocate hours of PCM."""
     import av
     import numpy as np
@@ -74,7 +106,7 @@ def decode_bounded(content):
             for converted in resampler.resample(frame):
                 samples = converted.to_ndarray().reshape(-1)
                 count += len(samples)
-                if count > SAMPLE_RATE * MAX_AUDIO_SECONDS:
+                if count > SAMPLE_RATE * max_seconds:
                     raise ProviderUnavailable(
                         "Please keep each recording under three minutes, or use typed input."
                     )
@@ -82,7 +114,7 @@ def decode_bounded(content):
         for converted in resampler.resample(None):
             samples = converted.to_ndarray().reshape(-1)
             count += len(samples)
-            if count > SAMPLE_RATE * MAX_AUDIO_SECONDS:
+            if count > SAMPLE_RATE * max_seconds:
                 raise ProviderUnavailable(
                     "Please keep each recording under three minutes, or use typed input."
                 )
@@ -374,7 +406,10 @@ def _transcribe(content, suffix, live=None):
             "segments": segments,
             "lexical_metrics": lexical_metrics(transcript),
             "processing_ms": round((time.monotonic() - started) * 1000),
-            "metrics": pause_metrics(intervals, len(audio)),
+            "metrics": {
+                **pause_metrics(intervals, len(audio)),
+                "fluency": answer_fluency(audio, [w for s in segments for w in s["words"]]),
+            },
             "pause_marks": pause_marks(
                 transcript,
                 [w for s in segments for w in s["words"]],

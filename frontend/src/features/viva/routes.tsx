@@ -1,6 +1,26 @@
+import { lazy, Suspense } from "react";
 import type { RouteObject } from "react-router-dom";
-import VivaApp from "./pages/VivaApp";
-import "./styles/viva.css";
+
+// The viva and its styles load only when /viva is opened, so other AdaptLearn pages
+// never download them.
+const VivaApp = lazy(() => import("./pages/VivaApp"));
+
+const loading = (
+  <div
+    role="status"
+    style={{
+      minHeight: "100vh",
+      display: "grid",
+      placeItems: "center",
+      background: "#f6f8fc",
+      color: "#62748b",
+      fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+      fontSize: 14,
+    }}
+  >
+    Loading the viva workspace…
+  </div>
+);
 
 /**
  * C4 Intelligent Viva System. Mounted by app/router.tsx at /viva.
@@ -12,7 +32,9 @@ export const vivaRoutes: RouteObject[] = [
     path: "viva/*",
     element: (
       <div className="viva-app">
-        <VivaApp />
+        <Suspense fallback={loading}>
+          <VivaApp />
+        </Suspense>
       </div>
     ),
   },

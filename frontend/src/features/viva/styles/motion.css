@@ -1,0 +1,222 @@
+/* Motion and polish for the C4 viva (October 2026). Scoped to .viva-app.
+   Every animation ends in the normal visible state and is switched off for people who
+   prefer reduced motion (bottom of this file). */
+
+@keyframes viva-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes viva-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes viva-grow-x {
+  from { transform: scaleX(0); }
+}
+@keyframes viva-shimmer {
+  from { background-position: -420px 0; }
+  to { background-position: 420px 0; }
+}
+@keyframes viva-float {
+  0%, 100% { transform: rotate(-10deg) translateY(0); }
+  50% { transform: rotate(-10deg) translateY(-7px); }
+}
+@keyframes viva-orbit-a {
+  from { transform: rotate(-30deg); }
+  to { transform: rotate(330deg); }
+}
+@keyframes viva-orbit-b {
+  from { transform: rotate(40deg); }
+  to { transform: rotate(-320deg); }
+}
+@keyframes viva-mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(225 29 72 / 0.45), 0 10px 24px rgb(225 29 72 / 0.3); }
+  70% { box-shadow: 0 0 0 20px rgb(225 29 72 / 0), 0 10px 24px rgb(225 29 72 / 0.3); }
+  100% { box-shadow: 0 0 0 0 rgb(225 29 72 / 0), 0 10px 24px rgb(225 29 72 / 0.3); }
+}
+@property --value {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+@keyframes viva-ring-fill {
+  from { --value: 0; }
+}
+
+/* Every page enters with a short rise. */
+.viva-app .view-enter { animation: viva-rise 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) backwards; }
+
+/* Navigation, buttons and focus */
+.viva-app .nav-item { transition: background 0.18s, color 0.18s, transform 0.18s; }
+.viva-app .nav-item:hover:not(.selected) { transform: translateX(2px); }
+.viva-app .button { transition: background 0.15s, border-color 0.15s, box-shadow 0.2s, transform 0.12s; }
+.viva-app .button:hover:not(:disabled) { transform: translateY(-1px); }
+.viva-app .button:active:not(:disabled) { transform: none; }
+.viva-app .button:focus-visible,
+.viva-app .nav-item:focus-visible,
+.viva-app .icon-button:focus-visible,
+.viva-app .text-button:focus-visible,
+.viva-app .segmented button:focus-visible,
+.viva-app [role="button"]:focus-visible {
+  outline: 3px solid #a9bdf3;
+  outline-offset: 2px;
+}
+.viva-app .panel { transition: box-shadow 0.2s; }
+
+/* Loading placeholders */
+.viva-app .skeleton-stack { display: grid; gap: 16px; }
+.viva-app .skeleton-block {
+  border-radius: 12px;
+  border: 1px solid #e8edf4;
+  background: linear-gradient(90deg, #f1f4f9 0, #f9fbfd 40%, #f1f4f9 80%) 0 0 / 840px 100%;
+  animation: viva-shimmer 1.3s linear infinite;
+}
+
+/* Session history */
+.viva-app .hx-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.viva-app .hx-stat {
+  background: #fff;
+  border: 1px solid #e3e9f2;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: grid;
+  gap: 4px;
+  animation: viva-rise 0.4s backwards;
+}
+.viva-app .hx-stat:nth-child(2) { animation-delay: 40ms; }
+.viva-app .hx-stat:nth-child(3) { animation-delay: 80ms; }
+.viva-app .hx-stat:nth-child(4) { animation-delay: 120ms; }
+.viva-app .hx-stat span {
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #7a8ba3;
+  font-weight: 650;
+}
+.viva-app .hx-stat strong { font-size: 26px; color: #1b304b; letter-spacing: -0.5px; line-height: 1.2; }
+.viva-app .segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  background: #eef2f8;
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+.viva-app .segmented button {
+  border: 0;
+  background: none;
+  padding: 7px 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6a7d97;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.viva-app .segmented button span { margin-left: 6px; font-size: 11px; color: #9aa8bc; }
+.viva-app .segmented button.selected { background: #fff; color: #315bd6; box-shadow: 0 1px 3px rgb(27 48 75 / 0.1); }
+.viva-app .tone-active { --hx-tone: #4f7be0; }
+.viva-app .tone-strong { --hx-tone: #2f9e74; }
+.viva-app .tone-knowledge { --hx-tone: #e0566f; }
+.viva-app .tone-communication { --hx-tone: #e3a33f; }
+.viva-app .tone-mixed { --hx-tone: #9aa8bc; }
+.viva-app .hx-card {
+  position: relative;
+  overflow: hidden;
+  animation: viva-rise 0.4s backwards;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.viva-app .hx-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--hx-tone, #9aa8bc);
+}
+.viva-app .hx-card:hover { box-shadow: 0 10px 24px rgb(27 48 75 / 0.08); transform: translateY(-1px); }
+.viva-app .hx-chip {
+  font-size: 11px;
+  font-weight: 650;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--hx-tone, #9aa8bc) 13%, white);
+  color: color-mix(in srgb, var(--hx-tone, #9aa8bc) 78%, black);
+  white-space: nowrap;
+}
+.viva-app .hx-cover { display: flex; align-items: center; gap: 10px; margin-top: 9px; max-width: 360px; }
+.viva-app .hx-cover-track { flex: 1; height: 6px; border-radius: 999px; background: #edf1f7; overflow: hidden; }
+.viva-app .hx-cover-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hx-tone, #9aa8bc);
+  transform-origin: left;
+  animation: viva-grow-x 0.8s 0.15s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+.viva-app .hx-cover small { font-size: 11px; color: #7a8ba3; white-space: nowrap; }
+.viva-app .hx-none { padding: 20px 4px; }
+
+/* Welcome: keep the closing line clear of the orbit drawing, and let the drawing breathe. */
+.viva-app .welcome-story > p { margin-top: 250px; }
+.viva-app .welcome-orbits > span { animation: viva-float 5s ease-in-out infinite; }
+.viva-app .welcome-orbits > div { animation: viva-orbit-a 90s linear infinite; }
+.viva-app .welcome-orbits > div + div { animation: viva-orbit-b 120s linear infinite; }
+.viva-app .welcome-form,
+.viva-app .welcome-story { animation: viva-rise 0.5s backwards; }
+.viva-app .welcome-story { animation-delay: 80ms; }
+.viva-app .welcome-bottom > div { animation: viva-rise 0.5s backwards; }
+.viva-app .welcome-bottom > div:nth-child(2) { animation-delay: 80ms; }
+.viva-app .welcome-bottom > div:nth-child(3) { animation-delay: 160ms; }
+
+/* Live viva */
+.viva-app .st-question { animation: viva-rise 0.4s backwards; }
+.viva-app .st-mic { transition: background 0.15s, transform 0.15s; }
+.viva-app .st-mic:hover:not(:disabled) { transform: scale(1.04); }
+.viva-app .st-mic.is-recording { animation: viva-mic-pulse 1.6s ease-out infinite; }
+.viva-app .st-answer,
+.viva-app .st-heard,
+.viva-app .st-live { animation: viva-fade 0.3s backwards; }
+.viva-app .st-hint { font-size: 12px; color: #94a3b8; margin: -8px 0 0; }
+.viva-app .st-hint kbd {
+  font: inherit;
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid #dbe2ec;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #fff;
+  color: #5f7392;
+}
+.viva-app .st-progress span { transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1); }
+
+/* Report */
+.viva-app .st-link { display: inline-flex; align-items: center; gap: 6px; }
+.viva-app .st-ring { animation: viva-ring-fill 1.1s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.viva-app .st-report > * { animation: viva-rise 0.45s backwards; }
+.viva-app .st-report > *:nth-child(2) { animation-delay: 50ms; }
+.viva-app .st-report > *:nth-child(3) { animation-delay: 100ms; }
+.viva-app .st-report > *:nth-child(4) { animation-delay: 150ms; }
+.viva-app .st-report > *:nth-child(5) { animation-delay: 200ms; }
+.viva-app .st-report > *:nth-child(6) { animation-delay: 250ms; }
+.viva-app .st-report > *:nth-child(n + 7) { animation-delay: 300ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .viva-app *,
+  .viva-app *::before,
+  .viva-app *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+@media print {
+  .viva-app .view-enter,
+  .viva-app .st-report > *,
+  .viva-app .st-ring { animation: none !important; }
+}

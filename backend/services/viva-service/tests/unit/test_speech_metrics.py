@@ -87,3 +87,34 @@ def test_voice_shares_one_provider_call_per_question(monkeypatch):
     for t in threads:
         t.join()
     assert calls == ["What is a stack?"]
+
+
+def test_answer_fluency_uses_research_pauses_and_never_blocks_a_transcript(monkeypatch):
+    from app.integrations import speech
+
+    monkeypatch.setattr(speech, "research_intervals", lambda audio: [(0.0, 6.0), (6.6, 12.0)])
+    words = [{"start": i * 0.5, "end": i * 0.5 + 0.3, "word": " stack"} for i in range(24)]
+    result = speech.answer_fluency(None, words)
+    assert result["silent_pauses"] == 1 and result["speaking_time_s"] == 12.0
+    assert speech.answer_fluency(None, []) is None
+
+    def broken(audio):
+        raise RuntimeError("VAD failed")
+
+    monkeypatch.setattr(speech, "research_intervals", broken)
+    assert speech.answer_fluency(None, words) is None
+
+
+def test_live_fluency_uses_the_research_tools_vad_settings(monkeypatch):
+    """The live viva and the recording analysis must measure pauses the same way."""
+    vad = pytest.importorskip("faster_whisper.vad")
+    recording = pytest.importorskip("app.integrations.recording")
+    from app.integrations import speech
+
+    seen = []
+    monkeypatch.setattr(
+        vad, "get_speech_timestamps", lambda a, vad_options, **k: seen.append(vad_options) or []
+    )
+    speech.research_intervals([])
+    recording.speech_intervals([])
+    assert seen[0] == seen[1] and seen[0].min_silence_duration_ms == 250

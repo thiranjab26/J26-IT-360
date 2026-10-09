@@ -70,6 +70,21 @@ export function date(value: string) {
     year: "numeric",
   });
 }
+/** "Today", "Yesterday", "3 days ago", or the date for anything older than a week. */
+export function ago(value: string) {
+  const then = new Date(value);
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (Number.isNaN(days)) return "";
+  if (days <= 0) {
+    const minutes = Math.floor((Date.now() - then.getTime()) / 60000);
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes} min ago`;
+    return "Today";
+  }
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days} days ago`;
+  return date(value);
+}
 export const gapLabels: Record<string, string> = {
   LIKELY_KNOWLEDGE_GAP: "Likely knowledge gap",
   LIKELY_COMMUNICATION_DIFFICULTY: "Likely communication difficulty",

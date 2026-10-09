@@ -25,6 +25,10 @@ speech = [
     "numpy>=1.26",
     "faster-whisper>=1.0",
 ]
+research = [
+    "matplotlib>=3.8",
+    "praat-parselmouth>=0.4",
+]
 
 [dependency-groups]
 dev = [

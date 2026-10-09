@@ -2,8 +2,30 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.routes import auth, bank, courses, evaluation, health, sessions, speech, topics
+from app.api.v1.routes import (
+    auth,
+    bank,
+    courses,
+    evaluation,
+    health,
+    lab,
+    overview,
+    sessions,
+    speech,
+    topics,
+)
 
 api_router = APIRouter()
-for module in (health, auth, topics, sessions, speech, courses, bank, evaluation):
+for module in (
+    health,
+    auth,
+    topics,
+    sessions,
+    speech,
+    courses,
+    bank,
+    evaluation,
+    overview,
+    lab,
+):
     api_router.include_router(module.router)

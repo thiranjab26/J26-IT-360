@@ -19,6 +19,16 @@ export function Busy({ text = "Loading…" }: { text?: string }) {
     </div>
   );
 }
+/** Placeholder blocks shown while a list or dashboard loads. */
+export function Skeleton({ rows = 3, height = 92 }: { rows?: number; height?: number }) {
+  return (
+    <div className="skeleton-stack" aria-busy="true" aria-label="Loading">
+      {Array.from({ length: rows }, (_, i) => (
+        <div className="skeleton-block" key={i} style={{ height, animationDelay: `${i * 120}ms` }} />
+      ))}
+    </div>
+  );
+}
 export function ErrorNotice({
   message,
   onClose,

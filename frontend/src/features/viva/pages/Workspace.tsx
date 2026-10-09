@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -19,7 +19,7 @@ import "../styles/student.css";
 
 export default function Workspace({
   auth,
-  topics,
+  topics: allTopics,
   session,
   setSession,
   onReport,
@@ -32,6 +32,8 @@ export default function Workspace({
   onReport: (r: Report) => void;
   onError: (s: string) => void;
 }) {
+  // Students only see topics they can start: a topic needs at least one approved question.
+  const topics = useMemo(() => allTopics.filter((t) => t.question_count > 0), [allTopics]);
   const [topicId, setTopicId] = useState(topics[0]?.id || ""),
     [context, setContext] = useState<Context | null>(null),
     [mode, setMode] = useState<"text" | "speech">("speech"),
@@ -303,6 +305,27 @@ function LiveSession({
     }
   }
   const locked = busy || speech.recording || speech.transcribing;
+  // Keyboard: Space starts or stops recording (outside text fields and buttons);
+  // Ctrl+Enter or Cmd+Enter submits the answer, also from inside the answer box.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        if (q && ready && !locked && answer.trim()) {
+          e.preventDefault();
+          void submit();
+        }
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (e.key !== " " || e.repeat || target?.closest("input, textarea, select, button, a, [contenteditable='true'], [role='button']")) return;
+      if (!q || !ready || mode !== "speech" || busy || speech.starting || speech.transcribing) return;
+      e.preventDefault();
+      if (speech.recording) speech.stop();
+      else void speech.start();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   const mascot = busy || speech.transcribing ? "thinking" : speech.recording ? "listening" : nodding ? "nodding" : speech.speaking ? "speaking" : "idle";
   const status = busy
     ? "Thinking about your answer…"
@@ -375,7 +398,9 @@ function LiveSession({
       ) : q ? (
         <section className="st-card st-stage" aria-live="polite">
           <Mascot state={mascot} />
-          <p className="st-question">{q.question}</p>
+          <p className="st-question" key={q.id}>
+            {q.question}
+          </p>
           <div className="st-row" style={{ justifyContent: "center" }}>
             <button
               className="st-btn st-btn-ghost"
@@ -420,6 +445,11 @@ function LiveSession({
             </>
           )}
           <p className="st-status">{status}</p>
+          {mode === "speech" && !speech.recording && !speech.transcribing && !busy && (
+            <p className="st-hint">
+              <kbd>Space</kbd> starts or stops recording · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> submits
+            </p>
+          )}
           {speech.recording && speech.liveProvider && (
             <div className="st-live" aria-live="polite">
               <div className="st-label">Live transcript · {providerName(speech.liveProvider)}</div>
@@ -447,7 +477,7 @@ function LiveSession({
                 <span className="st-small st-muted">
                   {audioEvidence
                     ? `Transcribed by ${providerName(audioEvidence.provider)}. Pauses and timing come from your recording.`
-                    : "Typed answers have no timing data."}
+                    : "Typed answers have no timing data. Ctrl + Enter submits."}
                 </span>
                 <button className="st-btn st-btn-primary" disabled={locked || !answer.trim()} onClick={submit}>
                   {busy ? <Busy text="Thinking…" /> : <>Submit answer <Send size={16} /></>}

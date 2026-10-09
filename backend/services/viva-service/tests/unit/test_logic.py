@@ -78,12 +78,33 @@ def test_repeat_prompt_bounded_and_issued_ids_unique():
     assert action == "REPEATED_PROMPT_NEXT_CONCEPT"
 
 
-def evidence(state, coverage, mis=None, scaffolded=False, latency=4000):
+# Slow, pause-heavy speech: all four literature-profile measures beyond their thresholds.
+SLOW = {
+    "speaking_time_s": 20.0,
+    "speech_rate_syll_s": 1.5,
+    "articulation_rate_syll_s": 2.5,
+    "mean_length_of_run_syll": 3.0,
+    "mean_silent_pause_ms": 900,
+    "silent_pauses": 8,
+    "syllables": 30,
+}
+FLUENT = {
+    "speaking_time_s": 20.0,
+    "speech_rate_syll_s": 2.6,
+    "articulation_rate_syll_s": 3.4,
+    "mean_length_of_run_syll": 6.0,
+    "mean_silent_pause_ms": 450,
+    "silent_pauses": 4,
+    "syllables": 52,
+}
+
+
+def evidence(state, coverage, mis=None, scaffolded=False, fluency=SLOW):
     return {
         "assessment": {"state": state, "coverage": coverage, "misconceptions": mis or []},
         "input_mode": "speech",
         "scaffolded": scaffolded,
-        "hesitation": hesitation("um I think", "speech", latency),
+        "hesitation": hesitation("um I think", "speech", 4000, {"fluency": fluency}),
     }
 
 
@@ -126,3 +147,36 @@ def test_complete_initial_answer_explains_absence_of_weakness():
     outcome, reason = differentiate([evidence("complete", 100)], "B")
     assert outcome == MIXED
     assert "No weakness" in reason
+
+
+def test_fluency_signal_uses_the_literature_profile():
+    from app.domain.logic import GAP_VERSION, hesitation_signals
+
+    assert GAP_VERSION == "c04-gap-1.4-literature-profile"
+    assert hesitation_signals(evidence("partial", 50)) == ["fluency", "fillers"]
+    assert hesitation_signals(evidence("partial", 50, fluency=FLUENT)) == ["fillers"]
+    # One measure beyond its threshold is not enough: the profile needs two of four.
+    one = dict(FLUENT, mean_silent_pause_ms=900)
+    assert hesitation_signals(evidence("partial", 50, fluency=one)) == ["fillers"]
+    # Under 10 s of speech the profile does not judge; nor without measures, or when typed.
+    short = dict(SLOW, speaking_time_s=8.0)
+    assert hesitation_signals(evidence("partial", 50, fluency=short)) == ["fillers"]
+    assert hesitation_signals(evidence("partial", 50, fluency=None)) == ["fillers"]
+    typed = evidence("partial", 50) | {"input_mode": "text"}
+    assert hesitation_signals(typed) == []
+    # The old prototype delay signal is gone: a long wait alone counts for nothing.
+    slow_start = evidence("partial", 50, fluency=FLUENT)
+    slow_start["hesitation"]["response_latency_ms"] = 60000
+    assert hesitation_signals(slow_start) == ["fillers"]
+
+
+def test_fluency_needs_a_verbal_signal_to_decide_communication():
+    recovered = [evidence("partial", 50), evidence("complete", 100)]
+    assert differentiate(recovered, "C")[0] == COMMUNICATION
+    for turn in recovered:  # same slow speech, no filler or hedge in the words
+        turn["hesitation"] = hesitation(
+            "it is last in first out", "speech", 4000, {"fluency": SLOW}
+        )
+    assert differentiate(recovered, "C")[0] == MIXED
+    recovered = [evidence("partial", 50, fluency=FLUENT), evidence("complete", 100)]
+    assert differentiate(recovered, "C")[0] == MIXED  # fluent speech: one filler signal only

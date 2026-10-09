@@ -78,6 +78,8 @@ export type Summary = {
   questions_asked?: number;
   answered_count?: number;
   outcome?: string;
+  coverage?: number | null;
+  strong?: boolean;
 };
 export type Report = {
   session_id: string;
@@ -201,4 +203,86 @@ export type AudioMetrics = {
   average_pause_ms: number;
   audio_duration_ms: number;
   long_pause_count?: number;
+  /** Literature-profile measures of the answer (250 ms pauses); null without word timings. */
+  fluency?: {
+    speaking_time_s: number;
+    speech_rate_syll_s: number;
+    articulation_rate_syll_s: number | null;
+    mean_length_of_run_syll: number;
+    mean_silent_pause_ms: number | null;
+    silent_pauses: number;
+    syllables: number;
+  } | null;
+};
+
+export type Overview = {
+  generated_at: string;
+  totals: {
+    participants: number;
+    sessions: number;
+    completed: number;
+    active: number;
+    answers: number;
+    skipped: number;
+    spoken_answers: number;
+    typed_answers: number;
+    average_coverage: number | null;
+    average_minutes: number | null;
+  };
+  bank: { approved: number; draft: number; rejected: number; courses: number };
+  ratings: { total: number; raters: number };
+  outcomes: Record<string, number>;
+  answer_states: Record<string, number>;
+  daily: { date: string; started: number; completed: number }[];
+  topics: { topic: string; sessions: number; completed: number; average_coverage: number | null }[];
+  recent: {
+    id: string;
+    participant_code: string;
+    topic: string;
+    status: string;
+    created_at: string;
+    answers: number;
+    outcome?: string | null;
+    strong: boolean;
+    coverage?: number | null;
+  }[];
+};
+export type FluencyMeasures = {
+  speaking_time_s?: number;
+  silent_pauses_per_min?: number;
+  mean_silent_pause_ms?: number | null;
+  long_pauses_per_min?: number;
+  filled_pauses_per_min?: number;
+  filled_pauses_per_100_words?: number | null;
+  speech_rate_syll_s?: number | null;
+  articulation_rate_syll_s?: number | null;
+  mean_length_of_run_syll?: number | null;
+  phonation_time_ratio?: number;
+  mid_clause_pause_share?: number | null;
+  response_latency_s?: number | null;
+  silent_pauses?: number;
+  filled_pauses?: number;
+  syllables?: number;
+  words?: number;
+};
+export type LabResult = {
+  file: string;
+  examiner_file: string | null;
+  transcript_source: string;
+  syllable_source: "transcript" | "acoustic" | "none";
+  duration_s: number;
+  session: FluencyMeasures & {
+    answers: number;
+    literature_flags: number;
+    literature_flagged: boolean | null;
+    flagged_measures: string;
+  };
+  answers: (FluencyMeasures & { answer: number; start_s: number; end_s: number })[];
+  windows: (FluencyMeasures & { answer: number; window_start_s: number; window_end_s: number })[];
+  profile: { name: string; min_flags: number; rules: { measure: string; direction: "below" | "above"; threshold: number }[] };
+  words: { start: number; end: number; word: string; filler: boolean }[];
+  pauses: { start: number; end: number; ms: number }[];
+  speech_span: [number, number] | null;
+  question_turns: [number, number][];
+  notes: string[];
 };
