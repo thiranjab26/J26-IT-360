@@ -1,0 +1,4 @@
+# Real item banks contain answer keys and must never reach the repository.
+*
+!.gitignore
+!example.json

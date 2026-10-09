@@ -1,0 +1,69 @@
+{
+  "version": "example-format-only",
+  "papers": [
+    {
+      "paper_id": "dsa-A",
+      "module_id": "dsa",
+      "form": "A",
+      "title": "DSA test, form A",
+      "items": [
+        {
+          "item_id": "dsa-A-01",
+          "concept_id": "dsa.stack",
+          "stem": "After push(1), push(2), pop(), push(3) on an empty Stack<Integer>, what does peek() return?",
+          "options": ["1", "2", "3", "The stack is empty"],
+          "answer_index": 2,
+          "twin_item_id": "dsa-B-01"
+        },
+        {
+          "item_id": "dsa-A-02",
+          "concept_id": "dsa.queue",
+          "stem": "After offer(4), offer(5), poll() on an empty Queue<Integer>, what does peek() return?",
+          "options": ["4", "5", "null", "It throws an exception"],
+          "answer_index": 1,
+          "twin_item_id": "dsa-B-02"
+        },
+        {
+          "item_id": "dsa-A-P1",
+          "concept_id": "prog.loops",
+          "section": "prereq",
+          "stem": "How many times does the body of for (int i = 0; i < 5; i += 2) run?",
+          "options": ["2", "3", "5", "6"],
+          "answer_index": 1
+        }
+      ]
+    },
+    {
+      "paper_id": "dsa-B",
+      "module_id": "dsa",
+      "form": "B",
+      "title": "DSA test, form B",
+      "items": [
+        {
+          "item_id": "dsa-B-01",
+          "concept_id": "dsa.stack",
+          "stem": "After push(7), push(8), push(9), pop() on an empty Stack<Integer>, what does peek() return?",
+          "options": ["7", "8", "9", "The stack is empty"],
+          "answer_index": 1,
+          "twin_item_id": "dsa-A-01"
+        },
+        {
+          "item_id": "dsa-B-02",
+          "concept_id": "dsa.queue",
+          "stem": "After offer(2), offer(6), offer(1), poll() on an empty Queue<Integer>, what does peek() return?",
+          "options": ["2", "6", "1", "null"],
+          "answer_index": 1,
+          "twin_item_id": "dsa-A-02"
+        },
+        {
+          "item_id": "dsa-B-P1",
+          "concept_id": "prog.loops",
+          "section": "prereq",
+          "stem": "How many times does the body of for (int i = 10; i > 0; i -= 3) run?",
+          "options": ["3", "4", "9", "10"],
+          "answer_index": 1
+        }
+      ]
+    }
+  ]
+}
