@@ -31,9 +31,10 @@ class BktParams:
             raise ValueError("p_guess + p_slip must be below 1")
 
 
-# Until notebook 03 fits them on Junyi. guess 0.25 = four-option MCQ.
+# Medians over the healthy Junyi exercises (research notebook 03, EM on 24,000 training
+# students). guess stays 0.25 because every C1 item is a four-option MCQ.
 DEFAULT_PARAMS = BktParams(
-    p_init=0.20, p_learn=0.15, p_guess=0.25, p_slip=0.10, version="bkt-default-v1"
+    p_init=0.4404, p_learn=0.0801, p_guess=0.25, p_slip=0.1268, version="bkt-junyi-v1"
 )
 
 
