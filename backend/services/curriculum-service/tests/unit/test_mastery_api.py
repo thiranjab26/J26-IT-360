@@ -14,7 +14,9 @@ from app.domain.graph_loader import GraphCache, GraphLoader
 from app.domain.learner import Learner
 from app.domain.mastery import DEFAULT_PARAMS, MasteryRecord, Observation, apply
 from app.domain.recommend import Recommendation
+from app.domain.study import Study
 from app.main import create_app
+from tests.unit.fakes import FakeAssessmentRepository
 from tests.unit.test_graph_api import Source
 from tests.unit.test_recommend import graph
 
@@ -26,28 +28,45 @@ STUDENT = {"X-User-Id": str(USER), "X-User-Role": "student"}
 class FakeRepository:
     """Same behaviour as MasteryStore: first try per item only, BKT on ingest."""
 
+    params = DEFAULT_PARAMS
     params_version = DEFAULT_PARAMS.version
 
     def __init__(self) -> None:
         self.attempts: list[tuple[uuid.UUID, str, str, bool, int]] = []
         self.records: dict[uuid.UUID, dict[str, MasteryRecord]] = {}
-        self.seen: set[str] = set()
+        self.seen: set[tuple[str, str]] = set()
+        self.evidence: list[tuple[uuid.UUID, Observation]] = []
         self.saved: dict[tuple[uuid.UUID, str], Recommendation] = {}
 
     def ingest(self, user_id: uuid.UUID | None = None) -> set[uuid.UUID]:
         changed = set()
         for learner, concept_id, item_id, correct, hints in self.attempts:
-            ref = f"{learner}|{item_id}"
-            if (user_id and learner != user_id) or ref in self.seen:
+            if user_id and learner != user_id:
                 continue
-            self.seen.add(ref)
             obs = Observation(
-                concept_id, item_id, "practice", ref, correct, hints, datetime.now(UTC)
+                concept_id,
+                item_id,
+                "practice",
+                f"{learner}|{item_id}",
+                correct,
+                hints,
+                datetime.now(UTC),
             )
-            records = self.records.setdefault(learner, {})
-            _, records[concept_id] = apply(records.get(concept_id), obs, DEFAULT_PARAMS)
-            changed.add(learner)
+            if self.apply(learner, [obs]):
+                changed.add(learner)
         return changed
+
+    def apply(self, user_id: uuid.UUID, observations: list[Observation]) -> int:
+        applied = 0
+        for obs in sorted(observations, key=lambda o: o.observed_at):
+            if (obs.source, obs.source_ref) in self.seen:
+                continue
+            self.seen.add((obs.source, obs.source_ref))
+            records = self.records.setdefault(user_id, {})
+            _, records[obs.concept_id] = apply(records.get(obs.concept_id), obs, DEFAULT_PARAMS)
+            self.evidence.append((user_id, obs))
+            applied += 1
+        return applied
 
     def mastery(self, user_id: uuid.UUID) -> dict[str, MasteryRecord]:
         return dict(self.records.get(user_id, {}))
@@ -69,6 +88,7 @@ def client(repo: FakeRepository) -> TestClient:
     app = create_app()
     app.state.graph_runtime = GraphRuntime(GraphCache(GraphLoader([Source("core", graph())])))
     app.state.learner = Learner(repo)
+    app.state.study = Study(FakeAssessmentRepository(), app.state.learner)
     return TestClient(app, raise_server_exceptions=False)
 
 
