@@ -10,6 +10,7 @@ import pytest
 from app.domain.assessment import (
     CELLS,
     AssessmentError,
+    Enrolment,
     GainLine,
     Item,
     Paper,
@@ -21,8 +22,11 @@ from app.domain.assessment import (
     gain_report,
     normalised_gain,
     open_test,
+    option_order,
     score,
+    shuffled,
     summarise_group,
+    to_original,
     validate_snapshot,
 )
 from app.domain.mastery import DEFAULT_PARAMS
@@ -73,9 +77,34 @@ def test_assignment_stays_balanced_over_many_learners() -> None:
     rng = random.Random(42)
     counts: Counter[tuple[str, str]] = Counter()
     for _ in range(101):
-        e = choose_cell(counts, rng.choice)
+        e = choose_cell(counts, rng=rng.choice)
         counts[(e.group, e.form_order)] += 1
     assert max(counts.values()) - min(counts.values()) <= 1
+
+
+def test_a_learner_with_a_group_keeps_it_and_only_the_form_order_is_chosen() -> None:
+    counts = {cell: 0 for cell in CELLS} | {("comparison", "AB"): 3}
+    assert choose_cell(counts, group="comparison") == Enrolment("comparison", "BA")
+    assert choose_cell(counts, group="adaptive").group == "adaptive"
+
+
+def test_option_order_is_a_stable_permutation_per_attempt() -> None:
+    order = option_order(7, "dsa-A-01", 4)
+    assert sorted(order) == [0, 1, 2, 3]
+    assert option_order(7, "dsa-A-01", 4) == order
+    assert len({tuple(option_order(a, "dsa-A-01", 4)) for a in range(50)}) > 1
+
+
+def test_shuffled_options_map_back_to_the_original_answer() -> None:
+    paper = make_paper("prog", "A")
+    for attempt_id in range(20):
+        items = [shuffled(i, attempt_id) for i in paper.items]
+        shown_right = {i.item_id: i.options.index("r") for i in items}
+        original = to_original(paper.items, attempt_id, shown_right)
+        assert set(original.values()) == {1}  # "r" is option 1 in make_paper
+        assert score(paper.items, original).main_correct == 6
+    with pytest.raises(AssessmentError):
+        to_original(paper.items, 1, {"prog-A-01": 4})
 
 
 def test_form_order_decides_which_paper_comes_first() -> None:

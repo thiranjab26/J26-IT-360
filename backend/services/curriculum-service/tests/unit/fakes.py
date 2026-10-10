@@ -4,12 +4,54 @@ from __future__ import annotations
 
 import itertools
 import uuid
-from collections.abc import Callable, Mapping
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from app.domain.assessment import CELLS, Enrolment, Paper, Phase, Response, Scored, TestKind
+from app.domain.assessment import (
+    CELLS,
+    Chooser,
+    Enrolment,
+    Paper,
+    Phase,
+    Response,
+    Scored,
+    TestKind,
+)
+from app.domain.practice import PracticeItem
 from app.domain.study import Attempt, LearnerResults, SnapshotRow
+
+
+class FakePracticeRepository:
+    """In-memory PracticeRepository; tries come from the mastery fake's stub attempts."""
+
+    def __init__(self, items: tuple[PracticeItem, ...], attempts: list) -> None:
+        self.by_id = {i.item_id: i for i in items}
+        self.retired: set[str] = set()
+        self.attempts = attempts  # FakeRepository.attempts: (user, concept, item, correct, hints)
+        self.hint_log: list[tuple[uuid.UUID, str]] = []
+
+    def items(self, concept_id: str) -> list[PracticeItem]:
+        return [
+            i
+            for i in self.by_id.values()
+            if i.concept_id == concept_id and i.item_id not in self.retired
+        ]
+
+    def item(self, item_id: str) -> PracticeItem | None:
+        return self.by_id.get(item_id)
+
+    def tries(self, user_id: uuid.UUID, concept_id: str) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for user, concept, item_id, _, _ in self.attempts:
+            if user == user_id and concept == concept_id:
+                counts[item_id] = counts.get(item_id, 0) + 1
+        return counts
+
+    def add_hint(self, user_id: uuid.UUID, item_id: str) -> None:
+        self.hint_log.append((user_id, item_id))
+
+    def hints(self, user_id: uuid.UUID, item_id: str) -> int:
+        return self.hint_log.count((user_id, item_id))
 
 
 class FakeAssessmentRepository:
@@ -31,18 +73,14 @@ class FakeAssessmentRepository:
     def enrolment(self, user_id: uuid.UUID, module_id: str) -> Enrolment | None:
         return self.enrolments.get((user_id, module_id))
 
-    def enrol(
-        self,
-        user_id: uuid.UUID,
-        module_id: str,
-        choose: Callable[[Mapping[tuple[str, str], int]], Enrolment],
-    ) -> Enrolment:
+    def enrol(self, user_id: uuid.UUID, module_id: str, choose: Chooser) -> Enrolment:
         if (user_id, module_id) not in self.enrolments:
             counts = {cell: 0 for cell in CELLS}
             for (_, module), e in self.enrolments.items():
                 if module == module_id:
                     counts[(e.group, e.form_order)] += 1
-            self.enrolments[(user_id, module_id)] = choose(counts)
+            group = next((e.group for (u, _), e in self.enrolments.items() if u == user_id), None)
+            self.enrolments[(user_id, module_id)] = choose(counts, group)
         return self.enrolments[(user_id, module_id)]
 
     def paper(self, paper_id: str) -> Paper | None:
