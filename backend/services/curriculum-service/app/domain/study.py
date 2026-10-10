@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
 from app.domain.assessment import (
     AssessmentError,
+    Chooser,
     Enrolment,
     GainLine,
     GainReport,
@@ -27,7 +28,9 @@ from app.domain.assessment import (
     gain_report,
     open_test,
     score,
+    shuffled,
     summarise_group,
+    to_original,
     validate_snapshot,
 )
 from app.domain.learner import Learner
@@ -74,13 +77,9 @@ class AssessmentRepository(Protocol):
 
     def enrolment(self, user_id: uuid.UUID, module_id: str) -> Enrolment | None: ...
 
-    def enrol(
-        self,
-        user_id: uuid.UUID,
-        module_id: str,
-        choose: Callable[[Mapping[tuple[str, str], int]], Enrolment],
-    ) -> Enrolment:
-        """Idempotent; `choose` sees the current cell counts under a per-module lock."""
+    def enrol(self, user_id: uuid.UUID, module_id: str, choose: Chooser) -> Enrolment:
+        """Idempotent. Under a lock, `choose` gets this module's cell counts and the group the
+        learner already has in another module (None for a new learner)."""
         ...
 
     def paper(self, paper_id: str) -> Paper | None: ...
@@ -144,7 +143,7 @@ class Study:
         self,
         repository: AssessmentRepository,
         learner: Learner,
-        choose: Callable[[Mapping[tuple[str, str], int]], Enrolment] = choose_cell,
+        choose: Chooser = choose_cell,
     ) -> None:
         self.repository = repository
         self.learner = learner
@@ -172,7 +171,8 @@ class Study:
     def start(
         self, user_id: uuid.UUID, module_id: str, kind: TestKind
     ) -> tuple[Attempt, tuple[Item, ...]]:
-        """Starts the test, or resumes an unsubmitted one with the same paper."""
+        """Starts the test, or resumes an unsubmitted one with the same paper.
+        Options come in this attempt's own order (the same on every resume)."""
         self._require_open(module_id, kind)
         existing = self.repository.attempt(user_id, module_id, kind)
         if existing is not None and existing.submitted:
@@ -193,7 +193,7 @@ class Study:
             raise AssessmentError("no_paper", "This test has not been set up yet.")
         items = paper.items_for(kind)
         if existing is not None:
-            return existing, items
+            return existing, tuple(shuffled(i, existing.attempt_id) for i in items)
 
         snapshot: list[SnapshotRow] = []
         if kind == "posttest":
@@ -211,7 +211,7 @@ class Study:
         attempt = self.repository.start_attempt(
             user_id, module_id, kind, paper.paper_id, snapshot, self.learner.params_version
         )
-        return attempt, items
+        return attempt, tuple(shuffled(i, attempt.attempt_id) for i in items)
 
     def submit(
         self,
@@ -220,7 +220,8 @@ class Study:
         kind: TestKind,
         answers: Mapping[str, int | None],
     ) -> tuple[Attempt, bool]:
-        """Scores once; a repeated submit returns the stored result. Returns (attempt, repeat)."""
+        """Scores once; a repeated submit returns the stored result. Returns (attempt, repeat).
+        `answers` are positions as shown to this attempt; they are mapped back before scoring."""
         attempt = self.repository.attempt(user_id, module_id, kind)
         if attempt is None:
             raise AssessmentError("not_started", "Start the test before submitting it.")
@@ -229,8 +230,10 @@ class Study:
             paper = self.repository.paper(attempt.paper_id)
             if paper is None:
                 raise AssessmentError("no_paper", "This test has not been set up yet.")
+            items = paper.items_for(kind)
+            original = to_original(items, attempt.attempt_id, answers)
             attempt, newly = self.repository.finish_attempt(
-                attempt.attempt_id, score(paper.items_for(kind), answers)
+                attempt.attempt_id, score(items, original)
             )
         else:
             newly = False

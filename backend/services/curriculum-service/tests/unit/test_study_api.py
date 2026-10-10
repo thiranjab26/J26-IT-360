@@ -42,7 +42,14 @@ class Setup:
         app = create_app()
         app.state.graph_runtime = GraphRuntime(GraphCache(GraphLoader([Source("core", graph())])))
         app.state.learner = Learner(self.mastery)
-        app.state.study = Study(self.tests, app.state.learner, lambda _: self.next_cell)
+        app.state.study = Study(
+            self.tests,
+            app.state.learner,
+            # Like choose_cell: an existing group wins, the test picks the rest.
+            lambda _counts, group: Enrolment(
+                group or self.next_cell.group, self.next_cell.form_order
+            ),
+        )
         self.client = TestClient(app, raise_server_exceptions=False)
 
     def window(self, module: str, phase: str):  # noqa: ANN201
@@ -64,13 +71,19 @@ class Setup:
         )
 
     def sit(self, who: dict, kind: str, right: int, module: str = "prog") -> dict:
-        """Start and submit, answering the first `right` items correctly (option 1)."""
+        """Start and submit: the first `right` main items and every prerequisite item right."""
         items = self.start(who, kind, module).json()["items"]
         answers = {
-            item["item_id"]: (1 if n < right else 2) if item["section"] == "main" else 0
+            item["item_id"]: pick(item, right=n < right or item["section"] == "prereq")
             for n, item in enumerate(items)
         }
         return self.submit(who, kind, answers, module).json()
+
+
+def pick(item: dict, right: bool) -> int:
+    """Position of the right option ("r" in make_paper) as shown, or of a wrong one."""
+    shown = item["options"]
+    return shown.index("r") if right else next(i for i, o in enumerate(shown) if o != "r")
 
 
 @pytest.fixture
@@ -165,10 +178,37 @@ def test_pretest_answers_set_starting_mastery_without_a_learning_step(s: Setup) 
 def test_blank_answers_are_wrong_but_not_evidence(s: Setup) -> None:
     s.window("prog", "pretest")
     who = student()
-    s.start(who, "pretest")
-    body = s.submit(who, "pretest", {"prog-A-01": 1}).json()
+    first = s.start(who, "pretest").json()["items"][0]
+    body = s.submit(who, "pretest", {first["item_id"]: pick(first, right=True)}).json()
     assert body["attempt"]["main_correct"] == 1
     assert len(s.mastery.evidence) == 1
+
+
+def test_options_are_shuffled_per_attempt_and_scored_by_the_original_option(s: Setup) -> None:
+    s.window("prog", "pretest")
+    one, two = student(), student()
+    first = [i["options"] for i in s.start(one, "pretest").json()["items"]]
+    second = [i["options"] for i in s.start(two, "pretest").json()["items"]]
+    assert all(sorted(o) == ["r", "w", "x", "y"] for o in first)
+    assert first != second  # two attempts, two orders (chance of equal: 1 in 24^6)
+
+    body = s.sit(one, "pretest", right=6)
+    assert body["attempt"]["score_pct"] == 100.0
+    attempt_id = s.tests.attempts[(uuid.UUID(one["X-User-Id"]), "prog", "pretest")].attempt_id
+    assert {r.chosen_index for r in s.tests.answers[attempt_id]} == {1}  # stored as original
+
+
+def test_a_learner_keeps_one_group_across_modules(s: Setup) -> None:
+    s.window("prog", "pretest")
+    s.window("dsa", "pretest")
+    who = student()
+    user = uuid.UUID(who["X-User-Id"])
+    s.next_cell = Enrolment("comparison", "AB")
+    s.start(who, "pretest", "prog")
+    s.next_cell = Enrolment("adaptive", "BA")
+    s.start(who, "pretest", "dsa")
+    assert s.tests.enrolments[(user, "prog")] == Enrolment("comparison", "AB")
+    assert s.tests.enrolments[(user, "dsa")] == Enrolment("comparison", "BA")
 
 
 @pytest.mark.parametrize(
@@ -262,13 +302,15 @@ def test_full_journey_with_snapshot_gain_and_validation(s: Setup) -> None:
     practised = s.mastery.records[user]["prog.variables"].score
 
     s.window("prog", "posttest")
-    s.start(who, "posttest")
+    post_items = s.start(who, "posttest").json()["items"]
     attempt_id = s.tests.attempts[(user, "prog", "posttest")].attempt_id
     snapshot = {row.concept_id: row.p_mastery for row in s.tests.snapshots[attempt_id]}
     assert snapshot["prog.variables"] == pytest.approx(practised)
     assert set(snapshot) == {"prog.variables", "prog.loops", "prog.arrays"}
 
-    s.submit(who, "posttest", {f"prog-B-0{n}": 1 if n <= 3 else 2 for n in range(1, 7)})
+    s.submit(
+        who, "posttest", {i["item_id"]: pick(i, right=n < 3) for n, i in enumerate(post_items)}
+    )
     assert {obs.source for _, obs in s.mastery.evidence} == {"pretest", "practice", "posttest"}
 
     gain = s.client.get(f"{PREFIX}/me/gain", params={"module": "prog"}, headers=who).json()
