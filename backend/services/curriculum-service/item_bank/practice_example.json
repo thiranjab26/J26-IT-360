@@ -1,0 +1,21 @@
+{
+  "version": "practice-example-format-only",
+  "items": [
+    {
+      "item_id": "pr-loops-01",
+      "concept_id": "prog.loops",
+      "stem": "How many times does the body of for (int i = 1; i <= 4; i++) run?",
+      "options": ["3", "4", "5", "It never stops"],
+      "answer_index": 1,
+      "hint": "Count the values of i: it starts at 1 and stops after 4."
+    },
+    {
+      "item_id": "pr-stack-01",
+      "concept_id": "dsa.stack",
+      "stem": "Stack<String> s = new Stack<>();\ns.push(\"a\");\ns.push(\"b\");\n\nWhat does s.pop() return?",
+      "options": ["\"a\"", "\"b\"", "null", "It throws EmptyStackException"],
+      "answer_index": 1,
+      "hint": "A stack returns the most recently pushed value first."
+    }
+  ]
+}
