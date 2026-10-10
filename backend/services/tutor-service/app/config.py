@@ -54,6 +54,13 @@ class Settings(BaseSettings):
         default="sentence-transformers/all-MiniLM-L6-v2", alias="TUTOR_EMBEDDING_MODEL"
     )
 
+    # --- guided sessions ----------------------------------------------------
+    # mastery_gated | points_only. The two study conditions: what unlocks the next concept.
+    session_policy: str = Field(default="mastery_gated", alias="TUTOR_SESSION_POLICY")
+    # False opens every concept, for demos and for testing a late concept without
+    # working through the earlier ones.
+    enforce_unlocks: bool = Field(default=True, alias="TUTOR_ENFORCE_UNLOCKS")
+
     # --- LLM providers ------------------------------------------------------
     # Read by the generation layer (phase P2). Gemini is the cloud provider; Ollama is
     # the local fallback for when there is no connectivity.

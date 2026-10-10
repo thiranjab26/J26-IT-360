@@ -8,7 +8,7 @@ research pipeline.
 Design docs: `docs/c3/Implementation-plan.md`, `docs/c3/dsa-module-plan.md`,
 `docs/c3/research-methodology.md`, `docs/c3/ui-design-brief.md`.
 
-**Current phase: P0 Foundation.**
+**Current phase: P2, guided sessions work end to end with authored text; the language model and the faithfulness gate come next.**
 
 ## Routes
 
@@ -17,6 +17,15 @@ Design docs: `docs/c3/Implementation-plan.md`, `docs/c3/dsa-module-plan.md`,
 | GET | `/health` | Liveness | P0 |
 | GET | `/api/v1/tutor/modules` | Modules, each `available` or `coming_soon` | P0 |
 | GET | `/api/v1/tutor/modules/{module_id}/concepts` | Concepts grouped by topic, in teaching order. `409 module_coming_soon` for a module with no content yet | P0 |
+| POST | `/api/v1/tutor/sessions` | Start a session on `{concept_id}`, or return the one already in progress for it. Starting a different concept puts the old session down (`student_ended`, resumable). `403 concept_locked` lists what is unmet | P2 |
+| GET | `/api/v1/tutor/sessions/{id}` | Where the session is now: the hook, an explanation part, an open question, feedback, a re-teach, or the summary | P2 |
+| POST | `/api/v1/tutor/sessions/{id}/continue` | Move on from the hook, an explanation, feedback or a re-teach | P2 |
+| POST | `/api/v1/tutor/sessions/{id}/answer` | Body `{answer}`. Marked, recorded, and the next state returned. An unreadable answer uses no try | P2 |
+| POST | `/api/v1/tutor/sessions/{id}/end` | The student stops. Resumable for 48 hours | P2 |
+| POST | `/api/v1/tutor/sessions/{id}/resume` | Pick up after the last passed checkpoint (`student_ended`, `load_exit`, `timeout` only) | P2 |
+| GET | `/api/v1/tutor/progress?module_id=prog` | XP, mastery per concept, what is unlocked and why not, the suggested next concept | P2 |
+
+The session routes are for students only (`403 students_only` otherwise), and a session is visible only to the student who started it. The answer key never appears in a response before the student has answered: a wrong gating answer gets no explanation, so the retry means something. Two settings shape them: `TUTOR_SESSION_POLICY` (`mastery_gated` or `points_only`, the two study conditions) and `TUTOR_ENFORCE_UNLOCKS` (`false` opens every concept, handy for demos).
 
 Everything below needs an authenticated caller: identity arrives as `X-User-Id`
 and `X-User-Role` from the gateway. This service never parses a JWT and never
@@ -103,13 +112,16 @@ The pieces of a guided session, built as plain logic first so each rule is testa
 | `app/grading/deterministic.py` | Marks multiple choice and "what does this program print" exactly, from the authored key, with no model: 77 of the 143 questions. An unreadable answer ("E", an empty box) is asked for again and never costs an attempt |
 | `app/sessions/state_machine.py` | The session loop: hook, teach, checkpoint, judge, branch. First miss on a gating checkpoint gives a hint, the second re-teaches, the third ends the session as `struggling`. Multiple-choice pulse checks never block or count towards finishing. Six typed exits; `load_exit`, `student_ended` and `timeout` can be resumed within 48 hours |
 | `app/sessions/plan.py` | Builds a session's steps for a concept: a hook, each part of the explanation with quick checks spread evenly between, then the gating checkpoints. Unseen questions come first |
+| `app/sessions/service.py` | Runs a session over HTTP: loads and saves it through a repository, marks answers, awards XP, applies the unlock rules, ends a silent session as `timeout`, shuffles multiple-choice options from a seed (session + question) so a refresh shows the same order. Holds no rules of its own. Mastery needs two gating results, or one for a concept that has only one gating question (the Java intro, until its Q6 gets an output block) |
+| `app/sessions/repository.py` | The session store: a SQL implementation on the `tutor` tables, with a unique index so a student can have only one active session even if two requests race |
+| `app/sessions/catalog.py` | The authored course, loaded once: concept order, prerequisites, explanation parts, question bank |
 | `app/gamification/` | XP per checkpoint passed (`xp.py`), a stand-in mastery estimate behind the interface C1's real one will use (`mastery.py`), and the unlock rules for the study's two conditions (`rules.py`): mastery-gated against points-only, identical except for what opens the next concept |
 
 `content check` flags a question that cannot be turned into structured data as an error, and a level-2 question with no expected-output block (one today: `java_intro` Q6) as a warning, because it then needs a model to mark it.
 
 ### Trying a session in the terminal
 
-None of the above has a route or a screen yet, so the way to see it work is a terminal demo that plays a real session on the course content, using the real state machine, question bank, marking, XP and unlock rules. It cannot write the teaching (that needs the model), so where the tutor would explain it prints the authored course passage.
+The session routes above serve the same engine to a browser (a screen for them is still to be built). To watch it work in a terminal now there is a demo that plays a real session on the course content, using the real state machine, question bank, marking, XP and unlock rules. It cannot write the teaching (that needs the model), so where the tutor would explain it prints the authored course passage.
 
 ```bash
 uv run python -m app.sessions.demo prog.loops                       # you play it
@@ -127,7 +139,7 @@ It ends by showing what the session opens under each of the study's two conditio
 
 ## Schemas and migrations
 
-This service owns two schemas: `content` (indexed course material: `units`, `chunks`) and `tutor` (runtime data: `gate_events` now, sessions and attempts from P2). Both are migrated from here, with the Alembic version table in `tutor`:
+This service owns two schemas: `content` (indexed course material: `units`, `chunks`) and `tutor` (runtime data: `gate_events`, `sessions`, `checkpoint_attempts`, and the published view `v_attempt_outcomes`). Both are migrated from here, with the Alembic version table in `tutor`:
 
 ```bash
 uv run alembic upgrade head     # apply
