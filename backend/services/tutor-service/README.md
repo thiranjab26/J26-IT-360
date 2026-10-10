@@ -107,6 +107,20 @@ The pieces of a guided session, built as plain logic first so each rule is testa
 
 `content check` flags a question that cannot be turned into structured data as an error, and a level-2 question with no expected-output block (one today: `java_intro` Q6) as a warning, because it then needs a model to mark it.
 
+### Trying a session in the terminal
+
+None of the above has a route or a screen yet, so the way to see it work is a terminal demo that plays a real session on the course content, using the real state machine, question bank, marking, XP and unlock rules. It cannot write the teaching (that needs the model), so where the tutor would explain it prints the authored course passage.
+
+```bash
+uv run python -m app.sessions.demo prog.loops                       # you play it
+uv run python -m app.sessions.demo prog.loops --auto                # a scripted perfect student
+uv run python -m app.sessions.demo prog.loops --auto --misses 1     # a hint, then a pass
+uv run python -m app.sessions.demo prog.loops --auto --misses 2     # a re-teach, then a pass
+uv run python -m app.sessions.demo prog.loops --auto --misses 3     # fails: ends as `struggling`
+```
+
+It ends by showing what the session opens under each of the study's two conditions, mastery-gated and points-only, for the same student with the same XP.
+
 ## LLM providers
 
 `TUTOR_LLM_PROVIDER` selects `gemini` (cloud) or `ollama` (local fallback). Put your key in `TUTOR_GEMINI_API_KEY` in `.env`; it is held as a secret value, so it cannot appear in logs or in a printed settings object, and an empty value counts as not configured. Check `TUTOR_GEMINI_MODEL` against the models Google AI Studio currently offers. The Ollama fallback defaults to `qwen2.5-coder:7b`; on a CPU-only machine generation is slow (the 1.5B model measured 2.6 tokens per second), which matters for the offline-fallback claim. The provider layer that reads these settings is the next P2 piece.
