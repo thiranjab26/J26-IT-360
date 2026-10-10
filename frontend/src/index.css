@@ -55,6 +55,22 @@
 
   --shadow-card: 0 1px 3px oklch(0.25 0.01 265 / 0.06), 0 12px 32px oklch(0.25 0.01 265 / 0.05);
   --shadow-focus: 0 0 0 3px oklch(0.52 0.14 265 / 0.16);
+
+  /* A short pop for XP badges when points are earned. */
+  --animate-pop: pop 0.45s ease-out;
+  @keyframes pop {
+    0% {
+      transform: scale(0.8);
+      opacity: 0.4;
+    }
+    60% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
 }
 
 @layer base {

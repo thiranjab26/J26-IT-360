@@ -1,19 +1,20 @@
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
-import { Badge, Button, Card, cx } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, cx } from '@/shared/components/ui';
+import { useStartSession, useProgress, type ConceptProgress } from '../api/sessionApi';
 import { useModuleConcepts, type Concept, type Topic } from '../api/tutorApi';
 
 /**
- * The module as a path of topics, in teaching order.
- *
- * Only real data is shown. Mastery, locks and XP depend on the session and
- * progress APIs (phases P2 and P5), so every topic reads "not started" for now
- * and the first one is marked as the place to begin.
+ * The module as a path of topics, in teaching order, with the student's own progress:
+ * which concepts are open, which are mastered, and where to go next.
  */
 export function QuestMapPage() {
   const { moduleId } = useParams<{ moduleId: string }>();
+  const navigate = useNavigate();
   const { data, isPending, error } = useModuleConcepts(moduleId);
+  const { data: progress } = useProgress(moduleId);
+  const start = useStartSession();
 
   if (isPending) return <MapSkeleton />;
 
@@ -43,7 +44,25 @@ export function QuestMapPage() {
   const conceptNames = new Map(
     topics.flatMap((topic) => topic.concepts.map((c) => [c.concept_id, c.name] as const)),
   );
-  const firstConcept = topics[0]?.concepts[0];
+  const status = new Map<string, ConceptProgress>(
+    (progress?.concepts ?? []).map((c) => [c.concept_id, c]),
+  );
+
+  const masteredCount = [...status.values()].filter((c) => c.mastered).length;
+  const masteredPercent = module.concept_count
+    ? Math.round((masteredCount / module.concept_count) * 100)
+    : 0;
+
+  const nextId = progress?.next_concept_id ?? topics[0]?.concepts[0]?.concept_id ?? null;
+  const activeId = progress?.active_session_id ?? null;
+
+  function begin(conceptId: string) {
+    start.mutate(conceptId, {
+      onSuccess: (session) => navigate(`/sessions/${session.session_id}`),
+    });
+  }
+
+  const startError = start.error;
 
   return (
     <div className="flex flex-col gap-[22px]">
@@ -51,9 +70,14 @@ export function QuestMapPage() {
         <Link to="/dashboard" className="font-mono text-[11px] text-ink-faint hover:text-brand">
           ← Modules
         </Link>
-        <h1 className="mt-[10px] text-[23px] font-semibold tracking-tight text-ink">
-          {module.name}
-        </h1>
+        <div className="mt-[10px] flex flex-wrap items-center justify-between gap-[12px]">
+          <h1 className="text-[23px] font-semibold tracking-tight text-ink">{module.name}</h1>
+          {progress && (
+            <span className="rounded-full border border-brand-soft bg-brand-wash px-[12px] py-[4px] font-mono text-[12px] font-semibold text-brand">
+              {progress.total_xp} XP
+            </span>
+          )}
+        </div>
         {module.description && (
           <p className="mt-[6px] max-w-[640px] text-[13px] leading-[1.6] text-ink-muted">
             {module.description}
@@ -61,22 +85,35 @@ export function QuestMapPage() {
         )}
       </header>
 
-      {firstConcept && (
+      {startError && (
+        <Banner
+          message={startError instanceof ApiError ? startError.message : 'Could not start.'}
+          code={startError instanceof ApiError ? startError.code : undefined}
+        />
+      )}
+
+      {nextId && (
         <div className="flex flex-wrap items-center justify-between gap-[14px] rounded-[14px] border border-brand-soft bg-brand-wash px-[20px] py-[16px]">
           <div>
             <p className="font-mono text-[10.5px] tracking-wide text-brand uppercase">
-              Start here
+              {activeId ? 'In progress' : masteredCount > 0 ? 'Up next' : 'Start here'}
             </p>
             <p className="mt-[3px] text-[15.5px] font-semibold tracking-tight text-ink">
-              {firstConcept.name}
+              {activeId ? 'Your guided session' : (conceptNames.get(nextId) ?? nextId)}
             </p>
             <p className="mt-[2px] text-[12.5px] text-ink-muted">
-              Guided sessions open in the next phase. The path below is already your route.
+              {activeId
+                ? 'You have a session open. Pick it up where you left off.'
+                : 'A guided session: a short explanation, quick checks, then checkpoints.'}
             </p>
           </div>
-          <Button disabled title="Guided sessions are not available yet">
-            Start session
-          </Button>
+          {activeId ? (
+            <Button onClick={() => navigate(`/sessions/${activeId}`)}>Continue session</Button>
+          ) : (
+            <Button onClick={() => begin(nextId)} busy={start.isPending}>
+              Start session
+            </Button>
+          )}
         </div>
       )}
 
@@ -85,7 +122,7 @@ export function QuestMapPage() {
           <div className="mb-[14px] flex items-baseline justify-between">
             <h2 className="text-[14px] font-semibold text-ink">Module path</h2>
             <span className="font-mono text-[10.5px] text-ink-faint">
-              0 of {module.topic_count} topics mastered
+              {masteredCount} of {module.concept_count} concepts mastered
             </span>
           </div>
 
@@ -95,9 +132,12 @@ export function QuestMapPage() {
                 key={topic.topic_id}
                 topic={topic}
                 number={index + 1}
-                first={index === 0}
                 last={index === topics.length - 1}
                 conceptNames={conceptNames}
+                status={status}
+                current={nextId}
+                busy={start.isPending}
+                onStart={begin}
               />
             ))}
           </ol>
@@ -111,10 +151,13 @@ export function QuestMapPage() {
             <dl className="mt-[10px] flex flex-col gap-[8px] text-[12.5px]">
               <Row label="Topics" value={String(module.topic_count)} />
               <Row label="Concepts" value={String(module.concept_count)} />
-              <Row label="Mastered" value="0%" />
+              <Row label="Mastered" value={`${masteredPercent}%`} />
             </dl>
             <div className="mt-[12px] h-[6px] overflow-hidden rounded-full bg-surface-sunken">
-              <div className="h-full w-0 rounded-full bg-brand" />
+              <div
+                className="h-full rounded-full bg-brand transition-[width] duration-500"
+                style={{ width: `${masteredPercent}%` }}
+              />
             </div>
           </Card>
 
@@ -125,7 +168,9 @@ export function QuestMapPage() {
             <ul className="mt-[10px] flex flex-col gap-[9px]">
               {[
                 'You earn XP for each checkpoint you pass.',
-                'Topics unlock on demonstrated mastery, not on points.',
+                progress?.policy === 'points_only'
+                  ? 'Topics unlock as your XP grows.'
+                  : 'Topics unlock on demonstrated mastery, not on points.',
                 'Quick multiple-choice checks never unlock anything.',
               ].map((line) => (
                 <li key={line} className="flex gap-[8px]">
@@ -139,8 +184,8 @@ export function QuestMapPage() {
           <div className="flex items-start gap-[8px] px-[4px]">
             <Shield />
             <p className="text-[11.5px] leading-[1.5] text-ink-faint">
-              Every tutor statement is checked against this module's course material before it
-              reaches you.
+              Explanations are written from this module's course material. A fact-check gate for
+              them is being built; until it is on, AI-written text is labelled as such.
             </p>
           </div>
         </aside>
@@ -152,16 +197,26 @@ export function QuestMapPage() {
 function TopicStep({
   topic,
   number,
-  first,
   last,
   conceptNames,
+  status,
+  current,
+  busy,
+  onStart,
 }: {
   topic: Topic;
   number: number;
-  first: boolean;
   last: boolean;
   conceptNames: Map<string, string>;
+  status: Map<string, ConceptProgress>;
+  current: string | null;
+  busy: boolean;
+  onStart: (conceptId: string) => void;
 }) {
+  const mastered = topic.concepts.filter((c) => status.get(c.concept_id)?.mastered).length;
+  const done = mastered === topic.concepts.length;
+  const open = topic.concepts.some((c) => c.concept_id === current);
+
   return (
     <li className="grid grid-cols-[38px_1fr] gap-[14px]">
       {/* Node and the line down to the next topic */}
@@ -170,12 +225,14 @@ function TopicStep({
           className={cx(
             'flex size-[34px] shrink-0 items-center justify-center rounded-full',
             'font-mono text-[12.5px] font-semibold',
-            first
-              ? 'bg-brand text-white shadow-[0_0_0_4px_oklch(0.52_0.14_265/0.14)]'
-              : 'border border-line-strong bg-surface text-ink-muted',
+            done
+              ? 'bg-verified text-white'
+              : open
+                ? 'bg-brand text-white shadow-[0_0_0_4px_oklch(0.52_0.14_265/0.14)]'
+                : 'border border-line-strong bg-surface text-ink-muted',
           )}
         >
-          {number}
+          {done ? '✓' : number}
         </span>
         {!last && <span className="my-[4px] w-px flex-1 bg-line" />}
       </div>
@@ -185,17 +242,24 @@ function TopicStep({
           <div className="flex flex-wrap items-center justify-between gap-[8px] border-b border-line-soft px-[18px] py-[12px]">
             <h3 className="text-[14.5px] font-semibold tracking-tight text-ink">{topic.name}</h3>
             <div className="flex items-center gap-[7px]">
-              {first && <Badge tone="brand">Start here</Badge>}
-              <Badge>
-                {topic.concepts.length} {topic.concepts.length === 1 ? 'concept' : 'concepts'}
+              {open && <Badge tone="brand">Up next</Badge>}
+              <Badge tone={done ? 'verified' : 'neutral'}>
+                {mastered} of {topic.concepts.length} mastered
               </Badge>
-              <Badge>not started</Badge>
             </div>
           </div>
 
           <ul className="divide-y divide-line-soft">
             {topic.concepts.map((concept) => (
-              <ConceptItem key={concept.concept_id} concept={concept} names={conceptNames} />
+              <ConceptItem
+                key={concept.concept_id}
+                concept={concept}
+                names={conceptNames}
+                progress={status.get(concept.concept_id)}
+                isNext={concept.concept_id === current}
+                busy={busy}
+                onStart={onStart}
+              />
             ))}
           </ul>
         </Card>
@@ -204,26 +268,69 @@ function TopicStep({
   );
 }
 
-function ConceptItem({ concept, names }: { concept: Concept; names: Map<string, string> }) {
+function ConceptItem({
+  concept,
+  names,
+  progress,
+  isNext,
+  busy,
+  onStart,
+}: {
+  concept: Concept;
+  names: Map<string, string>;
+  progress: ConceptProgress | undefined;
+  isNext: boolean;
+  busy: boolean;
+  onStart: (conceptId: string) => void;
+}) {
+  const locked = progress ? !progress.unlocked : false;
+  const unmet = (progress?.unmet ?? []).map((r) =>
+    r.concept_id ? (names.get(r.concept_id) ?? r.concept_id) : `${Math.ceil(r.required)} XP`,
+  );
+
   return (
-    <li className="px-[18px] py-[13px]">
-      <h4 className="text-[13.5px] font-medium text-ink">{concept.name}</h4>
-
-      {concept.description && (
-        <p className="mt-[3px] max-w-[620px] text-[12.5px] leading-[1.6] text-ink-muted">
-          {concept.description}
-        </p>
-      )}
-
-      {concept.prerequisite_ids.length > 0 && (
-        <div className="mt-[8px] flex flex-wrap items-center gap-[6px]">
-          <span className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
-            builds on
-          </span>
-          {concept.prerequisite_ids.map((id) => (
-            <Badge key={id}>{names.get(id) ?? id}</Badge>
-          ))}
+    <li className={cx('flex items-start justify-between gap-[14px] px-[18px] py-[13px]', locked && 'opacity-70')}>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-[8px]">
+          <h4 className="text-[13.5px] font-medium text-ink">{concept.name}</h4>
+          {progress?.mastered && <Badge tone="verified">mastered</Badge>}
+          {progress && !progress.mastered && progress.mastery !== null && (
+            <Badge tone="caution">{Math.round(progress.mastery * 100)}%</Badge>
+          )}
+          {locked && <Badge>locked</Badge>}
         </div>
+
+        {concept.description && (
+          <p className="mt-[3px] max-w-[620px] text-[12.5px] leading-[1.6] text-ink-muted">
+            {concept.description}
+          </p>
+        )}
+
+        {locked && unmet.length > 0 && (
+          <p className="mt-[6px] text-[12px] text-caution-ink">Needs: {unmet.join(', ')}</p>
+        )}
+
+        {!locked && concept.prerequisite_ids.length > 0 && (
+          <div className="mt-[8px] flex flex-wrap items-center gap-[6px]">
+            <span className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+              builds on
+            </span>
+            {concept.prerequisite_ids.map((id) => (
+              <Badge key={id}>{names.get(id) ?? id}</Badge>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {progress && !locked && (
+        <Button
+          variant={isNext ? 'primary' : 'secondary'}
+          className="shrink-0 px-[14px] py-[7px] text-[12.5px]"
+          onClick={() => onStart(concept.concept_id)}
+          disabled={busy}
+        >
+          {progress.mastered ? 'Review' : progress.mastery !== null ? 'Practise' : 'Start'}
+        </Button>
       )}
     </li>
   );
