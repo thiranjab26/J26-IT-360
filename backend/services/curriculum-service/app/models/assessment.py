@@ -108,6 +108,28 @@ class CohortGainOut(BaseModel):
     learners: list[CohortRowOut]
 
 
+class ConceptOverviewOut(BaseModel):
+    concept_id: str
+    name: str
+    topic_id: str
+    learners: int  # learners with any evidence on this concept
+    mastered: int
+    mastered_pct: float | None
+    mean_mastery: float | None
+
+
+class OverviewOut(BaseModel):
+    """Class-level numbers only; no learner is identified."""
+
+    module_id: str
+    threshold: float
+    learners: int
+    groups: dict[str, int]
+    pretest_done: int
+    posttest_done: int
+    concepts: list[ConceptOverviewOut]
+
+
 class SnapshotValidationOut(BaseModel):
     module_id: str
     params_version: str

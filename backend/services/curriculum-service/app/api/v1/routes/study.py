@@ -1,19 +1,23 @@
-"""Lecturer and admin view of the study: window control, cohort gain, BKT validity."""
+"""Lecturer and admin view: window control, class overview, cohort gain, BKT validity."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends, Path, Request
 
 from app.api.v1.routes.assessment import gain_line, known_module, topics
 from app.api.v1.routes.graph import MODULE_PATTERN, get_graph_cache
 from app.api.v1.routes.mastery import get_study
 from app.core.deps import CurrentUser, require_role
+from app.domain.cohort import CohortRepository, overview
 from app.domain.graph_loader import GraphCache
+from app.domain.mastery import MASTERY_THRESHOLD
 from app.domain.study import Study
 from app.models.assessment import (
     CohortGainOut,
     CohortRowOut,
+    ConceptOverviewOut,
     GroupSummaryOut,
+    OverviewOut,
     SnapshotValidationOut,
     WindowIn,
     WindowOut,
@@ -51,6 +55,47 @@ def update_window(
     known_module(cache, module)
     study.set_window(module, body.phase, caller.user_id)
     return WindowOut(module_id=module, phase=study.window(module))
+
+
+def get_cohort(request: Request) -> CohortRepository:
+    return request.app.state.cohort
+
+
+@router.get(
+    "/{module}/overview",
+    response_model=OverviewOut,
+    summary="Class progress per concept (no names)",
+)
+def read_overview(
+    module: str = ModulePath,
+    _: CurrentUser = Depends(staff),
+    cache: GraphCache = Depends(get_graph_cache),
+    cohort: CohortRepository = Depends(get_cohort),
+) -> OverviewOut:
+    graph = known_module(cache, module)
+    result = overview(cohort, graph, module)
+    return OverviewOut(
+        module_id=module,
+        threshold=MASTERY_THRESHOLD,
+        learners=result.learners,
+        groups=result.study.groups,
+        pretest_done=result.study.pretest_done,
+        posttest_done=result.study.posttest_done,
+        concepts=[
+            ConceptOverviewOut(
+                concept_id=row.concept_id,
+                name=graph.concept(row.concept_id).name,
+                topic_id=graph.concept(row.concept_id).topic_id,
+                learners=row.stat.learners,
+                mastered=row.stat.mastered,
+                mastered_pct=round(100 * row.stat.mastered / row.stat.learners, 1)
+                if row.stat.learners
+                else None,
+                mean_mastery=_round(row.stat.mean_mastery),
+            )
+            for row in result.concepts
+        ],
+    )
 
 
 @router.get("/{module}/gain", response_model=CohortGainOut, summary="Gain per learner and group")
