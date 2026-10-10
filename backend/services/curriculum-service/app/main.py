@@ -14,15 +14,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1.router import api_router
-from app.api.v1.routes import dev, health
+from app.api.v1.routes import dev, health, practice
 from app.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.db.assessment_store import AssessmentStore
+from app.db.cohort_store import CohortStore
 from app.db.graph_wiring import build_graph_runtime
 from app.db.mastery_store import MasteryStore
+from app.db.practice_store import PracticeStore
 from app.db.session import get_engine
 from app.domain.learner import Learner
+from app.domain.practice import Practice
 from app.domain.study import Study
 from app.integrations.attempts import attempts_relation
 
@@ -59,6 +62,8 @@ def create_app() -> FastAPI:
         MasteryStore(get_engine(), attempts_relation(settings.integration_mode))
     )
     app.state.study = Study(AssessmentStore(get_engine()), app.state.learner)
+    app.state.practice = Practice(PracticeStore(get_engine()), app.state.learner)
+    app.state.cohort = CohortStore(get_engine())
 
     app.add_middleware(RequestContextMiddleware)
     install_error_handlers(app)
@@ -69,6 +74,9 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(health.router, prefix=API_PREFIX)
     app.include_router(api_router, prefix=API_PREFIX)
+    # The C3 stand-in exists only until C3 publishes tutor.v_attempt_outcomes.
+    if settings.integration_mode == "stub":
+        app.include_router(practice.router, prefix=API_PREFIX)
     if settings.dev_tools_enabled:
         app.include_router(dev.router, prefix=API_PREFIX)
 
@@ -78,7 +86,7 @@ def create_app() -> FastAPI:
             "environment": settings.environment,
             "port": settings.port,
             "integration_mode": settings.integration_mode,
-            "graph_store": "neo4j" if settings.neo4j_enabled else "postgres-core",
+            "graph_store": "neo4j" if settings.neo4j_enabled else "postgres (edits, then core)",
             "dev_tools": settings.dev_tools_enabled,
         },
     )
