@@ -1,0 +1,131 @@
+/* Mock consumer page. Deliberately plain: it is example code for teammates. */
+:root {
+  --bg: #111310;
+  --surface: #191c17;
+  --border: #2c3029;
+  --text: #eceee6;
+  --muted: #9ca194;
+  --faint: #686d61;
+  --live: #d4ff3a;
+  --warn: #ffb547;
+  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f4ee;
+    --surface: #ffffff;
+    --border: #dcd8cc;
+    --text: #1b1d18;
+    --muted: #5c5f55;
+    --faint: #8d9085;
+    --live: #4f6b00;
+    --warn: #9a5b00;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+
+.consumer {
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.c-head h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.c-sub {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.c-conn {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.c-conn[data-state='live'] {
+  color: var(--live);
+}
+
+.c-conn[data-state='stale'] {
+  color: var(--warn);
+}
+
+.c-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.c-card h2 {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.c-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.c-grid dt {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.c-grid dd {
+  margin: 2px 0 0;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.c-grid dd[data-null='true'] {
+  color: var(--faint);
+  font-weight: 400;
+}
+
+.c-log {
+  overflow: auto;
+  max-height: 280px;
+  margin: 0;
+  padding-left: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre;
+  list-style: none;
+}
+
+.c-json {
+  overflow-x: auto;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}

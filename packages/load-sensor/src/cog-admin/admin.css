@@ -778,3 +778,10 @@
     transition: none;
   }
 }
+
+.admin-level[data-on='true'] {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}

@@ -165,6 +165,7 @@ export class WellbeingPanel {
     breakBtn.dataset.testid = 'took-break';
     breakBtn.addEventListener('click', () => {
       this.markBreak();
+      this.onUserBreak?.();
     });
     timeHead.append(breakBtn);
     this.#screenTime = el('p', 'wb-big', '0:00');
@@ -313,6 +314,12 @@ export class WellbeingPanel {
     this.#renderTimes();
     this.#renderFeatured();
   }
+
+  /**
+   * Called when the learner presses "I took a break" (not for the panel's own
+   * 2-minute-away rule: the event stream's strain has its own, ARCHITECTURE.md §8a).
+   */
+  onUserBreak: (() => void) | null = null;
 
   /** Resets both break timers (button, 2 min away, or a finished break game). */
   markBreak(): void {

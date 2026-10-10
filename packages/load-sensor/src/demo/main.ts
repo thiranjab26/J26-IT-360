@@ -7,6 +7,11 @@
 // - Break: two short calm games (neck stretch steered by head pose, memory match).
 // The consent screen comes with TODO A6.
 //
+// It composes the core parts itself (the overlay and charts need landmarks and
+// per-frame features), but publishes through the same LoadStateHub and status
+// mapping as createLoadSensor(), so the events on `adaptlearn.load-state` are
+// the ones teammates get. consumer.html shows them from another tab (A5).
+//
 // Sensing is off until the user presses "Turn sensing on" (invariant 4).
 
 import './styles.css';
@@ -16,6 +21,8 @@ import {
   TfjsFaceMeshProvider,
   UnsupportedBackendError,
 } from '../core/landmarks/index.js';
+import { LoadStateHub, type SourceStatus } from '../core/events/index.js';
+import { sourceForCamera } from '../core/sensor.js';
 import { FeaturePipeline } from '../core/window/index.js';
 import {
   AlarmSound,
@@ -26,6 +33,7 @@ import {
 import { BreakPanel } from './break/break-panel.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
+import { LoadStateCard } from './load-state-card.js';
 import {
   openControlChannel,
   SettingsStore,
@@ -261,12 +269,13 @@ function mount(root: HTMLElement): void {
   signals.toolbar.prepend(expressionSwitch.root);
   // Development builds only: the recorder is tree-shaken out of production.
   const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
+  const loadCard = new LoadStateCard(`${import.meta.env.BASE_URL}consumer.html`);
 
   // ── Tabs: Camera | Signals ──
   const cameraPanel = el('section');
   cameraPanel.id = 'panel-camera';
   cameraPanel.className = 'panel camera-panel';
-  cameraPanel.append(layout, ...(recorder ? [recorder.element] : []));
+  cameraPanel.append(layout, loadCard.element, ...(recorder ? [recorder.element] : []));
   const signalsPanel = el('section');
   signalsPanel.id = 'panel-signals';
   signalsPanel.className = 'panel';
@@ -297,6 +306,7 @@ function mount(root: HTMLElement): void {
     },
     onBreakTaken: () => {
       wellbeing.markBreak();
+      hub.markBreak();
     },
     onLayout: () => {
       placeDock();
@@ -354,7 +364,45 @@ function mount(root: HTMLElement): void {
     settings.value.wellbeing.eyeBreakMin,
     settings.value.wellbeing.moveBreakMin,
   );
+  let cameraFrames = 0;
+  let face = 'not tracking';
+  let modelState: 'not loaded' | 'loading' | 'ready' | 'failed' = 'not loaded';
+  let message: string | null = null;
+
+  // Event stream (A5). Set when the face model failed, so "stopped" is reported as the reason.
+  let modelFailure: 'unsupported' | 'error' | null = null;
+  let hub = createHub(settings.value.sensing.expressionFeatures);
   let pipeline = createPipeline(settings.value.sensing.expressionFeatures);
+  wellbeing.onUserBreak = () => {
+    hub.markBreak();
+  };
+
+  /** The expression flag is fixed per hub (FR3 ablation), so a change makes a new one. */
+  function createHub(useExpressionFeatures: boolean): LoadStateHub {
+    const h = new LoadStateHub({
+      useExpressionFeatures,
+      meta: () =>
+        modelState === 'ready' && provider.backend
+          ? { fps: tracker.running ? tracker.stats.fps : 0, backend: provider.backend }
+          : null,
+    });
+    h.on('state', (e) => {
+      loadCard.update(e);
+    });
+    h.on('error', (e) => {
+      console.error(e);
+    });
+    loadCard.update(h.latest);
+    return h;
+  }
+
+  function syncHub(): void {
+    const source: SourceStatus =
+      camera.status === 'stopped' && modelFailure
+        ? modelFailure
+        : sourceForCamera(camera.status, tracker.running);
+    hub.setSource(source);
+  }
 
   function createAttention(s: DemoSettings): AttentionMonitor {
     return new AttentionMonitor({
@@ -374,11 +422,13 @@ function mount(root: HTMLElement): void {
       );
       attention.update({ tMs: f.tMs, faceFound: f.signals !== null, eyesClosed: f.eyesClosed });
       renderAlarm();
+      hub.updatePipeline(p.state);
     });
     p.onSecond((s) => {
       signals.pushSecond(s);
       wellbeing.pushSecond(s);
       signals.setState(p.state);
+      hub.pushSecond(s, p.state, p.window.classifiable ? p.window.toModelInput() : null);
     });
     return p;
   }
@@ -402,6 +452,13 @@ function mount(root: HTMLElement): void {
   /** Starts a fresh baseline: after a feature-definition change, or on request. */
   function recalibrate(useExpressionFeatures: boolean): void {
     pipeline = createPipeline(useExpressionFeatures);
+    if (useExpressionFeatures === hub.useExpressionFeatures) {
+      hub.reset();
+    } else {
+      hub.close();
+      hub = createHub(useExpressionFeatures);
+      syncHub();
+    }
     signals.reset();
     if (camera.status === 'active' || camera.status === 'paused') signals.setState(pipeline.state);
   }
@@ -448,6 +505,7 @@ function mount(root: HTMLElement): void {
         break;
       case 'break-taken':
         wellbeing.markBreak();
+        hub.markBreak();
         break;
     }
     publishStatus();
@@ -480,11 +538,6 @@ function mount(root: HTMLElement): void {
     control.post({ type: 'status', status });
   }
 
-  let cameraFrames = 0;
-  let face = 'not tracking';
-  let modelState: 'not loaded' | 'loading' | 'ready' | 'failed' = 'not loaded';
-  let message: string | null = null;
-
   camera.onFrame(() => {
     cameraFrames += 1;
   });
@@ -512,6 +565,7 @@ function mount(root: HTMLElement): void {
       face = 'not tracking';
       // Sensing ended: the next session gets a fresh baseline.
       pipeline.reset();
+      hub.reset();
       signals.reset();
       wellbeing.reset();
     }
@@ -520,6 +574,7 @@ function mount(root: HTMLElement): void {
     renderAlarm();
     if (next === 'active' && !pipeline.baseline.ready) signals.setState(pipeline.state);
     if (error) console.info(`Camera ${error.status}: ${error.name} — ${error.message}`);
+    syncHub();
     render();
     publishStatus();
   });
@@ -543,6 +598,8 @@ function mount(root: HTMLElement): void {
     tracker.stop();
     camera.stop();
     message = null;
+    modelFailure = null;
+    syncHub();
     render();
   }
 
@@ -578,6 +635,7 @@ function mount(root: HTMLElement): void {
 
   async function enable(): Promise<void> {
     message = null;
+    modelFailure = null;
     const result = await camera.start();
     if (result !== 'active' && result !== 'paused') return;
 
@@ -589,6 +647,7 @@ function mount(root: HTMLElement): void {
         modelState = 'ready';
       } catch (error) {
         modelState = 'failed';
+        modelFailure = error instanceof UnsupportedBackendError ? 'unsupported' : 'error';
         camera.stop();
         message =
           error instanceof UnsupportedBackendError
@@ -601,6 +660,7 @@ function mount(root: HTMLElement): void {
     }
     // The user may have turned sensing off while the model was loading.
     if (camera.status === 'active' || camera.status === 'paused') tracker.start();
+    syncHub();
     render();
   }
 

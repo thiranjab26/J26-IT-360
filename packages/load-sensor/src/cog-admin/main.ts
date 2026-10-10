@@ -24,6 +24,7 @@ import {
   type DemoSettings,
   type SensorStatus,
 } from '../demo/settings.js';
+import { subscribe, type LoadStateEvent } from '../signals.js';
 
 // Static inline icons (24Ã—24, stroke = currentColor). No icon font or CDN (invariant 3).
 const ICONS = {
@@ -276,24 +277,35 @@ function buildOverview(send: (c: ControlCommand) => void): {
   );
   calib.append(calibTop, track, calibHint);
 
-  // Load state: the classifier ships with phase B, so no fake output here.
+  // Load state, read from the public event stream like any consumer (signals.ts).
+  // Until the 1D-CNN + GRU ships it comes from the heuristic-0 placeholder rule,
+  // and the badge says so.
   const load = el('div', 'admin-load');
   const loadHead = el('div', 'admin-load-head');
-  loadHead.append(
-    el('span', 'admin-calib-label', 'Cognitive load'),
-    el('span', 'admin-badge', 'Model pending'),
-  );
+  const loadBadge = el('span', 'admin-badge', 'no events');
+  loadBadge.dataset.testid = 'admin-load-model';
+  loadHead.append(el('span', 'admin-calib-label', 'Cognitive load'), loadBadge);
   const levels = el('div', 'admin-levels');
-  for (const l of ['Low', 'Medium', 'High']) levels.append(el('span', 'admin-level', l));
-  load.append(
-    loadHead,
-    levels,
-    el(
-      'p',
-      'admin-hint',
-      'The 1D-CNN + GRU classifier is not trained yet. Load state and confidence appear here once it ships; the event stream reports load_state: null until then.',
-    ),
-  );
+  const levelEls = new Map<string, HTMLElement>();
+  for (const l of ['Low', 'Medium', 'High']) {
+    const node = el('span', 'admin-level', l);
+    levelEls.set(l, node);
+    levels.append(node);
+  }
+  const loadHint = el('p', 'admin-hint', '');
+  loadHint.dataset.testid = 'admin-load-hint';
+  load.append(loadHead, levels, loadHint);
+  const renderLoad = (e: LoadStateEvent): void => {
+    for (const [level, node] of levelEls) node.dataset.on = String(e.load_state === level);
+    setText(loadBadge, e.meta?.model_version ?? e.status);
+    setText(
+      loadHint,
+      e.load_state
+        ? `Confidence ${(e.confidence ?? 0).toFixed(2)} · engagement ${String(e.engagement)} · fatigue ${String(e.fatigue)}. heuristic-0 is a placeholder rule, not the trained model.`
+        : `load_state: null (status ${e.status}). Consumers fall back to their default behaviour.`,
+    );
+  };
+  subscribe(renderLoad);
 
   const panel = el('div', 'admin-overview');
   panel.append(calib, load);

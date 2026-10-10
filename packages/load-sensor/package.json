@@ -4,6 +4,10 @@
   "private": true,
   "description": "C02 cognitive load detection: privacy-first, in-browser webcam load sensor for AdaptLearn.",
   "type": "module",
+  "exports": {
+    ".": "./src/core/index.ts",
+    "./signals": "./src/signals.ts"
+  },
   "engines": {
     "node": "^22.13.0 || >=24.0.0"
   },

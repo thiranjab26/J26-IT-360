@@ -123,9 +123,12 @@ describe('privacy lint is wired into the real config', () => {
   });
 });
 
-describe('no third-party hosts in the HTML entry point', () => {
-  it('index.html references same-origin assets only', () => {
-    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
-    for (const host of BANNED_HOSTS) expect(html).not.toContain(host);
-  });
+describe('no third-party hosts in the HTML entry points', () => {
+  it.each(['index.html', 'cog-admin.html', 'consumer.html'])(
+    '%s references same-origin assets only',
+    (page) => {
+      const html = readFileSync(new URL(`../../${page}`, import.meta.url), 'utf8');
+      for (const host of BANNED_HOSTS) expect(html).not.toContain(host);
+    },
+  );
 });

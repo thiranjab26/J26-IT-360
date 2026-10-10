@@ -18,6 +18,10 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
     page,
     baseURL,
   }) => {
+    // A long walk-through (model load, ≥ 5 s alarm, 5 s network idle) whose own
+    // waits allow up to 60 s: the 30 s default only fit an idle machine (~25 s
+    // alone) and timed out with the other TF.js pages running in parallel.
+    test.setTimeout(90_000);
     const requests: Request[] = [];
     page.on('request', (r) => requests.push(r));
 

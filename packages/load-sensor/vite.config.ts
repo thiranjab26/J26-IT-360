@@ -6,8 +6,9 @@ const mediapipeRuntimeStub = fileURLToPath(
 );
 
 // Serves the demo / debug page (index.html → src/demo). Port 5174 so it can run
-// next to the main frontend on 5173. The library build for consumers is added
-// with the public API (TODO A5).
+// next to the main frontend on 5173. Teammates consume the library as source
+// through the workspace package's `exports` (package.json), so there is no
+// separate library build.
 export default defineConfig({
   resolve: {
     // Adapter A uses runtime 'tfjs' only. The MediaPipe-runtime packages that
@@ -30,10 +31,12 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: true,
     rollupOptions: {
-      // Two pages: the sensor demo and its cog-admin settings panel.
+      // Three pages: the sensor demo, its cog-admin settings panel, and the
+      // mock consumer that shows the event stream as teammates receive it (A5).
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         'cog-admin': fileURLToPath(new URL('./cog-admin.html', import.meta.url)),
+        consumer: fileURLToPath(new URL('./consumer.html', import.meta.url)),
       },
     },
   },

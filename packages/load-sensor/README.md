@@ -4,6 +4,8 @@ Privacy-first, in-browser cognitive load sensor for AdaptLearn. Webcam frames ar
 
 Design and plan: [ARCHITECTURE](../../docs/c2/ARCHITECTURE.md) · [TODO](../../docs/c2/TODO.md) · [SKILLS](../../docs/c2/SKILLS.md)
 
+**Consuming the signal (C01, C03, C04):** read [INTEGRATION.md](INTEGRATION.md) and import `@adaptlearn/load-sensor/signals`.
+
 ## Run it
 
 From the repository root, once:
@@ -21,7 +23,7 @@ pnpm fetch-models            # add --verify to check without network, --update-l
 Then, inside `packages/load-sensor/`:
 
 ```bash
-pnpm dev          # demo / debug page on http://localhost:5174 (camera needs localhost or https)
+pnpm dev          # demo on http://localhost:5174; also /consumer.html (mock consumer) and /cog-admin.html
 pnpm build        # production build of the demo page
 pnpm preview      # serve the production build on http://localhost:4174
 pnpm typecheck    # tsc for browser code and for node-side code
@@ -36,9 +38,12 @@ pnpm bench        # latency and memory benchmark (TODO A7; exits 1 until then)
 
 ```
 src/core/      the library (framework-agnostic; the deliverable)
-  camera/ landmarks/ features/ window/ classifier/ events/ recorder/
-  index.ts     public API, the only module other components import
+  camera/ landmarks/ features/ window/ classifier/ heuristics/ events/ recorder/
+  sensor.ts    createLoadSensor(): camera → landmarks → features → LoadStateHub
+  index.ts     public API for the page that owns the camera
+src/signals.ts the integration file for consumers (receive-only; INTEGRATION.md)
 src/demo/      debug overlay, consent screen, study runner
+src/consumer/  mock consumer page (consumer.html): prints the event stream
 public/models/ self-hosted model files (downloaded by fetch-models, not committed)
 tests/         unit/ (vitest), e2e/ (playwright), fixtures/ (landmark arrays, never images)
 ```

@@ -193,34 +193,45 @@ interface LoadStateEvent {
   // additive:
   schema_version: 1;
   status: 'disabled' | 'permission_denied' | 'unsupported' | 'calibrating'
-        | 'active' | 'no_face' | 'paused';
+        | 'active' | 'no_face' | 'paused'
+        // proposed 2026-10-10 (C2 owner), pending C01/C03/C04 agreement:
+        | 'starting' | 'no_camera' | 'camera_in_use' | 'error';
   meta?: { fps: number; backend: string; model_version: string };
+  // + the wellbeing fields of §8a
 }
 ```
+
+Implemented in `src/core/events/types.ts` with a runtime validator (`validate.ts`) used on both sides of the channel. Rules the validator enforces: `confidence` is `null` exactly when `load_state` is; estimates are `null` unless `status` is `active`; `presence` / `strain` are `null` unless the camera is delivering frames (`calibrating`, `active`, `no_face`); unknown fields are allowed (additive evolution) but must be primitives, so no array or object can carry landmarks or pixels (FR7). The camera's own failure statuses map one-to-one onto the proposed values (decided 2026-10-10); consumers must treat an unknown status like `disabled`.
+
+Status from the pipeline while frames flow: `no_face` when presence is `absent` (no face > 2 s); otherwise `calibrating` while the baseline is collected **or the 30 s window is not classifiable** (still filling, or refilling after a gap), since the face is visible; `active` once a smoothed estimate exists. (§5.5 said "not classifiable → `no_face`"; with the face in view that would mislead consumers.)
 
 Points to settle with teammates:
 
 - The proposal's example timestamp has no timezone. Use UTC with `Z` so server-side consumers don't guess.
 - Consumers **must** handle `load_state: null`. In the requirements survey, 45.8 % of students said they were not comfortable with webcam sensing even when processed in-browser, so "sensing off" will be a common state, not an edge case. Each component needs a sensible default behaviour without the signal.
-- Emit on state change **and** as a heartbeat every 5 s **(tune)**, so consumers can tell "unchanged" from "dead".
+- Emit on state change **and** as a heartbeat every 5 s **(tune)**, so consumers can tell "unchanged" from "dead". "Change" means any field other than `timestamp`, `meta` and `confidence`; confidence rides along with heartbeats so it cannot turn every second into an event. The heartbeat is re-armed on every emission, so the gap never exceeds 5 s. Consumers treat 12 s without an event (two missed heartbeats + 2 s) as "no sensor".
 
 ### Delivery
 
 ```ts
-const sensor = await createLoadSensor({ modelBaseUrl: '/models' });
-sensor.on('state', (e: LoadStateEvent) => { /* ... */ });
+const sensor = createLoadSensor({ modelBaseUrl: '/models/' }); // opens nothing, loads nothing
+sensor.on('state', (e: LoadStateEvent) => { /* every event */ });
+sensor.on('change', (e: LoadStateEvent) => { /* real changes only */ });
 await sensor.enable();     // prompts for camera; call only after the user opts in
 sensor.pause(); sensor.resume(); sensor.disable();
 sensor.getState();         // last event, synchronously
+sensor.markBreak(); sensor.recalibrate(); sensor.destroy();
 ```
 
+`createLoadSensor()` is synchronous: there is nothing to load before the user opts in, and TF.js and the models are fetched (same-origin) only on the first `enable()`. Composition: `Camera → LandmarkTracker → FeaturePipeline → LoadStateHub` (`src/core/events/hub.ts`: classifier, smoothing, heuristics, change/heartbeat, channel). The demo page wires the same parts itself because its overlay and charts need landmarks, but publishes through the same hub and status mapping (`sourceForCamera`).
+
 - In-page: typed emitter (above).
-- Cross-tab / iframe: `BroadcastChannel('adaptlearn.load-state')`.
+- Cross-tab / iframe: `BroadcastChannel('adaptlearn.load-state')`. The channel also carries one consumer→sensor message, `{ type: 'adaptlearn.load-state.request' }`, answered with the latest event so a newly opened consumer need not wait for a heartbeat.
 - To a backend: **not done by the core.** If a teammate's server needs the signal, their integration code forwards the JSON event. Only the event object crosses the network — it contains no image or landmark data. Keep that boundary visible so the privacy claim stays easy to audit.
 
 ### 8a. Wellbeing signals (proposed, additive)
 
-Requested by the C2 owner on 2026-10-07 so that C01/C03/C04 can adapt when a learner is away, drowsy, upset or worn out after a long day. All are **documented heuristics**, not model outputs, and need agreement from the consumers before anyone relies on them (invariant 5). Every one is `null` when sensing is off or unreliable.
+Requested by the C2 owner on 2026-10-07 so that C01/C03/C04 can adapt when a learner is away, drowsy, upset or worn out after a long day. All are **documented heuristics**, not model outputs, and need agreement from the consumers before anyone relies on them (invariant 5). Every one is `null` when sensing is off or unreliable. Implemented in `src/core/heuristics/` with every threshold in `HEURISTIC_CONFIG` (commented, **(tune)**); `fatigue`, `affect` and `engagement` pass through the same hysteresis as load so they cannot flap.
 
 ```ts
 // additive, proposed:
@@ -243,11 +254,11 @@ Evaluation: the pilot NASA-TLX (B1) has Effort and Frustration subscales; add on
 
 ### Single integration file
 
-Teammates import one module, `packages/load-sensor/src/signals.ts`, which re-exports the event type, `subscribe`, per-signal helpers (`onLoadChange`, `onPresenceChange`, `onFatigueChange`, `onAffectChange`, `onStrainChange`), `getLatestSignal()` and the `BroadcastChannel` name. `INTEGRATION.md` documents every field. Server-side consumers, if any, get the same JSON from `backend/services/load-service/`; only the event crosses the network.
+Teammates import one module, `packages/load-sensor/src/signals.ts` (package export `@adaptlearn/load-sensor/signals`), which re-exports the event type, `subscribe`, per-signal helpers (`onLoadChange`, `onPresenceChange`, `onFatigueChange`, `onAffectChange`, `onStrainChange`), `getLatestSignal()` and the `BroadcastChannel` name. It is receive-only and contains no camera, model or network code. [`INTEGRATION.md`](../../packages/load-sensor/INTEGRATION.md) documents every field. Server-side consumers, if any, get the same JSON from `backend/services/load-service/`; only the event crosses the network. (Not built yet: waiting for the A0 answer on where each component runs.)
 
 ### Camera policy
 
-The owner wants studying to require the camera. That conflicts with invariant 4 and needs supervisor and ethics approval first (TODO A0). Until then `createLoadSensor({ cameraPolicy })` defaults to `'optional'`; `'required'` is implemented but not enabled.
+The owner wants studying to require the camera. That conflicts with invariant 4 and needs supervisor and ethics approval first (TODO A0). Until then `createLoadSensor({ cameraPolicy })` defaults to `'optional'`; `'required'` is implemented but not enabled: passing it throws `CameraPolicyNotApprovedError` while `REQUIRED_CAMERA_POLICY_APPROVED` (`src/core/sensor.ts`) is `false`. Under `'required'`, `sensor.studyGate` is `'needs_camera'` unless frames are flowing (a hidden-tab pause still counts as open; a user pause does not). The off switch and the camera indicator stay in both modes.
 
 ## 9. Privacy architecture (FR7, NFR2)
 

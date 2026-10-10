@@ -7,6 +7,13 @@ const isCI = Boolean(process.env.CI);
 // what ships and what the privacy and offline evidence must describe.
 export default defineConfig({
   testDir: 'tests/e2e',
+  // One worker. Each test runs TF.js with a live fake camera; with several in
+  // parallel (default 8 workers here), Chromium intermittently reports a page as
+  // `hidden`, the camera then pauses for "tab hidden" by design (A2) and timers
+  // throttle, so pause/resume, heartbeat and presence checks failed at random
+  // (seen 2026-10-10, already on the pre-A5 suite). Serial: 27/27 over 3 repeats.
+  // Latency evidence (A7) must run alone anyway.
+  workers: 1,
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,

@@ -24,6 +24,7 @@ Preparation material for every item below (question lists, request text, checkli
 - [ ] 🧑 Identify the weakest laptop available for benchmarking and note its spec.
 - [ ] 🧑 **Camera-required policy (decided by owner 2026-10-07, needs approval):** you want study pages to require the camera. This breaks invariant 4 ("opt-in, off by default, AdaptLearn works with it off"), contradicts the survey finding (45.8 % not comfortable) and changes what the ethics application must say. Get written OK from the supervisor and the ethics reviewer, then update CLAUDE.md invariant 4. Until then the code ships `cameraPolicy: 'optional'` (A5) and `'required'` stays off.
 - [ ] 🧑 Share the proposed wellbeing fields (`presence`, `fatigue`, `affect`, `strain`; ARCHITECTURE.md §8a) with C01/C03/C04 and agree names and meanings (invariant 5).
+  - Also share the four proposed `status` values added in A5 (`starting`, `no_camera`, `camera_in_use`, `error`) and the rule "unknown status = treat as `disabled`". Send them `packages/load-sensor/INTEGRATION.md`; it is written for them.
 
 ### A1. Scaffold
 
@@ -45,7 +46,7 @@ Preparation material for every item below (question lists, request text, checkli
 - [x] `camera/`: `getUserMedia` 640×480, frame loop on `requestVideoFrameCallback` with rAF fallback
   - `Camera` class (`src/core/camera/camera.ts`). Constraints are all `ideal` (never `exact`) so any webcam is accepted (NFR4); no audio. Frame time is rVFC `metadata.mediaTime`, or `video.currentTime` under rAF (duplicate display refreshes skipped); non-increasing timestamps are dropped. Video element is injectable so the demo shows the preview; the camera never reads pixels.
 - [x] Handle permission denied, no camera, camera in use → distinct `status` values
-  - `CameraStatus`: `permission_denied`, `no_camera`, `camera_in_use`, `unsupported` (no https / no mediaDevices), `error`, plus `idle/starting/active/paused/stopped`. `start()` resolves with the status, never rejects. A track ending on its own (unplugged, revoked) → `no_camera`. **Open for A5:** `LoadStateEvent.status` (ARCHITECTURE.md §8) only has `permission_denied`/`unsupported`; either map `no_camera`/`camera_in_use` onto those or agree new values with C01/C03/C04 (invariant 5 — needs your decision).
+  - `CameraStatus`: `permission_denied`, `no_camera`, `camera_in_use`, `unsupported` (no https / no mediaDevices), `error`, plus `idle/starting/active/paused/stopped`. `start()` resolves with the status, never rejects. A track ending on its own (unplugged, revoked) → `no_camera`. **Resolved in A5 (owner, 2026-10-10):** `no_camera`, `camera_in_use`, `error` and `starting` were added to `LoadStateEvent.status` as proposed values, pending agreement (A0).
 - [x] `visibilitychange` → pause / resume
   - Pause reasons are a set (`user`, `hidden`): returning to the tab does not undo a user's own pause. Starts paused if the tab is hidden when permission arrives.
 - [x] `disable()` stops all tracks (camera LED off) — verify by hand
@@ -110,18 +111,35 @@ Preparation material for every item below (question lists, request text, checkli
 
 ### A5. Events and public API [FR5, FR6, NFR8]
 
-- [ ] `LoadStateEvent` type + runtime validator
-- [ ] `createLoadSensor()` with `enable / pause / resume / disable / on / getState`
-- [ ] Heartbeat every 5 s + emit on change
-- [ ] `BroadcastChannel` publisher
-- [ ] Placeholder classifier: a transparent rule (e.g. weighted z-scores) clearly labelled `model_version: "heuristic-0"` so nobody mistakes it for the trained model
-- [ ] Heuristic `engagement` and `frustration`
-- [ ] Heuristic wellbeing fields (§8a), each clearly labelled heuristic: `presence`, `fatigue` (Low/Medium/High), `affect` (coarse mood from expression proxies, switchable with `useExpressionFeatures` for the FR3 ablation), `strain` (accumulated load over the day: time on task, time at High load, fatigue trend, minutes since last break) + `suggest_break` boolean. Day totals are derived numbers kept on the device only.
-- [ ] `cameraPolicy: 'optional' | 'required'` option; default `'optional'`. `'required'` only after the A0 approval item is ticked.
-- [ ] **Single integration file** `packages/load-sensor/src/signals.ts`: the one module teammates import. Exports the event types, `subscribe(callback)`, one helper per signal (`onLoadChange`, `onPresenceChange`, `onFatigueChange`, `onAffectChange`, `onStrainChange`), `getLatestSignal()`, and the `BroadcastChannel` name for other tabs/iframes. Documented field by field in `INTEGRATION.md`. HTTP endpoints in `backend/services/load-service/` only if a teammate's component runs on a server (A0 question).
-- [ ] EMA smoothing + hysteresis, unit-tested for no flapping on noisy input
-- [ ] `INTEGRATION.md` for teammates: install, 10-line example, field meanings, what `null` means
-- [ ] Tiny mock consumer page that subscribes and prints events (give this to teammates)
+- [x] `LoadStateEvent` type + runtime validator
+  - `src/core/events/types.ts` + `validate.ts` (hand-written, no schema library). Besides types it enforces `confidence` null ⇔ `load_state` null, estimates null unless `active`, presence/strain null unless frames flow, and unknown fields only as primitives, so an array (landmarks) or object can never ride inside an event (FR7). The hub validates every event before it leaves; a failing one is reported on `error` and not published. Consumers validate again, since any same-origin script can post on the channel.
+  - **Status values (owner decision 2026-10-10):** added `starting`, `no_camera`, `camera_in_use`, `error` as _proposed_; consumers treat unknown statuses like `disabled` (invariant 5, A0).
+- [x] `createLoadSensor()` with `enable / pause / resume / disable / on / getState`
+  - `src/core/sensor.ts`; also `markBreak`, `recalibrate`, `destroy`, `studyGate`. **Synchronous**, not `await createLoadSensor()` as §8 sketched: nothing may load before opt-in. `enable()` never rejects; disable during model load wins (generation counter); `pagehide` disables. `on()` events: `state` (every event), `change` (real changes), `error`. Tested end to end in Node with the fake camera + synthetic face: reaches `active` after the 60 s baseline + 30 s window (`tests/unit/sensor.test.ts`).
+  - **Changed from §5.5:** a non-classifiable window with the face _visible_ (filling, or refilling after a gap) reports `calibrating`, not `no_face`; `no_face` only when presence is `absent`. §8 updated.
+- [x] Heartbeat every 5 s + emit on change
+  - "Change" = any field except `timestamp`, `meta`, `confidence`; otherwise every second would be an event. The heartbeat is re-armed on each emission, so the gap never exceeds 5 s (tested over a simulated 30 min). Consumers call a signal stale after 12 s (2 missed heartbeats + 2 s).
+- [x] `BroadcastChannel` publisher
+  - `adaptlearn.load-state`. Also answers `{ type: 'adaptlearn.load-state.request' }` with the latest event, so a new consumer need not wait for a heartbeat. Works without BroadcastChannel (in-page listeners only). Unit tests structured-clone every message as the browser does.
+- [x] Placeholder classifier: a transparent rule (e.g. weighted z-scores) clearly labelled `model_version: "heuristic-0"` so nobody mistakes it for the trained model
+  - `src/core/classifier/heuristic.ts`: weighted mean of baseline z-scores (blink count −1, inner-brow gap −1, lip thickness −0.5; only the signs are motivated) → ordinal logistic → 3 probabilities. Lip weight dropped when `useExpressionFeatures` is false. The `LoadClassifier` interface is synchronous so the TF.js model (`predict` + `dataSync`) drops in. The demo badge and the cog-admin card show `heuristic-0`.
+- [x] Heuristic `engagement` and `frustration`
+  - `src/core/heuristics/estimators.ts`; thresholds in `heuristics/config.ts` (all **(tune)**, unvalidated). Engagement = face-present × (½ on-screen + ½ gaze-centred) over 30 s; frustration = published High ≥ 15 s and brow furrow or lip press ≥ 1 z.
+- [x] Heuristic wellbeing fields (§8a), each clearly labelled heuristic: `presence`, `fatigue` (Low/Medium/High), `affect` (coarse mood from expression proxies, switchable with `useExpressionFeatures` for the FR3 ablation), `strain` (accumulated load over the day: time on task, time at High load, fatigue trend, minutes since last break) + `suggest_break` boolean. Day totals are derived numbers kept on the device only.
+  - Fatigue: points from the PERCLOS proxy (≥ 0.08 / ≥ 0.15), long closures, yawns, nods. Affect is `null` when expression features are off. Strain: points from time on task, time at High, time since break, fatigue High; `suggest_break` = strain High or fatigue High for 2 min. Fatigue, affect and engagement go through the same hysteresis as load.
+  - **Owner decision 2026-10-10:** strain totals live in `localStorage` (`adaptlearn.c2.strain.v1`), today only: six numbers and a date, overwritten by the next day, memory-only when storage is blocked. 5 min without a face (or with sensing off) = a break. The demo's own 2-min "away = break" timer does not feed strain; only "I took a break", a finished break game and the admin command do.
+- [x] `cameraPolicy: 'optional' | 'required'` option; default `'optional'`. `'required'` only after the A0 approval item is ticked.
+  - `'required'` throws `CameraPolicyNotApprovedError` while `REQUIRED_CAMERA_POLICY_APPROVED` is `false`; flip it after the A0 approval and the CLAUDE.md invariant 4 update. Its runtime meaning (`studyGate`) is implemented and documented.
+- [x] **Single integration file** `packages/load-sensor/src/signals.ts`: the one module teammates import. Exports the event types, `subscribe(callback)`, one helper per signal (`onLoadChange`, `onPresenceChange`, `onFatigueChange`, `onAffectChange`, `onStrainChange`), `getLatestSignal()`, and the `BroadcastChannel` name for other tabs/iframes. Documented field by field in `INTEGRATION.md`. HTTP endpoints in `backend/services/load-service/` only if a teammate's component runs on a server (A0 question).
+  - Package exports `@adaptlearn/load-sensor/signals` (receive-only: no camera, TF.js or network) and `@adaptlearn/load-sensor` (`createLoadSensor`). Opens its channel on first use, replays the latest event to late subscribers, and the helpers call back with `null` when the signal goes stale. **Not done:** `backend/services/load-service/` endpoints, waiting for the A0 answer on where components run.
+- [x] EMA smoothing + hysteresis, unit-tested for no flapping on noisy input
+  - `classifier/smoothing.ts`: α 0.3, switch after 2 consecutive leads (both **(tune)**). Test: 600 noisy inferences around Medium with > 100 raw arg-max changes give 0 published changes; a real step to High is followed within 2–5 s. `confidence` is the smoothed probability of the _published_ level (equal to §7's max probability except while hysteresis holds), so a consumer is never told "High, 0.6" when 0.6 is Medium's.
+- [x] `INTEGRATION.md` for teammates: install, 10-line example, field meanings, what `null` means
+  - `packages/load-sensor/INTEGRATION.md`, linked from the package README and §8.
+- [x] Tiny mock consumer page that subscribes and prints events (give this to teammates)
+  - `consumer.html` (`src/consumer/`), importing only `signals.ts`. The demo's Camera tab gains an **Event stream** card (live event, raw JSON, "Open mock consumer"); the cog-admin load card shows the live state instead of "Model pending". The demo composes the core parts itself (overlay and charts need landmarks) but publishes through the same `LoadStateHub` and `sourceForCamera` mapping as `createLoadSensor()`. e2e `tests/e2e/event-stream.spec.ts`: two tabs, fake camera → consumer sees disabled → … → `no_face`/`absent`, heartbeats arrive, `disabled` on off, zero cross-origin requests.
+  - **e2e now runs with `workers: 1`.** With 8 parallel workers, Chromium intermittently reported pages as `hidden`, so the camera paused by design and timers throttled. Pause/resume, cog-admin and heartbeat checks then failed at random; the cog-admin flake already happened on the pre-A5 suite. Serial: 27/27 over 3 repeats, about 1 min per run. The long camera walk-through also gets a 90 s budget (it took ~25 s of the 30 s default even alone).
+  - **Not yet verified by hand:** the fake camera has no face, so `active` with a real `load_state` has only been reached in unit tests (synthetic face). Check once with a real webcam: about 90 s after opting in, the demo card and `consumer.html` should show a load level and `heuristic-0`.
 
 ### A6. Consent and control UI [survey findings: 45.8 % not comfortable, 54.2 % want a toggle]
 
