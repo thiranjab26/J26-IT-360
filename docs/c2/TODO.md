@@ -48,8 +48,8 @@ Preparation material for every item below (question lists, request text, checkli
   - `CameraStatus`: `permission_denied`, `no_camera`, `camera_in_use`, `unsupported` (no https / no mediaDevices), `error`, plus `idle/starting/active/paused/stopped`. `start()` resolves with the status, never rejects. A track ending on its own (unplugged, revoked) → `no_camera`. **Open for A5:** `LoadStateEvent.status` (ARCHITECTURE.md §8) only has `permission_denied`/`unsupported`; either map `no_camera`/`camera_in_use` onto those or agree new values with C01/C03/C04 (invariant 5 — needs your decision).
 - [x] `visibilitychange` → pause / resume
   - Pause reasons are a set (`user`, `hidden`): returning to the tab does not undo a user's own pause. Starts paused if the tab is hidden when permission arrives.
-- [ ] `disable()` stops all tracks (camera LED off) — verify by hand
-  - Implemented as `Camera.stop()` (public `disable()` arrives with A5): stops every track, detaches the stream, removes listeners; also releases a stream granted after stop was pressed during the permission prompt. Unit-tested and e2e-checked (`live-tracks` = 0). **Still to do by hand:** watch the laptop LED go off on "Turn sensing off".
+- [x] `disable()` stops all tracks (camera LED off) — verify by hand
+  - Implemented as `Camera.stop()` (public `disable()` arrives with A5): stops every track, detaches the stream, removes listeners; also releases a stream granted after stop was pressed during the permission prompt. Unit-tested and e2e-checked (`live-tracks` = 0). Verified by hand 2026-10-10: laptop LED goes off on "Turn sensing off".
 - [x] Unit tests with a mocked `MediaStream`
   - `tests/unit/camera/*` with doubles in `tests/unit/helpers/fake-media.ts` (Node, no jsdom). e2e `tests/e2e/camera-landmarks.spec.ts` covers the real browser path with the fake camera, pause/resume, and permission denied.
 
@@ -65,13 +65,13 @@ Preparation material for every item below (question lists, request text, checkli
   - `FrameGate` (`camera/frame-gate.ts`) + `LandmarkTracker` (`landmarks/landmark-tracker.ts`). One inference in flight; rate cap on frame time with 20 % early tolerance so 30 fps camera jitter still gives 15 fps (not 10). Counts dropped-busy vs dropped-rate separately. Adaptive rate (15→12→10) is not wired yet: needs bench numbers (A7).
 - [x] Debug overlay: draw landmarks, show fps, backend, frame time p50/p95
   - `src/demo/debug-overlay.ts`: points only on a transparent canvas (no camera pixels on it), irises in a second colour, mirrored like the preview. Read-out: camera status, live tracks, frame clock, resolution, landmark fps, inference p50/p95 (NumPy-style percentile over the last 128 frames), skipped frames, face found, TF.js tensor count, errors. Frame time here = time inside `estimate()`; the §11 frame-latency definition is for the bench (A7).
-- [ ] Confirm with DevTools Network tab: no requests after initial load
-  - Automated equivalent passes: `tests/e2e/camera-landmarks.spec.ts` asserts every request is same-origin and that none happen during 5 s of sensing (Chromium, fake camera). **Still to do by hand:** open DevTools → Network on the real webcam and screenshot it for the evidence folder.
+- [x] Confirm with DevTools Network tab: no requests after initial load
+  - Automated equivalent passes: `tests/e2e/camera-landmarks.spec.ts` asserts every request is same-origin and that none happen during 5 s of sensing (Chromium, fake camera). Verified by hand 2026-10-10 (Chrome, real webcam): after the one-time lazy load of TF.js chunks + the two models (all same-origin, cache/304), Network stays empty for 60 s of sensing. Screenshot: `docs/evidence/network-idle.png`. Clear the log only after the face points appear, or the lazy load shows up.
 
 ### A4. Features [FR2, FR3, FR8]
 
-- [ ] Landmark index constants in one file, each verified on the debug overlay
-  - `src/core/features/landmark-indices.ts`. Every index is checked automatically against `MEDIAPIPE_FACE_MESH_KEYPOINTS_BY_CONTOUR` from face-landmarks-detection (`tests/unit/features/landmark-indices.test.ts`), which caught nothing but would catch a left/right swap. The demo's **Feature points** switch rings and numbers each one. **Still to do by hand:** turn it on with your real face and check each label sits where its comment says (≈1 min), then tick.
+- [x] Landmark index constants in one file, each verified on the debug overlay
+  - `src/core/features/landmark-indices.ts`. Every index is checked automatically against `MEDIAPIPE_FACE_MESH_KEYPOINTS_BY_CONTOUR` from face-landmarks-detection (`tests/unit/features/landmark-indices.test.ts`), which caught nothing but would catch a left/right swap. The demo's **Feature points** switch rings and numbers each one. Verified by hand 2026-10-10 on a real face (mirrored preview): every label sits where its comment says.
 - [x] `ear()`, inter-ocular normalisation
   - `features/eye.ts`. EAR uses 3D distances (2D would read a lowered head as closing eyes). IOD = distance between eye-corner midpoints (pupils move with gaze). Landmarks are rescaled by frame aspect so all axes share one unit (`geometry.ts`).
 - [x] Blink state machine using frame timestamps and a baseline-relative threshold
