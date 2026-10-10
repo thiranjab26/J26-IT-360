@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     # Check the current model names in Google AI Studio and change this if it has moved on.
     gemini_model: str = Field(default="gemini-2.5-flash", alias="TUTOR_GEMINI_MODEL")
 
+    # Optional second provider tried when the first fails: "ollama" or empty for none.
+    # Ollama on a CPU is slow, so it only helps if the timeout below is generous.
+    llm_fallback_provider: str = Field(default="", alias="TUTOR_LLM_FALLBACK_PROVIDER")
+    llm_timeout_seconds: float = Field(default=25.0, alias="TUTOR_LLM_TIMEOUT_SECONDS")
+
     ollama_base_url: str = Field(default="http://localhost:11434", alias="TUTOR_OLLAMA_BASE_URL")
     ollama_model: str = Field(default="qwen2.5-coder:7b", alias="TUTOR_OLLAMA_MODEL")
 

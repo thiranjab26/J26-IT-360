@@ -6,6 +6,8 @@ else's looks the same as asking for one that does not exist.
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -14,10 +16,12 @@ from app.core.deps import CurrentUser, current_user
 from app.core.errors import ApiError
 from app.db.session import get_session
 from app.gamification.rules import Policy
+from app.llm.providers import build_provider
 from app.models.sessions import AnswerIn, ProgressOut, SessionOut, StartIn
 from app.sessions.catalog import get_course
 from app.sessions.repository import SqlSessionRepository
 from app.sessions.service import SessionProblem, SessionService
+from app.sessions.writer import TutorWriter
 
 router = APIRouter(tags=["sessions"])
 
@@ -36,6 +40,12 @@ def student(caller: CurrentUser = Depends(current_user)) -> CurrentUser:
     return caller
 
 
+@lru_cache
+def get_writer() -> TutorWriter:
+    """One writer for the whole process, so a provider that is down stays skipped."""
+    return TutorWriter(build_provider(get_settings()))
+
+
 def get_service(db: Session = Depends(get_session)) -> SessionService:
     settings = get_settings()
     return SessionService(
@@ -43,6 +53,7 @@ def get_service(db: Session = Depends(get_session)) -> SessionService:
         get_course,
         policy=Policy(settings.session_policy),
         enforce_unlocks=settings.enforce_unlocks,
+        writer=get_writer(),
     )
 
 

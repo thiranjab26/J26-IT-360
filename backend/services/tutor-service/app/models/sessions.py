@@ -26,6 +26,7 @@ class QuestionOut(BaseModel):
     attempt: int
     max_attempts: int
     hint: str | None = None
+    hint_source: Literal["generated", "authored"] | None = None
 
 
 class FeedbackOut(BaseModel):
@@ -64,6 +65,10 @@ class SessionOut(BaseModel):
     xp_earned: int
     heading: str | None = None
     text: str | None = None  # the hook, an explanation part, or a re-teach passage
+    # "generated" when a model wrote `text` from the course passage, which is then given
+    # in `source_text` so the student can read the original. "authored" is the course text.
+    text_source: Literal["generated", "authored"] | None = None
+    source_text: str | None = None
     question: QuestionOut | None = None
     feedback: FeedbackOut | None = None
     summary: SummaryOut | None = None
@@ -89,6 +94,7 @@ class ConceptProgressOut(BaseModel):
     title: str
     unlocked: bool
     mastery: float | None
+    mastered: bool = False
     unmet: list[RequirementOut] = []
 
 

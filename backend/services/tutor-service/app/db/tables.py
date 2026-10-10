@@ -280,3 +280,31 @@ SELECT s.user_id,
  WHERE a.gating
    AND a.outcome IN ('correct', 'wrong')
 """
+
+# ---------------------------------------------------------------------------
+# tutor.session_texts: the explanation, hint or re-teach shown at one point of a session
+#
+# Written the first time a point is shown and read back after that, so a page refresh
+# shows the same words and a model is called once per point, not once per view. It is
+# also the record of exactly what the tutor said, which the faithfulness gate (P3)
+# will check. `source` is 'generated' (a model wrote it) or 'authored' (the course text,
+# used when no model was available or a call failed).
+# ---------------------------------------------------------------------------
+session_texts = Table(
+    "session_texts",
+    metadata,
+    Column(
+        "session_id",
+        UUID(as_uuid=True),
+        ForeignKey(f"{TUTOR_SCHEMA}.sessions.session_id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("key", Text, primary_key=True),
+    Column("text", Text, nullable=False),
+    Column("source", Text, nullable=False),
+    Column("provider", Text),
+    Column("model", Text),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint(_in("source", ("generated", "authored")), name="ck_session_texts_source"),
+    schema=TUTOR_SCHEMA,
+)

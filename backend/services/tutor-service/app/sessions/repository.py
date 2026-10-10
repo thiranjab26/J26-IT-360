@@ -12,11 +12,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from sqlalchemy import func, insert, select, update
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.db.tables import checkpoint_attempts, sessions
+from app.db.tables import checkpoint_attempts, session_texts, sessions
 from app.sessions.state_machine import ExitReason, Phase, SessionState, Step
 
 
@@ -41,6 +42,16 @@ class AttemptRecord:
     xp: int
     hints_used: int
     created_at: datetime
+
+
+@dataclass(frozen=True)
+class StoredText:
+    """What the tutor showed at one point of a session."""
+
+    text: str
+    source: str  # generated | authored
+    provider: str | None = None
+    model: str | None = None
 
 
 class SessionRepository(Protocol):
@@ -70,6 +81,12 @@ class SessionRepository(Protocol):
     def total_xp(self, user_id: str) -> int: ...
 
     def seen_questions(self, user_id: str, concept_id: str) -> set[str]: ...
+
+    def get_text(self, session_id: str, key: str) -> StoredText | None: ...
+
+    def put_text(self, session_id: str, key: str, text: StoredText) -> None:
+        """Keep the first text written for a point; a second write is ignored."""
+        ...
 
 
 # ---------------------------------------------------------------------------- SQL
@@ -165,6 +182,34 @@ class SqlSessionRepository:
             .where(sessions.c.user_id == uuid.UUID(user_id))
         ).scalar_one()
         return int(total)
+
+    def get_text(self, session_id: str, key: str) -> StoredText | None:
+        row = (
+            self.db.execute(
+                select(session_texts).where(
+                    session_texts.c.session_id == uuid.UUID(session_id), session_texts.c.key == key
+                )
+            )
+            .mappings()
+            .first()
+        )
+        if row is None:
+            return None
+        return StoredText(row["text"], row["source"], row["provider"], row["model"])
+
+    def put_text(self, session_id: str, key: str, text: StoredText) -> None:
+        self.db.execute(
+            insert(session_texts)
+            .values(
+                session_id=uuid.UUID(session_id),
+                key=key,
+                text=text.text,
+                source=text.source,
+                provider=text.provider,
+                model=text.model,
+            )
+            .on_conflict_do_nothing()
+        )
 
     def seen_questions(self, user_id: str, concept_id: str) -> set[str]:
         rows = self.db.execute(

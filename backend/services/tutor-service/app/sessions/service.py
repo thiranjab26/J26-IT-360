@@ -29,7 +29,14 @@ from datetime import UTC, datetime
 
 from app.domain.questions import AnswerKey, BankEntry, Question, shuffled
 from app.gamification.mastery import MIN_EVIDENCE, CheckpointResult, estimate
-from app.gamification.rules import Policy, UnlockRules, module_status, next_concept, unlock_status
+from app.gamification.rules import (
+    Policy,
+    UnlockRules,
+    is_mastered,
+    module_status,
+    next_concept,
+    unlock_status,
+)
 from app.gamification.xp import xp_for_checkpoint
 from app.grading.deterministic import grade
 from app.models.sessions import (
@@ -46,7 +53,7 @@ from app.models.sessions import (
 from app.retrieval.hybrid import BM25, tokens
 from app.sessions.catalog import Course, UnknownModule
 from app.sessions.plan import build_plan
-from app.sessions.repository import AttemptRecord, SessionRepository, StoredSession
+from app.sessions.repository import AttemptRecord, SessionRepository, StoredSession, StoredText
 from app.sessions.state_machine import (
     Answer,
     Continue,
@@ -62,6 +69,7 @@ from app.sessions.state_machine import (
     start,
     step,
 )
+from app.sessions.writer import EXPLAIN, HINT, RETEACH, TutorWriter, gives_away
 
 GENERIC_HINT = (
     "Look back at the explanation you just read, then trace the code one line at a time. "
@@ -123,6 +131,7 @@ class SessionService:
         enforce_unlocks: bool = True,
         rules: Rules | None = None,
         unlock_rules: UnlockRules | None = None,
+        writer: TutorWriter | None = None,
     ) -> None:
         self.repo = repo
         self._courses = courses
@@ -131,6 +140,7 @@ class SessionService:
         self.enforce_unlocks = enforce_unlocks
         self.rules = rules or Rules()
         self.unlock_rules = unlock_rules or UnlockRules()
+        self.writer = writer or TutorWriter(None)
 
     # ------------------------------------------------------------------ actions
     def start(self, user_id: str, concept_id: str) -> SessionOut:
@@ -301,6 +311,7 @@ class SessionService:
                     title=course.titles[s.concept_id],
                     unlocked=s.unlocked or not self.enforce_unlocks,
                     mastery=mastery[s.concept_id],
+                    mastered=is_mastered(mastery[s.concept_id], self.unlock_rules),
                     unmet=[
                         RequirementOut(
                             kind=r.kind,
@@ -468,10 +479,27 @@ class SessionService:
             out.text = course.objectives(state.concept_id) or course.titles[state.concept_id]
         elif phase is Phase.TEACH:
             out.heading = course.titles[state.concept_id]
-            out.text = course.chunk_text[step_.ref]
+            passage = course.chunk_text[step_.ref]
+            shown = self._words(
+                state, f"teach:{step_.ref}", EXPLAIN, course, passage=passage, fallback=passage
+            )
+            out.text, out.text_source = shown.text, shown.source
+            out.source_text = passage if shown.source == "generated" else None
         elif phase is Phase.CHECKPOINT:
             entry = course.bank[step_.ref]
-            question, _ = self._presented(state.session_id, entry)
+            question, key = self._presented(state.session_id, entry)
+            hint = None
+            if step_.gating and state.attempts >= 1:
+                hint = self._words(
+                    state,
+                    f"hint:{step_.ref}:{state.attempts}",
+                    HINT,
+                    course,
+                    passage=self._reteach_passage(course, state, step_.ref),
+                    fallback=GENERIC_HINT,
+                    question=question.stem,
+                    expected_output=key.expected_output,
+                )
             out.question = QuestionOut(
                 question_id=question.question_id,
                 kind=question.kind,
@@ -480,7 +508,8 @@ class SessionService:
                 gating=step_.gating,
                 attempt=state.attempts + 1 if step_.gating else 1,
                 max_attempts=state.rules.max_attempts,
-                hint=GENERIC_HINT if step_.gating and state.attempts >= 1 else None,
+                hint=hint.text if hint else None,
+                hint_source=hint.source if hint else None,
             )
             if last is not None and last.question_id == step_.ref and last.outcome == "unreadable":
                 out.feedback = self._feedback(last, state, course)
@@ -489,8 +518,46 @@ class SessionService:
                 out.feedback = self._feedback(last, state, course)
             if phase is Phase.RETEACH:
                 out.heading = "Let's look at that again"
-                out.text = self._reteach_passage(course, state, step_.ref)
+                passage = self._reteach_passage(course, state, step_.ref)
+                shown = self._words(
+                    state,
+                    f"reteach:{step_.ref}:{state.attempts}",
+                    RETEACH,
+                    course,
+                    passage=passage,
+                    fallback=passage,
+                    question=course.bank[step_.ref].question.stem,
+                )
+                out.text, out.text_source = shown.text, shown.source
+                out.source_text = passage if shown.source == "generated" else None
         return out
+
+    def _words(
+        self,
+        state: SessionState,
+        key: str,
+        kind: str,
+        course: Course,
+        *,
+        passage: str,
+        fallback: str,
+        question: str | None = None,
+        expected_output: str | None = None,
+    ) -> StoredText:
+        """What the tutor says at one point. Written once, then read back on every view."""
+        saved = self.repo.get_text(state.session_id, key)
+        if saved is not None:
+            return saved
+
+        made = self.writer.write(
+            kind, concept=course.titles[state.concept_id], passage=passage, question=question
+        )
+        if made is not None and not (kind == HINT and gives_away(made.text, expected_output)):
+            saved = StoredText(made.text, "generated", made.provider, made.model)
+        else:
+            saved = StoredText(fallback, "authored")
+        self.repo.put_text(state.session_id, key, saved)
+        return saved
 
     def _feedback(self, last: AttemptRecord, state: SessionState, course: Course) -> FeedbackOut:
         if last.outcome == "unreadable":

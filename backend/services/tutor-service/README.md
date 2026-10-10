@@ -135,11 +135,11 @@ It ends by showing what the session opens under each of the study's two conditio
 
 ## LLM providers
 
-`TUTOR_LLM_PROVIDER` selects `gemini` (cloud) or `ollama` (local fallback). Put your key in `TUTOR_GEMINI_API_KEY` in `.env`; it is held as a secret value, so it cannot appear in logs or in a printed settings object, and an empty value counts as not configured. Check `TUTOR_GEMINI_MODEL` against the models Google AI Studio currently offers. The Ollama fallback defaults to `qwen2.5-coder:7b`; on a CPU-only machine generation is slow (the 1.5B model measured 2.6 tokens per second), which matters for the offline-fallback claim. The provider layer that reads these settings is the next P2 piece.
+`TUTOR_LLM_PROVIDER` selects `gemini` (cloud) or `ollama` (local fallback). Put your key in `TUTOR_GEMINI_API_KEY` in `.env`; it is held as a secret value, so it cannot appear in logs or in a printed settings object, and an empty value counts as not configured. Check `TUTOR_GEMINI_MODEL` against the models Google AI Studio currently offers. The Ollama fallback defaults to `qwen2.5-coder:7b`; on a CPU-only machine generation is slow (the 1.5B model measured 2.6 tokens per second), which matters for the offline-fallback claim. The provider layer (`app/llm/providers.py`) reads these settings: Gemini first, optionally Ollama after it (`TUTOR_LLM_FALLBACK_PROVIDER=ollama`), each with a timeout (`TUTOR_LLM_TIMEOUT_SECONDS`), and a provider that just failed is skipped for a minute. `app/sessions/writer.py` uses it to write explanations, hints and re-teaches from one authored course passage; no prompt ever contains an answer key, and a hint that states the expected output is replaced by a generic one. If no key is set, or a call fails, the session shows the authored course text instead and never breaks. Whatever was shown at each point is saved in `tutor.session_texts` (so a refresh shows the same words, and the faithfulness gate in P3 has the exact text to check). Generated text is labelled in the API (`text_source: generated`) and in the interface until that gate exists.
 
 ## Schemas and migrations
 
-This service owns two schemas: `content` (indexed course material: `units`, `chunks`) and `tutor` (runtime data: `gate_events`, `sessions`, `checkpoint_attempts`, and the published view `v_attempt_outcomes`). Both are migrated from here, with the Alembic version table in `tutor`:
+This service owns two schemas: `content` (indexed course material: `units`, `chunks`) and `tutor` (runtime data: `gate_events`, `sessions`, `checkpoint_attempts`, `session_texts`, and the published view `v_attempt_outcomes`). Both are migrated from here, with the Alembic version table in `tutor`:
 
 ```bash
 uv run alembic upgrade head     # apply

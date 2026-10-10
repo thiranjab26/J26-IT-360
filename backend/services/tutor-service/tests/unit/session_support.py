@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from app.sessions.repository import AttemptRecord, StoredSession
+from app.sessions.repository import AttemptRecord, StoredSession, StoredText
 
 
 class InMemorySessionRepository:
     def __init__(self) -> None:
         self.sessions: dict[str, StoredSession] = {}
         self._attempts: list[AttemptRecord] = []
+        self.texts: dict[tuple[str, str], StoredText] = {}
 
     def get(self, session_id: str, *, lock: bool = False) -> StoredSession | None:
         return self.sessions.get(session_id)
@@ -55,6 +56,12 @@ class InMemorySessionRepository:
             and a.gating
             and a.outcome in ("correct", "wrong")
         ]
+
+    def get_text(self, session_id: str, key: str) -> StoredText | None:
+        return self.texts.get((session_id, key))
+
+    def put_text(self, session_id: str, key: str, text: StoredText) -> None:
+        self.texts.setdefault((session_id, key), text)
 
     def total_xp(self, user_id: str) -> int:
         return sum(
