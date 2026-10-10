@@ -163,7 +163,7 @@ def test_every_authored_answer_marks_itself_correct(bank) -> None:
             continue
         checked += 1
 
-    assert checked == 77
+    assert checked == 78
 
 
 def test_every_wrong_letter_marks_wrong_on_the_real_questions(bank) -> None:

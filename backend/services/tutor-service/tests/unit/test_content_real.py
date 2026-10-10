@@ -48,11 +48,26 @@ def test_the_content_passes_every_structural_check(units, chunks) -> None:
     errors = [i for i in issues if i.severity == "error"]
     assert errors == [], "\n".join(str(i) for i in errors)
 
-    # The one known warning: java_intro Q6 asks what a program prints "and why", so it
-    # has no expected-output block and needs a model to mark it. Pinned so that any NEW
-    # question that cannot be marked automatically is noticed rather than slipping in.
+    # No warnings: every level-2 question has an expected-output block, so it can be
+    # marked exactly. Pinned so that any NEW question that cannot be marked automatically
+    # is noticed rather than slipping in.
     warnings = [i.message.split(":")[0] for i in issues if i.severity == "warning"]
-    assert warnings == ["prog.java_intro#exercise-q06"]
+    assert warnings == []
+
+
+def test_every_concept_has_at_least_two_gating_questions(units, chunks) -> None:
+    """Mastery needs two gating results. A concept with one could never be mastered."""
+    from app.domain.questions import KIND_PREDICT, build_question_bank
+
+    bank = build_question_bank(all_chunks(chunks))
+    for unit in units:
+        if unit.concept_id:
+            gating = [
+                e
+                for e in bank.values()
+                if e.question.concept_id == unit.concept_id and e.question.kind == KIND_PREDICT
+            ]
+            assert len(gating) >= 2, unit.concept_id
 
 
 def test_every_question_has_a_solution_and_a_matching_rubric(chunks) -> None:

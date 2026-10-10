@@ -328,7 +328,7 @@ public class Main {
 }
 ```
 
-**Q6.** The following program is run with the input shown. What does it print, and why?
+**Q6.** The following program is run with the input shown. What does it print?
 
 ```java
 import java.util.Scanner;
@@ -416,7 +416,13 @@ E3
 
 `"D" + 1` is the string `"D1"`, then `+ 2` gives `"D12"`. In the last line the parentheses force `1 + 2` to be calculated first.
 
-**Q6.** It prints `[7][]`. `nextInt()` reads `7` but leaves the newline after it unread. `nextLine()` then reads that leftover newline and returns an empty string, so `word` is empty and `apple` is never read.
+**Q6.**
+
+```output
+[7][]
+```
+
+`nextInt()` reads `7` but leaves the newline after it unread. `nextLine()` then reads that leftover newline and returns an empty string, so `word` is empty and `apple` is never read.
 
 **Q7.** `javac` compiles source code into bytecode, not into instructions for a specific processor. Bytecode is executed by the JVM, and a JVM exists for each operating system. The same bytecode therefore runs on any system with a JVM.
 

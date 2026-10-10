@@ -272,8 +272,8 @@ def test_every_authored_question_becomes_a_bank_entry(bank) -> None:
     assert len(bank) == 143
     assert Counter(e.question.kind for e in bank.values()) == {
         KIND_MCQ: 52,
-        KIND_PREDICT: 25,
-        KIND_EXPLAIN: 27,
+        KIND_PREDICT: 26,
+        KIND_EXPLAIN: 26,
         KIND_CODE: 39,
     }
 
@@ -295,7 +295,7 @@ def test_every_free_form_question_has_what_a_grader_needs(bank) -> None:
     explain = [e for e in bank.values() if e.question.kind == KIND_EXPLAIN]
     code = [e for e in bank.values() if e.question.kind == KIND_CODE]
 
-    assert sum(bool(e.key.rubric) for e in explain) == 26  # the 27th is java_intro Q6
+    assert all(e.key.rubric for e in explain)
     assert all(e.key.reference_solution for e in code)
 
 
