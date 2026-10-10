@@ -25,7 +25,7 @@ module, one author. Results are about this content, not retrieval in general.
 
 Run from the repo root:
     uv run --project backend/services/tutor-service \\
-        python research/c3-veritutor/experiments/retrieval_eval.py
+        python "research/c3-RAG tutor/experiments/retrieval_eval.py"
 """
 
 # ruff: noqa: E501  (analysis script: long report strings are clearer unwrapped)
@@ -34,7 +34,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import re
 import subprocess
@@ -64,10 +63,12 @@ from app.content.embedder import SentenceTransformerEmbedder  # noqa: E402
 from app.content.indexer import embed_text, index_module, open_store, truncated_chunks  # noqa: E402
 from app.content.loader import load_content  # noqa: E402
 from app.retrieval.access import RetrievalMode, searchable_sections  # noqa: E402
+from app.retrieval.hybrid import BM25, tokens  # noqa: E402
 from app.retrieval.retriever import Retriever  # noqa: E402
 
 MODULE = "prog"
 K_MAX = 10
+K_FUSE = 60  # depth kept for the keyword baseline (the production retriever uses its own)
 PROSE_MIN_WORDS = 12
 KS = (1, 3, 5, 10)
 BOOTSTRAP = 4000
@@ -156,37 +157,6 @@ def build_queries(chunks) -> list[Query]:
     return queries
 
 
-# -------------------------------------------------------------------- BM25 baseline
-def tokens(text: str) -> list[str]:
-    return re.findall(r"[a-z0-9]+", text.lower())
-
-
-class BM25:
-    """Okapi BM25, written out so the baseline has no hidden tuning."""
-
-    def __init__(self, docs: list[list[str]], k1: float = 1.5, b: float = 0.75) -> None:
-        self.k1, self.b = k1, b
-        self.lengths = np.array([len(d) for d in docs], dtype=float)
-        self.avg = self.lengths.mean()
-        self.tf = [Counter(d) for d in docs]
-        df = Counter(t for d in docs for t in set(d))
-        n = len(docs)
-        self.idf = {t: math.log(1 + (n - c + 0.5) / (c + 0.5)) for t, c in df.items()}
-
-    def scores(self, query: list[str]) -> np.ndarray:
-        out = np.zeros(len(self.tf))
-        for term in set(query):
-            idf = self.idf.get(term)
-            if idf is None:
-                continue
-            for i, tf in enumerate(self.tf):
-                f = tf.get(term, 0)
-                if f:
-                    norm = self.k1 * (1 - self.b + self.b * self.lengths[i] / self.avg)
-                    out[i] += idf * f * (self.k1 + 1) / (f + norm)
-        return out
-
-
 # ------------------------------------------------------------------------- metrics
 def relevance_flags(ranked_concepts: list[str], relevant: set[str]) -> list[bool]:
     return [c in relevant for c in ranked_concepts]
@@ -256,7 +226,10 @@ def prose_only(queries: list[Query]) -> list[Query]:
     for q in queries:
         words = re.sub(r"\s+", " ", CODE_FENCE.sub(" ", q.text)).strip()
         if len(words.split()) >= PROSE_MIN_WORDS:
-            kept.append(Query(q.chunk_id, q.concept_id, q.level, words))
+            # A distinct ID: this is a different query text for the same question, and the
+            # rankings are stored by ID. Sharing the ID with the as-written question made
+            # the two sets overwrite each other.
+            kept.append(Query(f"{q.chunk_id}@prose", q.concept_id, q.level, words))
     return kept
 
 
@@ -302,6 +275,8 @@ def main() -> int:
         query_sets[f"student-style, hand written (n={len(student)})"] = student
 
     everything = {q.chunk_id: q for qs in query_sets.values() for q in qs}
+    # Rankings are keyed by this ID, so two different queries must never share one.
+    assert len(everything) == sum(len(qs) for qs in query_sets.values()), "query ids collide"
     print(
         f"{len(pool)} chunks in the tutoring pool (avg {len(pool) / len(concept_size):.0f} per "
         f"concept) | query sets: "
@@ -333,25 +308,30 @@ def main() -> int:
         ranked: dict[str, list[tuple[str, str, float]]] = {}
         top1: list[float] = []
         for q in practice:
-            found = retriever.search(q.text, mode=RetrievalMode.TUTORING, module_id=MODULE, k=K_MAX)
+            found = retriever.search(
+                q.text, mode=RetrievalMode.TUTORING, module_id=MODULE, k=K_FUSE, method="dense"
+            )
             ranked[q.chunk_id] = [(p.chunk_id, p.concept_id, p.distance) for p in found]
             top1.append(found[0].distance)
         for q in everything.values():
             if q.chunk_id not in ranked:
                 found = retriever.search(
-                    q.text, mode=RetrievalMode.TUTORING, module_id=MODULE, k=K_MAX
+                    q.text, mode=RetrievalMode.TUTORING, module_id=MODULE, k=K_FUSE, method="dense"
                 )
                 ranked[q.chunk_id] = [(p.chunk_id, p.concept_id, p.distance) for p in found]
 
         oos = {
             name: [
-                retriever.search(t, mode=RetrievalMode.TUTORING, module_id=MODULE, k=1)[0].distance
+                retriever.search(
+                    t, mode=RetrievalMode.TUTORING, module_id=MODULE, k=1, method="dense"
+                )[0].distance
                 for t in group
             ]
             for name, group in (("unrelated", UNRELATED), ("java_not_covered", JAVA_NOT_COVERED))
         }
         arms[label] = {
             "ranked": ranked,
+            "retriever": retriever,
             "truncated": len(cut),
             "pool": len(pool),
             "top1_in_scope": top1,
@@ -364,10 +344,31 @@ def main() -> int:
     bm25 = BM25([tokens(embed_text(c)) for c in pool])
     ranked = {}
     for q in everything.values():
-        order = np.argsort(-bm25.scores(tokens(q.text)), kind="stable")[:K_MAX]
+        order = bm25.rank(tokens(q.text), limit=K_FUSE)
         ranked[q.chunk_id] = [(pool[i].chunk_id, pool[i].concept_id, 0.0) for i in order]
     arms["BM25 keyword baseline"] = {"ranked": ranked, "truncated": 0, "pool": len(pool)}
-    print("  done: BM25 keyword baseline\n")
+
+    # ---- hybrids: the production retriever's default method, so what is measured here
+    # is exactly the code the service runs. Keyword matching wins when a question shares
+    # code and vocabulary with the content, embeddings win on natural phrasing, and
+    # fusing the two rankings by rank needs no tuning of scores against distances.
+    for dense in (
+        "bge-small-en-v1.5 (512-token window)",
+        "all-MiniLM-L6-v2 (256-token window, as shipped)",
+    ):
+        retriever = arms[dense]["retriever"]
+        hybrid_ranked = {}
+        for q in everything.values():
+            found = retriever.search(
+                q.text, mode=RetrievalMode.TUTORING, module_id=MODULE, k=K_MAX, method="hybrid"
+            )
+            hybrid_ranked[q.chunk_id] = [(p.chunk_id, p.concept_id, 0.0) for p in found]
+        arms[f"hybrid: {dense.split(' (')[0]} + BM25"] = {
+            "ranked": hybrid_ranked,
+            "truncated": arms[dense]["truncated"],
+            "pool": len(pool),
+        }
+    print("  done: BM25 keyword baseline and two hybrids (production retriever)\n")
 
     rng = np.random.default_rng(SEED)
     base_label = next(iter(arms))

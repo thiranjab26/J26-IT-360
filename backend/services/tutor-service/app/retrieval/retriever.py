@@ -5,22 +5,29 @@ works with the database unreachable and its latency is the vector search alone.
 
 Two ways in:
 
-    search(...)              similarity search, restricted to the mode's section types
-                             and always to one module (one collection per module).
+    search(...)              restricted to the mode's section types and always to one
+                             module (one collection per module). By default hybrid: the
+                             embedding ranking and a BM25 keyword ranking fused by rank,
+                             which measured never worse than either and significantly
+                             better than embeddings alone on questions that contain
+                             code. `method="dense"` is the embedding ranking alone.
     question_materials(...)  exact lookup of one authored question with its solution
                              and rubric, for grading. No similarity involved.
 
-Every result carries its distance so callers can apply their own cut-off. Cosine
-distance on normalised vectors: 0 is identical, around 0.2 is a close match, larger is
-weaker. The faithfulness gate later logs the IDs it was handed, which is why a Passage
-keeps its chunk_id.
+The keyword index is built only from the sections the mode may see, so keyword search
+cannot return anything the embedding search could not.
+
+A Passage carries its cosine distance when the embedding search found it (0 is
+identical, around 0.2 a close match, larger weaker), and None when only the keyword
+ranking did. Hybrid results are ordered by fused rank, not by distance. The faithfulness
+gate later logs the IDs it was handed, which is why a Passage keeps its chunk_id.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from chromadb.api import ClientAPI
 from chromadb.api.models.Collection import Collection
@@ -33,6 +40,13 @@ from app.retrieval.access import (
     RetrievalMode,
     searchable_sections,
 )
+from app.retrieval.hybrid import BM25, reciprocal_rank_fusion, tokens
+
+Method = Literal["hybrid", "dense"]
+
+# How deep each ranking goes before fusion. The whole tutoring pool is a few hundred
+# chunks, so this is generous; it is what the evaluation used.
+FUSION_DEPTH = 60
 
 
 class RetrievalError(Exception):
@@ -61,10 +75,21 @@ class QuestionMaterials:
     rubric: Passage | None
 
 
+@dataclass(frozen=True)
+class _KeywordPool:
+    """The chunks a mode may see in one module, indexed for keyword search."""
+
+    passages: list[Passage]
+    bm25: BM25
+
+
 class Retriever:
     def __init__(self, client: ClientAPI, embedder: Embedder) -> None:
         self._client = client
         self._embedder = embedder
+        # Keyed by module, allowed sections and collection size, so re-indexing in the
+        # same process builds a fresh pool instead of serving a stale one.
+        self._pools: dict[tuple[str, tuple[str, ...], int], _KeywordPool] = {}
 
     # ------------------------------------------------------------------ search
     def search(
@@ -77,8 +102,9 @@ class Retriever:
         sections: Sequence[str] | None = None,
         k: int = 5,
         max_distance: float | None = None,
+        method: Method = "hybrid",
     ) -> list[Passage]:
-        """The k closest passages to `query` that `mode` is allowed to see.
+        """The k best passages for `query` that `mode` is allowed to see.
 
         concept_ids narrows the search to those concepts. Grading requires it.
         sections narrows it to some of the mode's section types, for example the
@@ -86,7 +112,8 @@ class Retriever:
         separately, so exercises do not crowd out the theory. It can only narrow:
         asking for a type the mode may not see is an error, not a silent drop.
         max_distance drops weak matches, so a question the course does not cover
-        returns nothing rather than the least-bad paragraph.
+        returns nothing rather than the least-bad paragraph. A passage only the keyword
+        ranking found has no distance and cannot satisfy a distance cut-off.
         """
         if not query.strip():
             return []
@@ -109,14 +136,14 @@ class Retriever:
             allowed = tuple(sections)
 
         collection = self._collection(module_id)
+        depth = k if method == "dense" else max(k, FUSION_DEPTH)
         result = collection.query(
             query_embeddings=[self._embedder.embed_query(query)],
-            n_results=k,
+            n_results=depth,
             where=_where(allowed, concept_ids),
             include=["documents", "metadatas", "distances"],
         )
-
-        passages = [
+        dense = [
             _passage(chunk_id, document, metadata, distance)
             for chunk_id, document, metadata, distance in zip(
                 result["ids"][0],
@@ -126,6 +153,12 @@ class Retriever:
                 strict=True,
             )
         ]
+
+        if method == "dense":
+            passages = dense[:k]
+        else:
+            passages = self._fuse(collection, module_id, query, allowed, concept_ids, dense, k)
+
         if max_distance is not None:
             passages = [
                 p for p in passages if p.distance is not None and p.distance <= max_distance
@@ -171,6 +204,56 @@ class Retriever:
         )
 
     # ----------------------------------------------------------------- helpers
+    def _fuse(
+        self,
+        collection: Collection,
+        module_id: str,
+        query: str,
+        allowed: Sequence[str],
+        concept_ids: Sequence[str] | None,
+        dense: list[Passage],
+        k: int,
+    ) -> list[Passage]:
+        """Merge the embedding ranking with a BM25 ranking of the same permitted pool."""
+        pool = self._pool(collection, module_id, allowed)
+
+        wanted = set(concept_ids) if concept_ids else None
+        candidates = (
+            [i for i, p in enumerate(pool.passages) if p.concept_id in wanted] if wanted else None
+        )
+        keyword = [
+            pool.passages[i]
+            for i in pool.bm25.rank(tokens(query), allowed=candidates, limit=FUSION_DEPTH)
+        ]
+
+        fused = reciprocal_rank_fusion(
+            [[p.chunk_id for p in dense], [p.chunk_id for p in keyword]]
+        )[:k]
+
+        # Prefer the embedding result when there is one: it carries the distance.
+        known = {p.chunk_id: p for p in keyword} | {p.chunk_id: p for p in dense}
+        return [known[chunk_id] for chunk_id in fused]
+
+    def _pool(self, collection: Collection, module_id: str, allowed: Sequence[str]) -> _KeywordPool:
+        key = (module_id, tuple(sorted(allowed)), collection.count())
+        if key not in self._pools:
+            stored = collection.get(
+                where={"section_type": {"$in": list(allowed)}},
+                include=["documents", "metadatas"],
+            )
+            passages = [
+                _passage(chunk_id, document, metadata, None)
+                for chunk_id, document, metadata in zip(
+                    stored["ids"], stored["documents"], stored["metadatas"], strict=True
+                )
+            ]
+            # The same text the embedding model sees: heading path, then the chunk.
+            self._pools[key] = _KeywordPool(
+                passages=passages,
+                bm25=BM25([tokens(f"{p.heading_path}\n\n{p.text}") for p in passages]),
+            )
+        return self._pools[key]
+
     def _collection(self, module_id: str) -> Collection:
         name = collection_name(module_id, self._embedder.name)
         try:

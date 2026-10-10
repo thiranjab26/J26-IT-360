@@ -182,9 +182,13 @@ def _embed(settings, units: list[Unit], chunks_by_unit: dict[str, list[Chunk]]) 
 
         cut_off = truncated_chunks(embedder, chunks)
         if cut_off:
-            print(f"WARNING {len(cut_off)} chunk(s) are longer than the model reads, so their")
-            print("        ends are not searchable. Shorten them or use a longer-window model:")
-            for chunk, tokens in sorted(cut_off, key=lambda item: -item[1])[:5]:
+            print(
+                f"note: {len(cut_off)} of {len(chunks)} chunks are longer than the model's "
+                f"{embedder.max_tokens}-token window, so their ends are not embedded."
+            )
+            print("      On the Programming module this measured as no loss in retrieval quality;")
+            print("      re-check if much longer content is added. Longest:")
+            for chunk, tokens in sorted(cut_off, key=lambda item: -item[1])[:3]:
                 print(f"        {chunk.chunk_id} ({tokens} tokens)")
 
         result = index_module(client, embedder, module, chunks)

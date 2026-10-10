@@ -37,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
     search.add_argument("--concept", action="append", help="limit to a concept; repeatable")
     search.add_argument("-k", type=int, default=5, help="how many passages (default 5)")
     search.add_argument("--max-distance", type=float, help="drop matches weaker than this")
+    search.add_argument(
+        "--method",
+        choices=["hybrid", "dense"],
+        default="hybrid",
+        help="hybrid fuses embedding and keyword rankings (default); dense is embeddings only",
+    )
 
     question = sub.add_parser("question", help="an authored question with solution and rubric")
     question.add_argument("unit_id", help="e.g. prog.loops")
@@ -57,8 +63,9 @@ def main(argv: list[str] | None = None) -> int:
                 concept_ids=args.concept,
                 k=args.k,
                 max_distance=args.max_distance,
+                method=args.method,
             )
-            print(f"{len(passages)} passage(s) for mode={args.mode}\n")
+            print(f"{len(passages)} passage(s) for mode={args.mode}, method={args.method}\n")
             for passage in passages:
                 _show(passage)
             return 0

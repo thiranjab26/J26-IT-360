@@ -1,7 +1,7 @@
 """Write chunk embeddings into ChromaDB. The vector store belongs to this service alone.
 
 One collection per module and embedding model, named like
-`content_prog__bge-small-en-v1-5`. Retrieval is therefore namespaced by module by
+`content_prog__all-minilm-l6-v2`. Retrieval is therefore namespaced by module by
 construction (architecture: retrieval is module-scoped), and trying a second
 embedding model for the evaluation means a second collection next to the first rather
 than overwriting it.

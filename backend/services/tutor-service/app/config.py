@@ -13,7 +13,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,10 +46,26 @@ class Settings(BaseSettings):
     # Embedded vector store (ChromaDB). Private to this service and gitignored.
     chroma_path: Path = Field(default=Path(".chroma"), alias="TUTOR_CHROMA_PATH")
 
-    # Local sentence embedding model. The default has a 512-token window, which
-    # covers every course chunk; all-MiniLM-L6-v2 stops at 256 and would silently
-    # drop the end of the longer theory and example chunks.
-    embedding_model: str = Field(default="BAAI/bge-small-en-v1.5", alias="TUTOR_EMBEDDING_MODEL")
+    # Local sentence embedding model. MiniLM reads 256 tokens, so the ends of the longer
+    # chunks are not embedded; measured on the Programming module that cost nothing, and
+    # MiniLM with hybrid retrieval was the most robust option. Evidence and limits are in
+    # research/c3-RAG tutor/README.md.
+    embedding_model: str = Field(
+        default="sentence-transformers/all-MiniLM-L6-v2", alias="TUTOR_EMBEDDING_MODEL"
+    )
+
+    # --- LLM providers ------------------------------------------------------
+    # Read by the generation layer (phase P2). Gemini is the cloud provider; Ollama is
+    # the local fallback for when there is no connectivity.
+    llm_provider: str = Field(default="gemini", alias="TUTOR_LLM_PROVIDER")
+
+    # Left empty until you add your key. SecretStr keeps it out of logs and repr().
+    gemini_api_key: SecretStr | None = Field(default=None, alias="TUTOR_GEMINI_API_KEY")
+    # Check the current model names in Google AI Studio and change this if it has moved on.
+    gemini_model: str = Field(default="gemini-2.5-flash", alias="TUTOR_GEMINI_MODEL")
+
+    ollama_base_url: str = Field(default="http://localhost:11434", alias="TUTOR_OLLAMA_BASE_URL")
+    ollama_model: str = Field(default="qwen2.5-coder:7b", alias="TUTOR_OLLAMA_MODEL")
 
     @field_validator("database_url", "migration_database_url")
     @classmethod
@@ -58,6 +74,11 @@ class Settings(BaseSettings):
         if value and value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
+
+    @property
+    def gemini_configured(self) -> bool:
+        """True once a real key has been supplied (an empty value counts as missing)."""
+        return bool(self.gemini_api_key and self.gemini_api_key.get_secret_value().strip())
 
     @property
     def content_root(self) -> Path:

@@ -8,10 +8,95 @@
 # Format: a list of  {concept: <concept id>, text: <the question>}
 # Example (delete the leading '#' to use):
 #
-# - concept: prog.loops
-#   text: why does my for loop run one extra time
-# - concept: prog.references
-#   text: why did changing one variable also change the other
-#
 # Then re-run the experiment; the script scores this file as a separate query set.
-[]
+
+- concept: prog.java_intro
+  text: 'what is java and why is it used for programming'
+- concept: prog.java_intro
+  text: 'what are programms and how do they work'
+- concept: prog.java_intro
+  text: 'what is jvm and why is it important for running java programs'
+
+- concept: prog.variables_types
+  text: 'what are varaibles and how do I declare them in java'
+- concept: prog.variables_types
+  text: 'what are the different types of variables in java and how do I choose which one to use'
+- concept: prog.variables_types
+  text: 'how do I convert between different variable types in java'
+
+- concept: prog.operators_expressions
+  text: 'what are operators in java and how do I use them in expressions'
+- concept: prog.operators_expressions
+  text: 'how do I combine multiple expressions in java and what are the rules for operator precedence'
+- concept: prog.operators_expressions
+  text: 'what is the difference between == and .equals() in java and when should I use each'
+
+- concept: prog.conditionals
+  text: 'how do if statements work in java and what are some common mistakes to avoid'
+- concept: prog.conditionals
+  text: 'what is the difference between if, else if, and else in java and when should I use each'
+- concept: prog.conditionals
+  text: 'how do I use switch statements in java and what are some best practices for using them'
+
+- concept: prog.loops
+  text: 'what are loops and how do they work'
+- concept: prog.loops
+  text: 'why does my for loop run one extra time and how can I fix it'
+- concept: prog.loops
+  text: 'how do while loops work and when should I use them'
+
+- concept: prog.nested_loops
+  text: 'how do nested loops work and what are some common use cases for them'
+- concept: prog.nested_loops
+  text: 'how can I avoid infinite loops when using nested loops in java'
+- concept: prog.nested_loops
+  text: 'what is the difference between break and continue in nested loops and when should I use each'
+
+- concept: prog.methods
+  text: 'how do I define and call methods in java'
+- concept: prog.methods
+  text: 'what is the difference between static and instance methods in java and when should I use each'
+- concept: prog.methods
+  text: 'how do I pass parameters to methods in java and what are some best practices for doing so'
+
+- concept: prog.call_flow
+  text: 'how does the flow of control work when calling methods in java'
+- concept: prog.call_flow
+  text: 'what is the difference between call by value and call by reference in java and how does it affect method calls'
+- concept: prog.call_flow
+  text: 'how do I handle exceptions that may occur during method calls in java'
+
+- concept: prog.arrays
+  text: 'what are arrays in java and how do I declare and initialize them'
+- concept: prog.arrays
+  text: 'how do I access and modify elements in an array in java'
+- concept: prog.arrays
+  text: 'what are some common mistakes to avoid when working with arrays in java'
+
+- concept: prog.array_iteration
+  text: 'how do I iterate over an array in java and what are some common techniques for doing so'
+- concept: prog.array_iteration
+  text: 'what is the difference between a for loop and a foreach loop when iterating over an array in java'
+- concept: prog.array_iteration
+  text: 'how do I use the Arrays class in java to perform common operations on arrays'
+
+- concept: prog.classes_objects
+  text: 'what are classes and objects in java and how do I define them'
+- concept: prog.classes_objects
+  text: 'how do I create and use objects in java and what are some best practices for doing so'
+- concept: prog.classes_objects
+  text: 'what is the difference between instance variables and class variables in java and when should I use each'
+
+- concept: prog.references
+  text: 'what are references in java and how do they work'
+- concept: prog.references
+  text: 'how do I compare references in java and what are some common pitfalls to avoid'
+- concept: prog.references
+  text: 'what is the difference between shallow and deep copying of objects in java and when should I use each'
+
+- concept: prog.code_tracing
+  text: 'how do I trace the flow of control in a java program and what are some common techniques for doing so'
+- concept: prog.code_tracing
+  text: 'what is the difference between static and dynamic code tracing in java and when should I use each'
+- concept: prog.code_tracing
+  text: 'how do I use a debugger to trace the execution of a java program and what are some best practices for doing so'

@@ -28,6 +28,7 @@ from app.content.models import (
     Chunk,
     Unit,
 )
+from app.domain.questions import question_errors, question_warnings
 
 VALID_STATUSES = ("draft", "reviewed")
 FILENAME_NUMBER_RE = re.compile(r"(?:^|/)(\d{2})-[^/]+\.md$")
@@ -85,6 +86,7 @@ def validate(
 
         if unit.kind == KIND_CONCEPT:
             _questions(unit, chunks, where, error)
+            _question_bank(chunks, where, error, warning)
             _prerequisites(unit, where, loaded_ids, known_concepts, concept_units, error)
 
             if known_concepts is not None and unit.concept_id not in known_concepts:
@@ -132,6 +134,28 @@ def _file_matches_frontmatter(unit: Unit, where: str, error) -> None:  # noqa: A
 
     if unit.kind == KIND_MODULE_INTRO and unit.sequence != 0:
         error(where, "a module introduction must have sequence 0")
+
+
+def _question_bank(chunks: list[Chunk], where: str, error, warning) -> None:  # noqa: ANN001
+    """Every question must turn into structured data, so sessions can use it.
+
+    A missing solution is already reported by _questions, so it is skipped here rather
+    than reported twice. What this adds: multiple choice that does not split into four
+    options, an answer letter that is not readable, and level-2 questions that cannot be
+    marked automatically (a warning, because the question still works, it just needs a
+    model to mark it).
+    """
+    solutions = {n: c for c in chunks if c.section_type == "solution" for n in c.question_nos or ()}
+    rubrics = {n: c for c in chunks if c.section_type == "rubric" for n in c.question_nos or ()}
+
+    for exercise in (c for c in chunks if c.section_type == "exercise" and c.question_nos):
+        number = exercise.question_nos[0]
+        if number not in solutions:
+            continue
+        for problem in question_errors(exercise, solutions[number], rubrics.get(number)):
+            error(where, problem)
+        for note in question_warnings(exercise, solutions[number], rubrics.get(number)):
+            warning(where, note)
 
 
 def _questions(unit: Unit, chunks: list[Chunk], where: str, error) -> None:  # noqa: ANN001

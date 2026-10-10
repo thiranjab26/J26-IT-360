@@ -6,7 +6,7 @@ Notebooks, labelling tools, datasets and experiment scripts. **Nothing here is i
 |---|---|
 | `c1-curriculum/` | C1 |
 | `c2-load/` | C2 |
-| `c3-veritutor/` | C3 |
+| `c3-RAG tutor/` | C3 |
 | `c4-viva/` | C4 |
 
 Inside a component folder, the convention C3 uses (copy it if it fits):
