@@ -72,6 +72,8 @@ class GraphLoader:
                 )
                 continue
             if graph is None:
+                if getattr(source, "optional", False):
+                    continue  # e.g. no lecturer edit yet: nothing to report
                 problems.append(f"{source.name} is empty")
                 logger.warning("graph source is empty", extra={"source": source.name})
                 continue

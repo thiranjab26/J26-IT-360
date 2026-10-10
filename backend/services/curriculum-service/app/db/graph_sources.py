@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 
 from sqlalchemy import text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 
 from app.domain.graph import Concept, Edge, PrerequisiteGraph
 
@@ -73,8 +73,10 @@ class SnapshotRepository:
 
     name = "snapshot"
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, optional: bool = False) -> None:
         self._engine = engine
+        # Optional: being empty is normal (no lecturer edit yet), not a fallback.
+        self.optional = optional
 
     def read(self) -> PrerequisiteGraph | None:
         with self._engine.connect() as connection:
@@ -107,20 +109,24 @@ class SnapshotRepository:
             ).first()
             if latest is not None and tuple(latest) == (checksum, graph.version):
                 return
-            connection.execute(
-                text(
-                    """
-                    INSERT INTO curriculum.graph_snapshot
-                        (graph_version, source, checksum, concepts, edges)
-                    VALUES (:version, :source, :checksum,
-                            CAST(:concepts AS jsonb), CAST(:edges AS jsonb))
-                    """
-                ),
-                {
-                    "version": graph.version,
-                    "source": source,
-                    "checksum": checksum,
-                    "concepts": json.dumps([c.__dict__ for c in graph.concepts]),
-                    "edges": json.dumps([e.__dict__ for e in graph.edges]),
-                },
-            )
+            insert_snapshot(connection, graph, source)
+
+
+def insert_snapshot(connection: Connection, graph: PrerequisiteGraph, source: str) -> None:
+    connection.execute(
+        text(
+            """
+            INSERT INTO curriculum.graph_snapshot
+                (graph_version, source, checksum, concepts, edges)
+            VALUES (:version, :source, :checksum,
+                    CAST(:concepts AS jsonb), CAST(:edges AS jsonb))
+            """
+        ),
+        {
+            "version": graph.version,
+            "source": source,
+            "checksum": graph.checksum(),
+            "concepts": json.dumps([c.__dict__ for c in graph.concepts]),
+            "edges": json.dumps([e.__dict__ for e in graph.edges]),
+        },
+    )
