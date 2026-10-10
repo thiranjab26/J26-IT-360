@@ -16,6 +16,7 @@ EXERCISE = """## Practice Questions
 ### Level 1: Recall (MCQ)
 
 **Q1.** First?
+A. one  B. two  C. three  D. four
 
 ### Level 3: Explain
 
@@ -194,3 +195,47 @@ def test_a_module_with_no_content_raises_no_warnings() -> None:
     issues = check([first_unit()], known_concepts={"prog.a", "dsa.big_o"})
 
     assert issues == []
+
+
+# ------------------------------------------------------------------ the question bank
+def with_sections(**changes: str):
+    return make_unit(sections=make_sections(**changes))
+
+
+def test_a_multiple_choice_question_that_will_not_split_is_an_error() -> None:
+    broken = with_sections(
+        exercise="## Practice Questions\n\n### Level 1: Recall (MCQ)\n\n**Q1.** No options here\n",
+        solution="## Solutions\n\n**Q1.** B.\n",
+        rubric="## Marking Rubrics\n\n**Q7 (Explain)**\n- a.\n",
+    )
+
+    assert "no `A. ...  B. ...` options line" in messages(check([first_unit(), broken]))
+
+
+def test_a_level_2_question_with_no_output_block_is_only_a_warning() -> None:
+    reason = with_sections(
+        exercise=(
+            "## Practice Questions\n\n### Level 2: Trace and Predict\n\n"
+            "**Q5.** What prints, and why?\n"
+        ),
+        solution="## Solutions\n\n**Q5.** It prints `7` because of x.\n",
+        rubric="## Marking Rubrics\n",
+    )
+    issues = check([first_unit(), reason])
+
+    assert [i.severity for i in issues if "no ```output block" in i.message] == ["warning"]
+    assert not [i for i in issues if i.severity == "error"]
+
+
+def test_a_well_formed_mcq_and_predict_question_raise_nothing() -> None:
+    fine = with_sections(
+        exercise=(
+            "## Practice Questions\n\n### Level 1: Recall (MCQ)\n\n"
+            "**Q1.** How many?\nA. 3  B. 4  C. 5  D. 8\n\n"
+            "### Level 2: Trace and Predict\n\n**Q5.** What prints?\n"
+        ),
+        solution="## Solutions\n\n**Q1.** B. four\n\n**Q5.**\n\n```output\n81\n```\n",
+        rubric="## Marking Rubrics\n",
+    )
+
+    assert check([first_unit(), fine]) == []

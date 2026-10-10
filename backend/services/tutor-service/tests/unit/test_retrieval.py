@@ -179,7 +179,9 @@ def test_results_are_the_true_nearest_allowed_chunks_in_order(retriever) -> None
     # this test flaky for a reason that has nothing to do with the retriever.
     assert len({round(distance(c), 9) for c in visible}) == len(visible), "corpus has a tie"
 
-    passages = retriever.search(QUERY, mode=RetrievalMode.TUTORING, module_id="prog", k=3)
+    passages = retriever.search(
+        QUERY, mode=RetrievalMode.TUTORING, module_id="prog", k=3, method="dense"
+    )
 
     assert [p.chunk_id for p in passages] == [c.chunk_id for c in expected[:3]]
     distances = [p.distance for p in passages]

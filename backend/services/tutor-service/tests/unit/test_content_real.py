@@ -45,7 +45,14 @@ def test_the_module_has_an_introduction_and_thirteen_concepts(units) -> None:
 def test_the_content_passes_every_structural_check(units, chunks) -> None:
     issues = validate(units, chunks)
 
-    assert issues == [], "\n".join(str(i) for i in issues)
+    errors = [i for i in issues if i.severity == "error"]
+    assert errors == [], "\n".join(str(i) for i in errors)
+
+    # The one known warning: java_intro Q6 asks what a program prints "and why", so it
+    # has no expected-output block and needs a model to mark it. Pinned so that any NEW
+    # question that cannot be marked automatically is noticed rather than slipping in.
+    warnings = [i.message.split(":")[0] for i in issues if i.severity == "warning"]
+    assert warnings == ["prog.java_intro#exercise-q06"]
 
 
 def test_every_question_has_a_solution_and_a_matching_rubric(chunks) -> None:
