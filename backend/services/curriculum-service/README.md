@@ -23,9 +23,15 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/start?module=prog` | signed in | Start or resume my test; questions without answers | done |
 | POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/submit?module=prog` | signed in | Submit once, scored on the server; a repeat returns the stored result | done |
 | GET | `/api/v1/curriculum/me/gain?module=prog` | signed in | My normalised gain overall, per topic and per concept | done |
+| GET | `/api/v1/curriculum/study/{module}/overview` | lecturer, admin | Class progress per concept in syllabus order: learners, mastered, mean mastery; group sizes and test progress (counts only, no learner ids) | done |
+| POST | `/api/v1/curriculum/graph/edits` | lecturer, admin | Add or remove a prerequisite link with a reason; refused if it creates a loop; new graph version (`v0-core+e1`, ...) | done |
+| GET | `/api/v1/curriculum/graph/audit?limit=50` | lecturer, admin | Every graph change: who, when, what, why, previous version | done |
 | GET, PUT | `/api/v1/curriculum/study/{module}/window` | lecturer, admin | Read or set the phase: closed, pretest, learning, posttest, finished | done |
 | GET | `/api/v1/curriculum/study/{module}/gain` | lecturer, admin | Gain per learner and per group (mean g and class g) | done |
 | GET | `/api/v1/curriculum/study/{module}/snapshot-validation` | lecturer, admin | Mastery at post-test start vs post-test answers: AUC, Brier, accuracy at 0.70 | done |
+| GET | `/api/v1/curriculum/me/practice/next?concept=prog.loops` | signed in, stub mode only | C3 stand-in: my next practice question (least tried first, options in my own order, no answer) | done |
+| POST | `/api/v1/curriculum/me/practice/hint` | signed in, stub mode only | Show the hint; logged on the server, so the answer then counts as wrong | done |
+| POST | `/api/v1/curriculum/me/practice/answer` | signed in, stub mode only | Checked on the server, written with C3's contract columns, updates my mastery; reveals the right option | done |
 | POST | `/api/v1/curriculum/dev/attempts` | signed in, dev + stub only | C3 stand-in: record one practice answer for me and update my mastery | done |
 
 Arriving next: feedback, the lecturer cohort and graph-edit routes, GAT inference.
@@ -33,7 +39,10 @@ Arriving next: feedback, the lecturer cohort and graph-edit routes, GAT inferenc
 ## Pre/post tests and gain
 
 - `app/domain/assessment.py`: counterbalancing (2 groups x 2 form orders, each new
-  learner fills a least-used cell at random), scoring, normalised gain
+  learner fills a least-used cell at random; a learner keeps one group across modules
+  and only the form order is chosen per module), option order shuffled per attempt
+  (stable on resume; answers are mapped back to the original option before scoring and
+  stored as the original index), scoring, normalised gain
   `g = (post - pre) / (100 - pre)` (`null` when pre = 100), BKT validity metrics,
   item bank checks.
 - `app/domain/study.py`: the rules. A test opens only in its phase; one attempt per
@@ -72,6 +81,12 @@ cycles) and answers prerequisites, dependents, depth and learning order.
 
 `GET /graph` reports which one answered (`source`) and why a fallback happened
 (`fallback_reason`).
+
+Lecturer edits (`POST /graph/edits`, `app/domain/graph_edit.py`) build a new graph
+that must validate (no loop, no self-link, known concepts), then store it in Neo4j
+(when configured) and in `curriculum.graph_snapshot`, with a row in
+`curriculum.graph_audit`. This service never writes `core`: without Neo4j the loader
+reads the edited snapshot first and `core` only while nobody has edited.
 
 ## Security rules
 
@@ -114,6 +129,13 @@ Load the graph into Neo4j (needs the Neo4j settings and the migration above):
 ```bash
 uv run python -m scripts.import_graph --dry-run      # validate core, write nothing
 uv run python -m scripts.import_graph --version v0   # writes Neo4j, snapshot and audit row
+```
+
+Load practice questions for the C3 stand-in (added or updated by item id):
+
+```bash
+uv run python -m scripts.import_practice item_bank/practice.json --dry-run
+uv run python -m scripts.import_practice item_bank/practice.json     # writes practice_item
 ```
 
 Load test papers (refuses to replace a paper that learners have already sat):
