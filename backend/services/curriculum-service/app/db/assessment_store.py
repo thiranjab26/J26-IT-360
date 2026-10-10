@@ -4,13 +4,23 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
-from app.domain.assessment import CELLS, Enrolment, Item, Paper, Phase, Response, Scored, TestKind
+from app.domain.assessment import (
+    CELLS,
+    Chooser,
+    Enrolment,
+    Item,
+    Paper,
+    Phase,
+    Response,
+    Scored,
+    TestKind,
+)
 from app.domain.study import Attempt, LearnerResults, SnapshotRow
 
 _ATTEMPT_COLUMNS = (
@@ -54,22 +64,27 @@ class AssessmentStore:
         with self._engine.connect() as connection:
             return self._enrolment(connection, user_id, module_id)
 
-    def enrol(
-        self,
-        user_id: uuid.UUID,
-        module_id: str,
-        choose: Callable[[Mapping[tuple[str, str], int]], Enrolment],
-    ) -> Enrolment:
+    def enrol(self, user_id: uuid.UUID, module_id: str, choose: Chooser) -> Enrolment:
         with self._engine.begin() as connection:
-            # One enrolment per module at a time, so two learners cannot both see
-            # the same counts and fill the same cell.
-            connection.execute(
-                text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
-                {"key": f"curriculum.enrolment:{module_id}"},
-            )
+            # Learner lock first, then module lock (always this order, so no deadlock):
+            # one learner cannot get two groups, and two learners cannot both see the
+            # same counts and fill the same cell.
+            for key in (
+                f"curriculum.enrolment.user:{user_id}",
+                f"curriculum.enrolment:{module_id}",
+            ):
+                connection.execute(
+                    text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"), {"key": key}
+                )
             existing = self._enrolment(connection, user_id, module_id)
             if existing is not None:
                 return existing
+            group = connection.execute(
+                text(
+                    "SELECT study_group FROM curriculum.enrolment WHERE user_id = :user_id LIMIT 1"
+                ),
+                {"user_id": user_id},
+            ).scalar()
             counts = {cell: 0 for cell in CELLS}
             for row in connection.execute(
                 text(
@@ -79,7 +94,7 @@ class AssessmentStore:
                 {"module_id": module_id},
             ).mappings():
                 counts[(row["study_group"], row["form_order"])] = row["n"]
-            enrolment = choose(counts)
+            enrolment = choose(counts, group)
             connection.execute(
                 text(
                     "INSERT INTO curriculum.enrolment (user_id, module_id, study_group, form_order)"

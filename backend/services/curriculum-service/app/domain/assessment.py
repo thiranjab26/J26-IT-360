@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import random
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Literal
 
 from app.domain.mastery import MASTERY_THRESHOLD, BktParams
@@ -93,12 +94,55 @@ def open_test(phase: Phase) -> TestKind | None:
 
 
 def choose_cell(
-    counts: Mapping[tuple[str, str], int], rng: Callable[[Sequence], object] = random.choice
+    counts: Mapping[tuple[str, str], int],
+    group: Group | None = None,
+    rng: Callable[[Sequence], object] = random.choice,
 ) -> Enrolment:
-    """Random among the least-filled cells, so groups and form orders stay balanced."""
-    fewest = min(counts.get(cell, 0) for cell in CELLS)
-    group, order = rng([cell for cell in CELLS if counts.get(cell, 0) == fewest])  # type: ignore[misc]
-    return Enrolment(group, order)
+    """Random among the least-filled cells of this module, so groups and form orders stay
+    balanced. A learner already in a group (from another module) keeps it."""
+    cells = [cell for cell in CELLS if group is None or cell[0] == group]
+    fewest = min(counts.get(cell, 0) for cell in cells)
+    chosen_group, order = rng([cell for cell in cells if counts.get(cell, 0) == fewest])  # type: ignore[misc]
+    return Enrolment(chosen_group, order)
+
+
+# (cell counts in this module, the learner's existing group or None) -> enrolment
+Chooser = Callable[[Mapping[tuple[str, str], int], Group | None], Enrolment]
+
+
+def option_order(attempt_id: int, item_id: str, n_options: int) -> list[int]:
+    """Shown position -> original option index; the same every time for one attempt."""
+    seed = int.from_bytes(hashlib.sha256(f"{attempt_id}:{item_id}".encode()).digest()[:8], "big")
+    order = list(range(n_options))
+    random.Random(seed).shuffle(order)
+    return order
+
+
+def shuffled(item: Item, attempt_id: int) -> Item:
+    """The item as this attempt sees it: options in its own order."""
+    order = option_order(attempt_id, item.item_id, len(item.options))
+    return replace(
+        item,
+        options=tuple(item.options[i] for i in order),
+        answer_index=order.index(item.answer_index),
+    )
+
+
+def to_original(
+    items: Sequence[Item], attempt_id: int, answers: Mapping[str, int | None]
+) -> dict[str, int | None]:
+    """Shown positions from the browser -> original option indexes, before scoring."""
+    by_id = {i.item_id: i for i in items}
+    original: dict[str, int | None] = {}
+    for item_id, shown in answers.items():
+        item = by_id.get(item_id)
+        if item is None or shown is None:
+            original[item_id] = shown  # score() rejects unknown items
+            continue
+        if not 0 <= shown < len(item.options):
+            raise AssessmentError("bad_choice", "An answer picks an option that does not exist.")
+        original[item_id] = option_order(attempt_id, item_id, len(item.options))[shown]
+    return original
 
 
 def form_for(order: FormOrder, kind: TestKind) -> Literal["A", "B"]:
