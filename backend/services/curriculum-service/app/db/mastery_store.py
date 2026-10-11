@@ -151,6 +151,18 @@ class MasteryStore:
         with self._engine.connect() as connection:
             return self._read(connection, user_id, lock=False)
 
+    def history(self, user_id: uuid.UUID) -> list[bool]:
+        with self._engine.connect() as connection:
+            return list(
+                connection.execute(
+                    text(
+                        "SELECT correct FROM curriculum.mastery_evidence WHERE user_id = :user_id"
+                        " ORDER BY observed_at, evidence_id"
+                    ),
+                    {"user_id": user_id},
+                ).scalars()
+            )
+
     def save_recommendation(
         self, user_id: uuid.UUID, recommendation: Recommendation, graph_version: str
     ) -> None:

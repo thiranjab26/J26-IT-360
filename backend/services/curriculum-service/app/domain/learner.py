@@ -2,12 +2,23 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Protocol
 
+from app.domain.gat import GatModel, score
 from app.domain.graph import PrerequisiteGraph
 from app.domain.mastery import BktParams, MasteryRecord, Observation
-from app.domain.recommend import Plan, Recommendation, fixed_order, recommend
+from app.domain.recommend import (
+    MODEL_VERSION,
+    Plan,
+    Recommendation,
+    Scores,
+    fixed_order,
+    recommend,
+)
+
+logger = logging.getLogger("curriculum-service")
 
 
 class MasteryRepository(Protocol):
@@ -24,6 +35,10 @@ class MasteryRepository(Protocol):
 
     def mastery(self, user_id: uuid.UUID) -> dict[str, MasteryRecord]: ...
 
+    def history(self, user_id: uuid.UUID) -> list[bool]:
+        """Every evidence row's counted correctness (all sources), oldest first."""
+        ...
+
     def save_recommendation(
         self, user_id: uuid.UUID, recommendation: Recommendation, graph_version: str
     ) -> None: ...
@@ -34,8 +49,14 @@ class MasteryRepository(Protocol):
 
 
 class Learner:
-    def __init__(self, repository: MasteryRepository) -> None:
+    def __init__(self, repository: MasteryRepository, model: GatModel | None = None) -> None:
+        """`model` None = rules-v1 only (model file missing or rejected at startup)."""
         self.repository = repository
+        self.model = model
+
+    @property
+    def recommender_version(self) -> str:
+        return self.model.version if self.model else MODEL_VERSION
 
     @property
     def params(self) -> BktParams:
@@ -59,11 +80,30 @@ class Learner:
     ) -> Plan:
         """`fixed` = comparison group: syllabus order instead of the adaptive ranking."""
         records = self.mastery(user_id)
-        scores = {cid: r.score for cid, r in records.items()}
-        plan = (fixed_order if fixed else recommend)(graph, module_id, scores)
+        mastery = {cid: r.score for cid, r in records.items()}
+        if fixed:
+            plan = fixed_order(graph, module_id, mastery)
+        else:
+            plan = recommend(
+                graph, module_id, mastery, scores=self._model_scores(user_id, graph, records)
+            )
         if plan.recommendation is not None:
             self.repository.save_recommendation(user_id, plan.recommendation, graph.version)
         return plan
+
+    def _model_scores(
+        self, user_id: uuid.UUID, graph: PrerequisiteGraph, records: dict[str, MasteryRecord]
+    ) -> Scores | None:
+        """None = use rules-v1. A model failure must never take recommendations down."""
+        if self.model is None:
+            return None
+        try:
+            return score(self.model, graph, records, self.repository.history(user_id), self.params)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "readiness model failed, using rules-v1", extra={"error": type(exc).__name__}
+            )
+            return None
 
     def practise(
         self, user_id: uuid.UUID, concept_id: str, item_id: str, correct: bool, hints_used: int
