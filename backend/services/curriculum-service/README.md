@@ -18,7 +18,7 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | GET | `/health`, `/api/v1/curriculum/health` | public | Liveness | done |
 | GET | `/api/v1/curriculum/graph?module=dsa` | signed in | Prerequisite graph: concepts with depth, edges, stats; a module view keeps its cross-module prerequisites | done |
 | GET | `/api/v1/curriculum/me/mastery?module=prog` | signed in | My BKT mastery per concept (`null` = no evidence yet) | done |
-| GET | `/api/v1/curriculum/me/recommendation?module=dsa` | signed in | Next concept, one-sentence explanation, locked concepts and their weak prerequisite (`rules-v1`); syllabus order for the comparison group | done |
+| GET | `/api/v1/curriculum/me/recommendation?module=dsa` | signed in | Next concept, readiness, one-sentence explanation, locked concepts and their weak prerequisite (`gat-v2`, or `rules-v1` without the model); syllabus order for the comparison group | done |
 | GET | `/api/v1/curriculum/me/tests?module=prog` | signed in | Current phase, which test is open, my results (never my group) | done |
 | POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/start?module=prog` | signed in | Start or resume my test; questions without answers | done |
 | POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/submit?module=prog` | signed in | Submit once, scored on the server; a repeat returns the stored result | done |
@@ -29,12 +29,17 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | GET, PUT | `/api/v1/curriculum/study/{module}/window` | lecturer, admin | Read or set the phase: closed, pretest, learning, posttest, finished | done |
 | GET | `/api/v1/curriculum/study/{module}/gain` | lecturer, admin | Gain per learner and per group (mean g and class g) | done |
 | GET | `/api/v1/curriculum/study/{module}/snapshot-validation` | lecturer, admin | Mastery at post-test start vs post-test answers: AUC, Brier, accuracy at 0.70 | done |
+| GET, POST | `/api/v1/curriculum/papers?module=prog` | lecturer, admin | List every paper version (status, current, item counts); start an empty draft for a form with no paper | done |
+| GET, PATCH, DELETE | `/api/v1/curriculum/papers/{paper_id}` | lecturer, admin | A paper with its answers; rename or discard a draft | done |
+| POST | `/api/v1/curriculum/papers/{paper_id}/revise` | lecturer, admin | Copy the current published or locked paper into a new draft version | done |
+| POST, PUT, DELETE | `/api/v1/curriculum/papers/{paper_id}/items[/{item_id}]` | lecturer, admin | Add, replace or remove (retire) a question in a draft | done |
+| POST | `/api/v1/curriculum/papers/publish?module=prog` | lecturer, admin | Check both forms and publish the module's drafts; 422 lists every problem | done |
 | GET | `/api/v1/curriculum/me/practice/next?concept=prog.loops` | signed in, stub mode only | C3 stand-in: my next practice question (least tried first, options in my own order, no answer) | done |
 | POST | `/api/v1/curriculum/me/practice/hint` | signed in, stub mode only | Show the hint; logged on the server, so the answer then counts as wrong | done |
 | POST | `/api/v1/curriculum/me/practice/answer` | signed in, stub mode only | Checked on the server, written with C3's contract columns, updates my mastery; reveals the right option | done |
 | POST | `/api/v1/curriculum/dev/attempts` | signed in, dev + stub only | C3 stand-in: record one practice answer for me and update my mastery | done |
 
-Arriving next: feedback, the lecturer cohort and graph-edit routes, GAT inference.
+Arriving next: explanation feedback (helpful / not helpful).
 
 ## Pre/post tests and gain
 
@@ -53,7 +58,30 @@ Arriving next: feedback, the lecturer cohort and graph-edit routes, GAT inferenc
 - The DSA papers carry a PF prerequisite section (`section = prereq`). It is served
   only on the pre-test, sets starting mastery, and never counts towards a score or gain.
 - Item banks contain answer keys, so they stay in `item_bank/` (gitignored);
-  `item_bank/example.json` shows the format. Answer keys never leave the service.
+  `item_bank/example.json` shows the format. Answer keys never leave the service
+  except to lecturers and admins in the question editor.
+
+## Question editor
+
+`app/domain/papers.py`. A paper is `draft`, `published` or `locked`:
+
+- Only drafts change. A paper locks when the first learner starts it (in the same
+  transaction as the attempt), and a locked paper never changes, so every attempt
+  keeps exactly the questions it was given.
+- To change a published or locked paper, revise it: the newest version is copied
+  into a new draft (`prog-A-v2`, items `prog-A-03:v2`). Removing a question from
+  that draft retires it; older versions keep it for the learners who sat them.
+- Learners get the newest published or locked version of their form; drafts never
+  reach them.
+- Publishing is per module: both forms (each one's draft, or else its current
+  version) are checked together with the import checks (24 main items, twins that
+  point at each other and share a concept, concepts in the live graph, valid
+  answers). Twins match by root (`prog-A-03:v2` = `prog-A-03`), so revising one
+  form keeps its pairs with the other.
+- Every write in a module runs under one Postgres advisory lock, and a partial
+  unique index allows at most one draft per form.
+- BKT and GAT read only evidence rows, never items, so editing questions cannot
+  change a learner's mastery history.
 
 ## Mastery and recommendations
 
@@ -64,9 +92,15 @@ Arriving next: feedback, the lecturer cohort and graph-edit routes, GAT inferenc
   (stub mode) or `tutor.v_attempt_outcomes` (live mode), stores every answer in
   `mastery_evidence` with mastery before and after, and keeps `concept_mastery`.
   Reads ingest the learner's new attempts first, so mastery is never stale.
-- `app/domain/recommend.py`: `rules-v1`. Ready = every prerequisite mastered
-  (>= 0.70); the ready concept with the lowest mastery comes next. When a module
-  is blocked by another module (DSA by PF), the weak PF prerequisite comes first.
+- `app/domain/recommend.py`: ready = every prerequisite mastered (>= 0.70), in
+  both versions. `gat-v2`: the ready concept with the highest predicted P(correct)
+  comes next, and the weak prerequisite is the argmax of attention x (1 - mastery).
+  `rules-v1` (no model): the ready concept with the lowest mastery comes next.
+  When a module is blocked by another module (DSA by PF), the weak PF prerequisite
+  comes first.
+- `app/domain/gat.py`: the GAT from research notebook 04 run with numpy. The model
+  loads only when its SHA-256, feature spec and weight shapes match; otherwise, or
+  if it fails during a request, recommendations use `rules-v1` and the log says why.
 - Views for other components: `curriculum.v_mastery`, `v_topic_mastery`, `v_next_topic`.
 
 ## The prerequisite graph
@@ -123,6 +157,10 @@ uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8101
 ```
 
 Through the gateway: `http://localhost:8080/api/v1/curriculum/health`.
+
+For GAT recommendations, copy `gat-v2.npz` and `feature_spec.json` from Drive
+(`junyi_processed/gat/`) into `models/` (gitignored). Without them the service
+starts normally with `rules-v1`; the startup log shows `"recommender"`.
 
 Load the graph into Neo4j (needs the Neo4j settings and the migration above):
 
