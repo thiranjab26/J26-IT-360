@@ -113,7 +113,15 @@ class AssessmentStore:
         return self._paper("p.paper_id = :key", paper_id)
 
     def paper_for(self, module_id: str, form: str) -> Paper | None:
-        return self._paper("p.module_id = :key AND p.form = :form", module_id, form)
+        """The newest published or locked version; drafts never reach learners."""
+        return self._paper(
+            """p.paper_id = (
+                   SELECT paper_id FROM curriculum.test_paper
+                   WHERE module_id = :key AND form = :form AND status <> 'draft'
+                   ORDER BY version DESC LIMIT 1)""",
+            module_id,
+            form,
+        )
 
     def attempt(self, user_id: uuid.UUID, module_id: str, kind: TestKind) -> Attempt | None:
         with self._engine.connect() as connection:
@@ -151,6 +159,15 @@ class AssessmentStore:
                 ),
                 {"user_id": user_id, "module_id": module_id, "kind": kind, "paper_id": paper_id},
             ).scalar()
+            if created is not None:
+                # From the first attempt on, the paper can never change.
+                connection.execute(
+                    text(
+                        "UPDATE curriculum.test_paper SET status = 'locked', locked_at = now()"
+                        " WHERE paper_id = :paper_id AND status = 'published'"
+                    ),
+                    {"paper_id": paper_id},
+                )
             if created is not None and snapshot:
                 connection.execute(
                     text(
@@ -303,7 +320,7 @@ class AssessmentStore:
         return [(user, float(p), bool(correct)) for user, p, correct in rows]
 
     def _paper(self, where: str, key: str, form: str | None = None) -> Paper | None:
-        # `where` is one of the two literals above, never input.
+        # `where` is one of the literals above, never input.
         with self._engine.connect() as connection:
             rows = (
                 connection.execute(

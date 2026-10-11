@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+import re
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -27,6 +28,12 @@ CELLS: tuple[tuple[Group, FormOrder], ...] = (
     ("comparison", "BA"),
 )
 MAIN_ITEMS_PER_PAPER = 24
+_VERSION_SUFFIX = re.compile(r":v\d+$")
+
+
+def item_root(item_id: str) -> str:
+    """The question slot an item belongs to: `prog-A-03:v2` is a revision of `prog-A-03`."""
+    return _VERSION_SUFFIX.sub("", item_id)
 
 
 class AssessmentError(Exception):
@@ -345,10 +352,14 @@ def check_bank(
         concepts_b = Counter(i.concept_id for i in b.items if i.section == "main")
         if concepts_a != concepts_b:
             problems.append(f"{module_id}: forms A and B cover concepts differently")
+        # Twins match by root, so revising one form keeps its pairs with the other.
+        b_main = {item_root(i.item_id): i for i in b.items if i.section == "main"}
         for item in (i for i in a.items if i.section == "main"):
-            twin = all_items.get(item.twin_item_id or "")
-            if twin is None or twin not in b.items:
+            twin = b_main.get(item_root(item.twin_item_id or ""))
+            if twin is None:
                 problems.append(f"{a.paper_id}/{item.item_id}: twin is missing from form B")
-            elif twin.concept_id != item.concept_id or twin.twin_item_id != item.item_id:
+            elif twin.concept_id != item.concept_id or item_root(
+                twin.twin_item_id or ""
+            ) != item_root(item.item_id):
                 problems.append(f"{a.paper_id}/{item.item_id}: twin does not point back")
     return problems

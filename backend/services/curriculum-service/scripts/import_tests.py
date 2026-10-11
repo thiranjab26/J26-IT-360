@@ -6,6 +6,8 @@
 Item banks hold answer keys, so they live in item_bank/ (gitignored) and never in
 git; item_bank/example.json shows the format. A paper that already has attempts
 is never replaced, because that would change a test some learners have taken.
+Imported papers are version 1 and published. Once a module has drafts or later
+versions, it is managed through the question editor API instead.
 
 Checks before anything is written: forms A and B per module, 24 main items each
 (--main-items to change), every concept exists in `core`, twins point at each
@@ -102,6 +104,23 @@ def main() -> int:
         )
         if taken:
             print(f"Not imported: learners have already sat {sorted(taken)}.", file=sys.stderr)
+            return 1
+        edited = (
+            connection.execute(
+                text(
+                    "SELECT DISTINCT module_id || '/' || form FROM curriculum.test_paper"
+                    " WHERE module_id = ANY(:modules) AND (version > 1 OR status = 'draft')"
+                ),
+                {"modules": sorted({p.module_id for p in papers})},
+            )
+            .scalars()
+            .all()
+        )
+        if edited:
+            print(
+                f"Not imported: {sorted(edited)} are managed in the question editor now.",
+                file=sys.stderr,
+            )
             return 1
         # Items cascade with their paper.
         connection.execute(
