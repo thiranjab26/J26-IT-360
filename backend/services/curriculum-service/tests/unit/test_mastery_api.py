@@ -71,6 +71,9 @@ class FakeRepository:
     def mastery(self, user_id: uuid.UUID) -> dict[str, MasteryRecord]:
         return dict(self.records.get(user_id, {}))
 
+    def history(self, user_id: uuid.UUID) -> list[bool]:
+        return [obs.correct for learner, obs in self.evidence if learner == user_id]
+
     def save_recommendation(self, user_id, recommendation, graph_version) -> None:  # noqa: ANN001
         self.saved[(user_id, recommendation.module_id)] = recommendation
 

@@ -5,7 +5,7 @@ variables are prefixed CURRICULUM_; DATABASE_URL, ENVIRONMENT, LOG_LEVEL and
 INTEGRATION_MODE are shared.
 
 Only the settings the current code actually reads live here. The mastery
-threshold and the model file arrive with the steps that need them.
+threshold (0.70) is fixed by the contracts, so it is not a setting.
 """
 
 from __future__ import annotations
@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     neo4j_uri: str | None = Field(default=None, alias="CURRICULUM_NEO4J_URI")
     neo4j_user: str | None = Field(default=None, alias="CURRICULUM_NEO4J_USER")
     neo4j_password: SecretStr | None = Field(default=None, alias="CURRICULUM_NEO4J_PASSWORD")
+
+    # GAT readiness model (research notebook 04); feature_spec.json sits beside it.
+    # Empty path, missing file or a checksum mismatch = rules-v1 recommendations.
+    model_path: str = Field(default="models/gat-v2.npz", alias="CURRICULUM_MODEL_PATH")
+    model_sha256: str = Field(
+        default="914a3046ac95daa2a58228de2ac6e75811c83f625760c826594123bf2c9cb17d",
+        alias="CURRICULUM_MODEL_SHA256",
+    )
 
     @field_validator("database_url", "migration_database_url")
     @classmethod

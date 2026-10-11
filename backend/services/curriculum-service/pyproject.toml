@@ -12,6 +12,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "alembic>=1.13",
     "neo4j>=5.20",
+    "numpy>=1.26",
 ]
 
 [dependency-groups]

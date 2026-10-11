@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from app.domain.assessment import (
     CELLS,
+    AssessmentError,
     Chooser,
     Enrolment,
     Paper,
@@ -17,8 +18,47 @@ from app.domain.assessment import (
     Scored,
     TestKind,
 )
+from app.domain.papers import Changes, PaperVersion, Plan
 from app.domain.practice import PracticeItem
 from app.domain.study import Attempt, LearnerResults, SnapshotRow
+
+
+class FakePaperRepository:
+    """In-memory PaperRepository with the same rules as PaperStore."""
+
+    def __init__(self, versions: tuple[PaperVersion, ...] = ()) -> None:
+        self.versions = {v.paper_id: v for v in versions}
+        self.writers: list[uuid.UUID] = []
+
+    def read(self, module_id: str) -> list[PaperVersion]:
+        return [v for v in self.versions.values() if v.paper.module_id == module_id]
+
+    def module_of(self, paper_id: str) -> str | None:
+        version = self.versions.get(paper_id)
+        return version.paper.module_id if version else None
+
+    def write(self, module_id: str, plan: Plan, by: uuid.UUID) -> Changes:
+        changes = plan(self.read(module_id))
+        for version in changes.save:
+            old = self.versions.get(version.paper_id)
+            if old is not None and old.status != "draft":
+                raise AssessmentError("not_draft", "Only a draft paper can change.")
+            self.versions[version.paper_id] = replace(version, status="draft")
+        for paper_id in changes.discard:
+            if self.versions[paper_id].status == "draft":
+                del self.versions[paper_id]
+        for paper_id in changes.publish:
+            self.versions[paper_id] = replace(
+                self.versions[paper_id], status="published", published_at=datetime.now(UTC)
+            )
+        self.writers.append(by)
+        return changes
+
+    def lock(self, paper_id: str) -> None:
+        """What AssessmentStore.start_attempt does on a learner's first attempt."""
+        self.versions[paper_id] = replace(
+            self.versions[paper_id], status="locked", locked_at=datetime.now(UTC)
+        )
 
 
 class FakePracticeRepository:

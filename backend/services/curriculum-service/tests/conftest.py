@@ -13,3 +13,5 @@ os.environ.setdefault("INTEGRATION_MODE", "stub")
 os.environ["CURRICULUM_NEO4J_URI"] = ""
 os.environ["CURRICULUM_NEO4J_USER"] = ""
 os.environ["CURRICULUM_NEO4J_PASSWORD"] = ""
+# rules-v1 unless a test passes a model, so results never depend on a local models/ folder.
+os.environ["CURRICULUM_MODEL_PATH"] = ""
