@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from app.api.v1.routes.graph import MODULE_PATTERN, get_graph_cache, load_graph, module_view
 from app.core.deps import CurrentUser, current_user
+from app.core.errors import ApiError
+from app.domain.feedback import FeedbackError, FeedbackRepository, rate
 from app.domain.graph import PrerequisiteGraph
 from app.domain.graph_loader import GraphCache
 from app.domain.learner import Learner
@@ -15,6 +17,7 @@ from app.domain.study import Study
 from app.models.mastery import (
     ConceptMastery,
     ConceptRef,
+    FeedbackIn,
     LockedOut,
     MasteryResponse,
     PlanResponse,
@@ -85,6 +88,28 @@ def read_my_recommendation(
     fixed = study.group_of(caller.user_id, module) == "comparison"
     plan = learner.plan(caller.user_id, graph, module, fixed=fixed)
     return plan_response(graph, plan)
+
+
+def get_feedback(request: Request) -> FeedbackRepository:
+    return request.app.state.feedback
+
+
+@router.post(
+    "/recommendation/feedback",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Rate my current explanation as helpful or not",
+)
+def rate_my_explanation(
+    body: FeedbackIn,
+    module: str = Query(pattern=MODULE_PATTERN),
+    caller: CurrentUser = Depends(current_user),
+    feedback: FeedbackRepository = Depends(get_feedback),
+) -> Response:
+    try:
+        rate(feedback, caller.user_id, module, body.concept_id, body.helpful)
+    except FeedbackError as exc:
+        raise ApiError(status.HTTP_409_CONFLICT, exc.code, exc.message) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def plan_response(graph: PrerequisiteGraph, plan: Plan) -> PlanResponse:

@@ -58,6 +58,11 @@ class PlanResponse(BaseModel):
     locked: list[LockedOut]
 
 
+class FeedbackIn(BaseModel):
+    concept_id: str = Field(pattern=CONCEPT_ID_PATTERN)  # the concept the card showed
+    helpful: bool
+
+
 class StubAttemptIn(BaseModel):
     concept_id: str = Field(pattern=CONCEPT_ID_PATTERN)
     item_id: str = Field(pattern=r"^[A-Za-z0-9._:-]{1,64}$")

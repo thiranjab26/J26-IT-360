@@ -21,6 +21,7 @@ from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
 from app.db.assessment_store import AssessmentStore
 from app.db.cohort_store import CohortStore
+from app.db.feedback_store import FeedbackStore
 from app.db.graph_wiring import build_graph_runtime
 from app.db.mastery_store import MasteryStore
 from app.db.paper_store import PaperStore
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.state.practice = Practice(PracticeStore(get_engine()), app.state.learner)
     app.state.cohort = CohortStore(get_engine())
     app.state.papers = Papers(PaperStore(get_engine()))
+    app.state.feedback = FeedbackStore(get_engine())
 
     app.add_middleware(RequestContextMiddleware)
     install_error_handlers(app)
