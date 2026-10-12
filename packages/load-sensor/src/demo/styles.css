@@ -2,37 +2,51 @@
  * Demo / debug page styles. System font stack only: no web fonts, because every
  * asset must be served same-origin and work offline (CLAUDE.md invariant 3).
  *
- * Look: a lab instrument rather than a web app. Warm graphite surfaces on a
- * faint graticule, one signal colour (chartreuse) for "live" and for every
+ * Look: a lab instrument rather than a web app. Neutral panels on a
+ * faint graticule, one signal colour (royal blue) for "live" and for every
  * chart line, coral for events, amber for thresholds. Flat panels with hairline
  * borders, monospace for labels and read-outs.
  */
 
+/*
+ * Theme: light is the default. A cool "ink and porcelain" palette: white
+ * panels on a blue-tinted ground, deep navy text, and one royal-blue signal
+ * colour (#335bd5, about 5.8:1 on white, so it passes WCAG AA for text and
+ * controls). Shadows are tinted with the same blue so depth reads soft rather
+ * than grey. Green is kept only for the semantic "good" state.
+ * The dark palette below opts in with <html data-theme="dark">.
+ * Camera and game stages stay dark in both themes (video and glow read best on
+ * black), so their colours are hard-coded further down.
+ */
 :root {
-  color-scheme: dark;
-  --bg: #0d0e0c;
-  --graticule: rgba(236, 239, 230, 0.045);
-  --surface: #151714;
-  --surface-2: #1b1d19;
-  --surface-3: #232620;
-  --border: #2a2d27;
-  --border-strong: #3a3e36;
-  --text: #eceee6;
-  --text-muted: #9ca194;
-  --text-faint: #686d61;
-  --accent: #d4ff3a;
-  --accent-text: #d4ff3a;
-  --accent-ink: #12160a;
-  --accent-soft: rgba(212, 255, 58, 0.12);
-  --event: #ff7a59;
-  --warn: #ffbe3d;
-  --danger: #ff5a4f;
-  --idle: #6b7064;
-  --good: #b5e61d;
-  --radius-lg: 10px;
-  --radius-md: 8px;
+  color-scheme: light;
+  --bg: #f5f7fc;
+  --bg-glow: rgba(51, 91, 213, 0.08);
+  --graticule: rgba(51, 91, 213, 0.055);
+  --surface: #ffffff;
+  --surface-2: #f7f9fd;
+  --surface-3: #eceff8;
+  --border: #e2e6f0;
+  --border-strong: #c9d0e0;
+  --text: #0f172e;
+  --text-muted: #4a5470;
+  --text-faint: #8189a0;
+  --accent: #335bd5;
+  --accent-hover: #2a4cb8;
+  --accent-text: #2d50c2;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(51, 91, 213, 0.09);
+  --accent-gradient: linear-gradient(180deg, #4069e0 0%, #335bd5 55%, #2c4fc4 100%);
+  --accent-shadow: 0 1px 2px rgba(31, 56, 140, 0.25), 0 6px 16px -6px rgba(51, 91, 213, 0.45);
+  --event: #c2410c;
+  --warn: #b45309;
+  --danger: #dc2626;
+  --idle: #8a91a6;
+  --good: #15803d;
+  --radius-lg: 12px;
+  --radius-md: 9px;
   --radius-sm: 6px;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --shadow: 0 1px 2px rgba(15, 23, 46, 0.04), 0 8px 24px -12px rgba(31, 56, 140, 0.12);
   --font:
     'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont,
     'Helvetica Neue', Arial, sans-serif;
@@ -40,50 +54,55 @@
     'Segoe UI Variable Display', 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Charts: one hue for every single-series strip; text never uses series colour. */
-  --chart-line: #c8f04a;
-  --chart-line-soft: rgba(200, 240, 74, 0.09);
-  --chart-grid: rgba(236, 239, 230, 0.07);
+  /* Charts: one hue for every single-series strip; text never uses series colour.
+     Calibration uses violet so it never reads as the blue data line. */
+  --chart-line: #335bd5;
+  --chart-line-soft: rgba(51, 91, 213, 0.08);
+  --chart-grid: rgba(15, 23, 46, 0.06);
+  --chart-threshold: #b45309;
+  --chart-marker: #c2410c;
+  --chart-invalid: rgba(220, 38, 38, 0.08);
+  --chart-calibration: rgba(124, 58, 237, 0.07);
+  --chart-calibration-edge: #7c3aed;
+  --chart-crosshair: rgba(15, 23, 46, 0.4);
+}
+
+/* Opt-in dark theme: midnight navy with a luminous blue signal colour. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0b0e16;
+  --bg-glow: rgba(124, 155, 255, 0.08);
+  --graticule: rgba(232, 235, 243, 0.045);
+  --surface: #12161f;
+  --surface-2: #171c27;
+  --surface-3: #1f2533;
+  --border: #262d3b;
+  --border-strong: #353d4f;
+  --text: #e8ebf3;
+  --text-muted: #9aa3b8;
+  --text-faint: #667089;
+  --accent: #7c9bff;
+  --accent-hover: #94adff;
+  --accent-text: #8fa9ff;
+  --accent-ink: #0b1230;
+  --accent-soft: rgba(124, 155, 255, 0.14);
+  --accent-gradient: linear-gradient(180deg, #91acff 0%, #7c9bff 100%);
+  --accent-shadow: 0 6px 16px -6px rgba(124, 155, 255, 0.45);
+  --event: #ff7a59;
+  --warn: #ffbe3d;
+  --danger: #ff5a4f;
+  --idle: #6b7389;
+  --good: #4ade80;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --chart-line: #7c9bff;
+  --chart-line-soft: rgba(124, 155, 255, 0.1);
+  --chart-grid: rgba(232, 235, 243, 0.07);
   --chart-threshold: #ffbe3d;
   --chart-marker: #ff7a59;
   --chart-invalid: rgba(255, 90, 79, 0.12);
-  --chart-calibration: rgba(124, 178, 255, 0.1);
-  --chart-calibration-edge: #7cb2ff;
-  --chart-crosshair: rgba(236, 238, 230, 0.5);
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color-scheme: light;
-    --bg: #f2f0e9;
-    --graticule: rgba(25, 26, 22, 0.05);
-    --surface: #fbfaf6;
-    --surface-2: #f4f2ec;
-    --surface-3: #e9e6dd;
-    --border: #dedad0;
-    --border-strong: #c9c4b7;
-    --text: #191a16;
-    --text-muted: #5c5f55;
-    --text-faint: #8b8e83;
-    /* Chartreuse is unreadable on paper: text and lines use a deep olive. */
-    --accent-text: #4f6b00;
-    --accent-soft: rgba(110, 150, 0, 0.12);
-    --event: #d9502e;
-    --warn: #a86400;
-    --danger: #cc3329;
-    --idle: #8b8e83;
-    --good: #557300;
-    --shadow: 0 1px 2px rgba(25, 26, 22, 0.05);
-    --chart-line: #557a00;
-    --chart-line-soft: rgba(85, 122, 0, 0.08);
-    --chart-grid: rgba(25, 26, 22, 0.08);
-    --chart-threshold: #b06a00;
-    --chart-marker: #d9502e;
-    --chart-invalid: rgba(204, 51, 41, 0.09);
-    --chart-calibration: rgba(40, 100, 200, 0.08);
-    --chart-calibration-edge: #2864c8;
-    --chart-crosshair: rgba(25, 26, 22, 0.45);
-  }
+  --chart-calibration: rgba(167, 139, 250, 0.1);
+  --chart-calibration-edge: #a78bfa;
+  --chart-crosshair: rgba(232, 235, 243, 0.5);
 }
 
 *,
@@ -101,8 +120,13 @@ body {
 body {
   /* Graticule: a 24 px dot grid, like an oscilloscope screen. */
   background-color: var(--bg);
-  background-image: radial-gradient(var(--graticule) 1px, transparent 1.2px);
-  background-size: 24px 24px;
+  background-image:
+    radial-gradient(1200px 520px at 50% -12%, var(--bg-glow), transparent 70%),
+    radial-gradient(var(--graticule) 1px, transparent 1.2px);
+  background-size:
+    100% 100%,
+    24px 24px;
+  background-repeat: no-repeat, repeat;
   color: var(--text);
   font-family: var(--font);
   font-size: 15px;
@@ -154,10 +178,11 @@ body {
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--accent-text);
+  background: var(--accent-gradient);
+  box-shadow: var(--accent-shadow);
+  color: var(--accent-ink);
 }
 
 .brand-mark svg {
@@ -519,9 +544,9 @@ h1 {
   background: linear-gradient(
     180deg,
     transparent,
-    rgba(212, 255, 58, 0.04) 70%,
-    rgba(212, 255, 58, 0.16) 97%,
-    rgba(212, 255, 58, 0.7) 100%
+    rgba(124, 155, 255, 0.04) 70%,
+    rgba(124, 155, 255, 0.16) 97%,
+    rgba(124, 155, 255, 0.7) 100%
   );
   transform: translateY(-100%);
   animation: scan 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
@@ -531,7 +556,7 @@ h1 {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(212, 255, 58, 0.18) 1px, transparent 1.4px);
+  background-image: radial-gradient(rgba(124, 155, 255, 0.18) 1px, transparent 1.4px);
   background-size: 18px 18px;
   mask-image: radial-gradient(60% 55% at 50% 50%, #000, transparent);
   animation: scan-grid 2.4s ease-in-out infinite;
@@ -578,7 +603,7 @@ h1 {
 }
 
 .stage[data-active='true']:has(.chip[data-face='found']) .viewfinder {
-  --vf: #d4ff3a;
+  --vf: #7c9bff;
 }
 
 .stage-empty {
@@ -681,8 +706,8 @@ h1 {
 }
 
 .chip[data-face='found'] {
-  border-color: rgba(212, 255, 58, 0.5);
-  color: #d4ff3a;
+  border-color: rgba(124, 155, 255, 0.5);
+  color: #7c9bff;
 }
 
 .privacy-chip {
@@ -698,7 +723,7 @@ h1 {
 .privacy-chip svg {
   width: 14px;
   height: 14px;
-  color: #d4ff3a;
+  color: #7c9bff;
 }
 
 .dock-expand {
@@ -837,13 +862,14 @@ h1 {
 
 .btn-primary {
   border-color: var(--accent);
-  background: var(--accent);
+  background: var(--accent-gradient);
+  box-shadow: var(--accent-shadow);
   color: var(--accent-ink);
 }
 
 .btn-primary:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 88%, #ffffff);
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
 }
 
 .btn-small {
@@ -1370,7 +1396,7 @@ h1 {
 }
 
 .dock-expand:focus-visible {
-  outline: 2px solid #d4ff3a;
+  outline: 2px solid #7c9bff;
   outline-offset: -2px;
   border-radius: var(--radius-md);
 }

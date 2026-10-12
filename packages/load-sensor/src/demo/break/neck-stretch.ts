@@ -23,7 +23,7 @@ import { clock, el, gameToolbar, setText, soundToggle } from './ui.js';
  */
 
 const COLOURS = {
-  accent: '#d4ff3a',
+  accent: '#7c9bff',
   coral: '#ff7a59',
   amber: '#ffbe3d',
   sky: '#7cb2ff',

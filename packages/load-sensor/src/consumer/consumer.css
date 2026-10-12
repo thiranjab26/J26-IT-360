@@ -1,29 +1,28 @@
-/* Mock consumer page. Deliberately plain: it is example code for teammates. */
+/* Mock consumer page. Deliberately plain: it is example code for teammates.
+   Light by default (same palette as the demo); <html data-theme="dark"> opts in to dark. */
 :root {
+  --bg: #f5f7fc;
+  --surface: #ffffff;
+  --border: #e2e6f0;
+  --text: #0f172e;
+  --muted: #4a5470;
+  --faint: #848c98;
+  --live: #2d50c2;
+  --warn: #b45309;
+  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
   --bg: #111310;
   --surface: #191c17;
   --border: #2c3029;
   --text: #eceee6;
   --muted: #9ca194;
   --faint: #686d61;
-  --live: #d4ff3a;
+  --live: #7c9bff;
   --warn: #ffb547;
-  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
   color-scheme: dark;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f4ee;
-    --surface: #ffffff;
-    --border: #dcd8cc;
-    --text: #1b1d18;
-    --muted: #5c5f55;
-    --faint: #8d9085;
-    --live: #4f6b00;
-    --warn: #9a5b00;
-    color-scheme: light;
-  }
 }
 
 * {

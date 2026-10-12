@@ -81,7 +81,7 @@ export class MemoryMatchGame {
   readonly #grid: HTMLElement;
   readonly #fxCanvas: HTMLCanvasElement;
   readonly #fxCtx: CanvasRenderingContext2D | null;
-  readonly #fx = new Particles(['#d4ff3a', '#ff7a59', '#ffbe3d', '#7cb2ff', '#ff8fb8']);
+  readonly #fx = new Particles(['#7c9bff', '#ff7a59', '#ffbe3d', '#7cb2ff', '#ff8fb8']);
   readonly #live: HTMLElement;
   readonly #ui: {
     moves: HTMLElement;
@@ -232,7 +232,7 @@ export class MemoryMatchGame {
       button.dataset.testid = 'mm-card';
       button.dataset.state = 'down';
       button.tabIndex = i === 0 ? 0 : -1;
-      button.style.setProperty('--hue', face?.colour ?? '#d4ff3a');
+      button.style.setProperty('--hue', face?.colour ?? '#7c9bff');
       const inner = el('span', 'mm-inner');
       const back = el('span', 'mm-face mm-back');
       back.append(el('span', 'mm-back-mark'));

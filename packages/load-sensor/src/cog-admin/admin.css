@@ -528,7 +528,7 @@
   border: 2px solid var(--accent-text);
   border-radius: 50%;
   background: var(--surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.2);
   appearance: none;
   transition: transform 0.15s ease;
 }

@@ -123,7 +123,7 @@ function mount(root: HTMLElement): void {
   const mark = el('span', 'brand-mark');
   mark.append(icon(ICONS.logo));
   const brandText = el('span', 'admin-brand-text');
-  brandText.append(el('span', 'brand-eyebrow', 'AdaptLearn Â· C02'), el('strong', '', 'Cog admin'));
+  brandText.append(el('span', 'brand-eyebrow', 'AdaptLearn · C02'), el('strong', '', 'Cog admin'));
   brand.append(mark, brandText);
   const navList = el('ul', 'admin-nav');
   const navLinks = new Map<string, HTMLAnchorElement>();
@@ -156,7 +156,7 @@ function mount(root: HTMLElement): void {
   const conn = el('div', 'status-pill');
   conn.dataset.testid = 'admin-connection';
   const connDot = el('span', 'dot');
-  const connText = el('span', '', 'Looking for the sensor pageâ€¦');
+  const connText = el('span', '', 'Looking for the sensor page…');
   connText.setAttribute('role', 'status');
   conn.append(connDot, connText);
   const saved = el('span', 'admin-saved');
@@ -208,10 +208,10 @@ function mount(root: HTMLElement): void {
       connText.textContent = 'Sensor page not open';
       conn.dataset.tone = 'idle';
     } else if (status?.camera === 'active') {
-      connText.textContent = 'Connected Â· sensing live';
+      connText.textContent = 'Connected · sensing live';
       conn.dataset.tone = 'live';
     } else {
-      connText.textContent = 'Connected Â· sensing off';
+      connText.textContent = 'Connected · sensing off';
       conn.dataset.tone = status?.camera === 'paused' ? 'paused' : 'idle';
     }
     overview.render(fresh ? status : null);
@@ -243,7 +243,7 @@ function buildOverview(send: (c: ControlCommand) => void): {
     testId: string,
   ): { value: HTMLElement; sub: HTMLElement; root: HTMLElement } => {
     const t = el('div', 'admin-tile');
-    const value = el('span', 'admin-tile-value', 'â€“');
+    const value = el('span', 'admin-tile-value', '–');
     value.dataset.testid = testId;
     const sub = el('span', 'admin-tile-sub', '');
     t.append(el('span', 'admin-tile-label', label), value, sub);
@@ -261,7 +261,7 @@ function buildOverview(send: (c: ControlCommand) => void): {
   const calib = el('div', 'admin-calib');
   const calibTop = el('div', 'admin-calib-top');
   const calibLabel = el('span', 'admin-calib-label', 'Baseline');
-  const calibValue = el('span', 'admin-calib-value', 'â€“');
+  const calibValue = el('span', 'admin-calib-value', '–');
   calibTop.append(calibLabel, calibValue);
   const track = el('div', 'admin-progress');
   const bar = el('div', 'admin-progress-bar');
@@ -361,11 +361,11 @@ function buildOverview(send: (c: ControlCommand) => void): {
         cam.sub,
         s ? (s.backend ? `Backend ${s.backend}` : `Model ${s.modelState}`) : 'Open the sensor page',
       );
-      setText(fps.value, running ? s.fps.toFixed(1) : 'â€“');
+      setText(fps.value, running ? s.fps.toFixed(1) : '–');
       setText(fps.sub, s ? `target ${String(s.targetFps)}` : '');
       setText(
         p95.value,
-        running && Number.isFinite(s.inferenceP95) ? `${s.inferenceP95.toFixed(0)} ms` : 'â€“',
+        running && Number.isFinite(s.inferenceP95) ? `${s.inferenceP95.toFixed(0)} ms` : '–',
       );
       setText(
         p95.sub,
@@ -376,7 +376,7 @@ function buildOverview(send: (c: ControlCommand) => void): {
       setText(
         face.value,
         !s
-          ? 'â€“'
+          ? '–'
           : s.face === 'found'
             ? 'Detected'
             : s.face === 'none'
@@ -385,11 +385,11 @@ function buildOverview(send: (c: ControlCommand) => void): {
       );
       face.root.dataset.tone = s?.face === 'found' ? 'live' : s?.face === 'none' ? 'busy' : 'idle';
       setText(face.sub, s ? `${String(s.errors)} inference errors` : '');
-      setText(screen.value, s ? clock(s.onScreenMs) : 'â€“');
+      setText(screen.value, s ? clock(s.onScreenMs) : '–');
       setText(screen.sub, s ? `eye break ${clock(s.sinceEyeBreakMs)} ago` : '');
       setText(
         alarmTile.value,
-        !s ? 'â€“' : s.alarm === 'absent' ? 'Away' : s.alarm === 'asleep' ? 'Eyes closed' : 'Quiet',
+        !s ? '–' : s.alarm === 'absent' ? 'Away' : s.alarm === 'asleep' ? 'Eyes closed' : 'Quiet',
       );
       alarmTile.root.dataset.tone = s?.alarm ? 'error' : 'idle';
       setText(alarmTile.sub, s?.alarm ? 'Beeping on the sensor page' : '');
@@ -404,8 +404,8 @@ function buildOverview(send: (c: ControlCommand) => void): {
           ? 'Waiting for sensing'
           : s.phase === 'ready'
             ? s.classifiable
-              ? 'Ready Â· window full'
-              : 'Ready Â· filling window'
+              ? 'Ready · window full'
+              : 'Ready · filling window'
             : `Calibrating ${String(pct)} %`,
       );
 
@@ -650,7 +650,7 @@ function formatConst(name: string, value: unknown): string {
       : value >= 1000
         ? `${String(value / 1000)} s`
         : `${String(value)} ms`;
-  if (name.endsWith('Deg')) return `${String(value)}Â°`;
+  if (name.endsWith('Deg')) return `${String(value)}°`;
   if (/Ratio$|Fraction$/.test(name)) return `${String(Math.round(value * 100))} %`;
   if (name === 'seconds') return `${String(value)} s`;
   return String(value);
@@ -680,7 +680,7 @@ function buildPrivacy(store: SettingsStore): { element: HTMLElement; render(): v
     ],
     [
       'Settings stay local',
-      'The values on this page live in this browserâ€™s storage only, for this site.',
+      'The values on this page live in this browser’s storage only, for this site.',
     ],
   ] as const) {
     const li = el('li');

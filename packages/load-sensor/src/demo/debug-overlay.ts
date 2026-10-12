@@ -24,7 +24,7 @@ const EASE_MS = 40;
 const FADE_MS = 280;
 
 const COLOURS = {
-  mesh: '212, 255, 58',
+  mesh: '124, 155, 255',
   iris: '255, 122, 89',
   feature: '#ffd166',
   ink: '#0b0d0a',
