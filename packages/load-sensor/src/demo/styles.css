@@ -20,8 +20,10 @@
  */
 :root {
   color-scheme: light;
-  --bg: #f5f7fc;
-  --bg-glow: rgba(51, 91, 213, 0.08);
+  --bg: #eef1f8;
+  --bg-glow: rgba(51, 91, 213, 0.1);
+  --band: linear-gradient(180deg, #e3e9fa 0%, #eaeefa 70%, rgba(238, 241, 248, 0) 100%);
+  --tile: #f5f7fc;
   --graticule: rgba(51, 91, 213, 0.055);
   --surface: #ffffff;
   --surface-2: #f7f9fd;
@@ -72,6 +74,8 @@
   color-scheme: dark;
   --bg: #0b0e16;
   --bg-glow: rgba(124, 155, 255, 0.08);
+  --band: linear-gradient(180deg, #121a2e 0%, rgba(11, 14, 22, 0) 100%);
+  --tile: #171c27;
   --graticule: rgba(232, 235, 243, 0.045);
   --surface: #12161f;
   --surface-2: #171c27;
@@ -120,13 +124,15 @@ body {
 body {
   /* Graticule: a 24 px dot grid, like an oscilloscope screen. */
   background-color: var(--bg);
+  /* Top band behind the header and tabs, a soft glow, then the dot grid. */
   background-image:
-    radial-gradient(1200px 520px at 50% -12%, var(--bg-glow), transparent 70%),
+    var(--band), radial-gradient(1200px 520px at 50% -12%, var(--bg-glow), transparent 70%),
     radial-gradient(var(--graticule) 1px, transparent 1.2px);
   background-size:
+    100% 190px,
     100% 100%,
     24px 24px;
-  background-repeat: no-repeat, repeat;
+  background-repeat: no-repeat, no-repeat, repeat;
   color: var(--text);
   font-family: var(--font);
   font-size: 15px;
@@ -140,28 +146,12 @@ body {
 }
 
 .shell {
-  max-width: 1240px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 24px 24px 48px;
+  padding: 18px 24px 28px;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────── */
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-
-.top-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
 
 .admin-link {
   text-decoration: none;
@@ -216,13 +206,22 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  max-width: 100%;
+  min-width: 0;
+  /* Long errors would otherwise push the header onto a second row. */
+  max-width: min(520px, 100%);
   padding: 7px 14px 7px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
   font-size: 13.5px;
   font-weight: 500;
+}
+
+.status-pill > span:last-child {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-pill .dot {
@@ -271,7 +270,7 @@ h1 {
   position: sticky;
   top: 0;
   z-index: 20;
-  margin: 0 -24px 24px;
+  margin: 0 -24px 16px;
   padding: 0 24px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg) 92%, transparent);
@@ -297,8 +296,8 @@ h1 {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
-  min-width: 210px;
-  padding: 12px 18px 13px 4px;
+  min-width: 196px;
+  padding: 9px 16px 10px 4px;
   border: 0;
   background: transparent;
   color: var(--text-muted);
@@ -425,8 +424,16 @@ h1 {
 .layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 20px;
+  gap: 14px;
   align-items: start;
+}
+
+/* Wide screens: the camera stays in view while the wellbeing column scrolls. */
+@media (min-width: 981px) {
+  .camera-panel[data-active='true'] .camera-card {
+    position: sticky;
+    top: 16px;
+  }
 }
 
 @media (max-width: 980px) {
@@ -475,14 +482,6 @@ h1 {
 
 .camera-card {
   padding: 10px;
-}
-
-/* Wide screens: the camera stays in view while the Wellbeing column scrolls. */
-@media (min-width: 981px) {
-  .camera-panel[data-active='true'] .camera-card {
-    position: sticky;
-    top: 96px;
-  }
 }
 
 .stage {
@@ -907,7 +906,7 @@ h1 {
 .perf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
+  gap: 14px;
   align-items: start;
   margin-top: 16px;
 }
@@ -925,8 +924,8 @@ h1 {
 
 .metric {
   min-width: 0;
-  padding: 12px 14px;
-  background: var(--surface);
+  padding: 11px 14px;
+  background: var(--tile);
 }
 
 .metric-label {
@@ -983,8 +982,8 @@ h1 {
 }
 
 .footer {
-  margin-top: 32px;
-  padding-top: 16px;
+  margin-top: 20px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
   color: var(--text-faint);
   font-family: var(--mono);
@@ -997,13 +996,13 @@ h1 {
 .wellbeing {
   display: grid;
   min-width: 0;
-  gap: 12px;
+  gap: 14px;
 }
 
 .wb-card {
   display: grid;
-  gap: 10px;
-  padding: 14px 16px 16px;
+  gap: 8px;
+  padding: 13px 16px 14px;
 }
 
 .wb-card > .card-title {
@@ -1219,66 +1218,6 @@ h1 {
   }
 }
 
-/* All tips */
-.wb-list {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.wb-item {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
-  align-items: start;
-  padding: 9px 8px;
-  border-radius: var(--radius-sm);
-  transition: background 0.2s ease;
-}
-
-.wb-item[data-current='true'] {
-  background: var(--surface-2);
-}
-
-.wb-item-icon {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-}
-
-.wb-item[data-current='true'] .wb-item-icon {
-  border-color: var(--accent-text);
-  color: var(--accent-text);
-}
-
-.wb-item-icon svg {
-  width: 17px;
-  height: 17px;
-}
-
-.wb-item-text {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.wb-item-text strong {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-.wb-item-text span {
-  color: var(--text-faint);
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-
 /* ── Dock: the camera as a mini preview while another tab is open ───── */
 
 /* Room at the bottom so the docked preview never covers the last content. */
@@ -1391,8 +1330,85 @@ h1 {
 }
 
 .dock-expand:hover svg,
-.dock-expand:focus-visible svg {
+.dock-expand:focus-visible svg,
+.camera-card:hover .dock-expand svg {
   opacity: 1;
+}
+
+/* Minimise toggle: only on the floating dock, never on the Break-tab slot. */
+.dock-min {
+  display: none;
+}
+
+.camera-panel[data-active='false'][data-running='true']:not([data-dock='slot'])
+  .dock-min:not([hidden]) {
+  position: absolute;
+  top: 10px;
+  right: 42px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(10, 11, 9, 0.7);
+  color: #eceee6;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.camera-panel[data-active='false'][data-running='true']:not([data-dock='slot'])
+  .camera-card:hover
+  .dock-min:not([hidden]),
+.camera-panel[data-active='false'][data-running='true']:not([data-dock='slot'])
+  .dock-min:not([hidden]):focus-visible {
+  opacity: 1;
+}
+
+.dock-min:focus-visible {
+  outline: 2px solid #7c9bff;
+  outline-offset: 1px;
+}
+
+.dock-min svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Minimised: a small live thumbnail. Still rendered, so sensing continues. */
+.camera-panel[data-active='false'][data-running='true'][data-dock-min='true']:not(
+    [data-dock='slot']
+  )
+  .camera-card {
+  width: 132px;
+  padding: 4px;
+}
+
+.camera-panel[data-dock-min='true']:not([data-dock='slot']) .viewfinder,
+.camera-panel[data-dock-min='true']:not([data-dock='slot']) .alarm-banner,
+.camera-panel[data-dock-min='true']:not([data-dock='slot']) .hud .chip:not(:first-child),
+.camera-panel[data-dock-min='true']:not([data-dock='slot']) .dock-expand svg {
+  display: none;
+}
+
+.camera-panel[data-active='false'][data-running='true'][data-dock-min='true']:not(
+    [data-dock='slot']
+  )
+  .dock-min:not([hidden]) {
+  top: 6px;
+  right: 6px;
+  opacity: 1;
+}
+
+.shell:has(
+  .camera-panel[data-active='false'][data-running='true'][data-dock-min='true']:not(
+      [data-dock='slot']
+    )
+) {
+  padding-bottom: 140px;
 }
 
 .dock-expand:focus-visible {
@@ -1459,7 +1475,7 @@ h1 {
 
 .signals {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .section-head {
@@ -1665,7 +1681,8 @@ h1 {
 /* KPI tiles: one strip of cells sharing hairline borders. */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+  /* Fixed column counts so a row never ends with an orphan tile and an empty hole. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -1677,7 +1694,7 @@ h1 {
   --tone: transparent;
   position: relative;
   min-width: 0;
-  padding: 16px 16px 14px;
+  padding: 13px 16px 12px;
   background: var(--surface);
 }
 
@@ -1782,7 +1799,7 @@ h1 {
 
 /* Chart cards */
 .chart-card {
-  padding: 16px 18px 12px;
+  padding: 13px 16px 10px;
 }
 
 .chart-card-head {
@@ -2058,9 +2075,16 @@ h1 {
 
 .load-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 10px 16px;
+  /* 10 fields: 2 or 5 per row, so rows are always full. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
   margin: 12px 18px 0;
+}
+
+.load-grid > div {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--tile);
 }
 
 .load-grid dt {
@@ -2093,4 +2117,293 @@ h1 {
   margin: 8px 0 0;
   font-family: var(--mono);
   font-size: 12px;
+}
+
+/* Minimised thumbnail keeps only a tiny LIVE / PAUSED chip. */
+.camera-panel[data-dock-min='true']:not([data-dock='slot']) .hud {
+  inset: 6px auto auto 6px;
+}
+
+.camera-panel[data-dock-min='true']:not([data-dock='slot']) .hud .chip {
+  padding: 1px 5px;
+  font-size: 9px;
+}
+
+/* ── Even grids (KPI tiles and event fields) ────────────────────────── */
+
+@media (min-width: 720px) {
+  .kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1300px) {
+  .kpis {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(220px, 1.25fr);
+  }
+}
+
+@media (min-width: 560px) {
+  .load-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* ── Sidebar and page frame ──────────────────────────────────────────
+   Wide screens: a full-height sidebar flush with the left edge (same frame
+   as the Cog admin page) holding the brand, the view tabs, status and
+   settings; the content column sits beside it. Narrow screens flatten the
+   sidebar into a header with the tabs as a sideways-scrolling bar. */
+
+.side-label,
+.side-note {
+  display: none;
+}
+
+.side-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+@media (max-width: 980px) {
+  .side {
+    display: contents;
+  }
+
+  .shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 16px;
+  }
+
+  .shell > .main,
+  .side > .tabs {
+    grid-column: 1 / -1;
+  }
+
+  /* Brand and status first, then the tab bar, then the content. */
+  .side > .tabs {
+    order: 1;
+  }
+
+  .shell > .main {
+    order: 2;
+  }
+
+  .side > .brand {
+    margin-bottom: 10px;
+  }
+
+  .side > .side-foot {
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  .side > .brand,
+  .side > .side-foot {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 981px) {
+  .shell {
+    display: grid;
+    grid-template-columns: 264px minmax(0, 1fr);
+    max-width: none;
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .side {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 22px 16px 16px;
+    border-right: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 88%, transparent);
+    backdrop-filter: blur(10px);
+    scrollbar-width: thin;
+  }
+
+  .side > .brand {
+    gap: 12px;
+    margin: 0 0 18px;
+    padding: 0 6px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .side .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .side .brand-mark svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .side .brand-eyebrow {
+    font-size: 10.5px;
+  }
+
+  .side h1 {
+    font-size: 18px;
+  }
+
+  .side-label {
+    display: block;
+    margin: 0 0 8px;
+    padding: 0 12px;
+    color: var(--text-faint);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* Tabs as a vertical nav list. */
+  .side > .tabs {
+    position: static;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    backdrop-filter: none;
+  }
+
+  .side .tabs-list {
+    flex-direction: column;
+    gap: 4px;
+    overflow: visible;
+  }
+
+  .side .tab,
+  .side .tab:first-child {
+    min-width: 0;
+    gap: 12px;
+    padding: 10px 10px 10px 12px;
+    border-radius: var(--radius-md);
+    transition:
+      color 0.15s ease,
+      background 0.15s ease;
+  }
+
+  .side .tab:hover {
+    background: var(--surface-3);
+  }
+
+  .side .tab[aria-selected='true'] {
+    background: var(--accent-soft);
+  }
+
+  .side .tab-index {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--surface);
+    font-size: 11.5px;
+  }
+
+  .side .tab-label {
+    font-size: 14.5px;
+  }
+
+  .side .tab-meta {
+    font-size: 11px;
+  }
+
+  /* Active marker on the sidebar's left edge (16 px = the sidebar padding). */
+  .side .tabs-indicator {
+    top: 0;
+    bottom: auto;
+    left: -16px;
+    width: 3px;
+    height: 0;
+    border-radius: 0 3px 3px 0;
+    background: var(--accent);
+  }
+
+  .side .tabs-indicator[data-ready='true'] {
+    transition:
+      transform 0.28s cubic-bezier(0.3, 0.7, 0.2, 1),
+      height 0.28s cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+
+  .side-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+  }
+
+  .side-foot .status-pill {
+    max-width: 100%;
+    padding: 9px 12px;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+  }
+
+  .side-foot .admin-link {
+    justify-content: flex-start;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .side-note {
+    display: block;
+    margin: 4px 0 0;
+    padding: 0 12px;
+    color: var(--text-faint);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .main {
+    width: 100%;
+    max-width: 1320px;
+    min-width: 0;
+    margin: 0 auto;
+    padding: 24px 28px 28px;
+  }
+}
+
+/*
+ * Wide, tall windows: the floating mini preview docks at the bottom of the
+ * sidebar, under the nav, so it never covers a tab's content. Short windows
+ * keep the bottom-right corner.
+ */
+@media (min-width: 981px) and (min-height: 720px) {
+  .camera-panel[data-active='false'][data-running='true']:not([data-dock='slot']) .camera-card {
+    right: auto;
+    bottom: 16px;
+    left: 16px;
+    width: 232px;
+  }
+
+  .camera-panel[data-active='false'][data-running='true'][data-dock-min='true']:not(
+      [data-dock='slot']
+    )
+    .camera-card {
+    width: 132px;
+  }
+
+  .shell:has(.camera-panel[data-active='false'][data-running='true']:not([data-dock='slot'])) {
+    padding-bottom: 0;
+  }
 }

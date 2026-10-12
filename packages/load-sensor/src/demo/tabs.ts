@@ -2,6 +2,10 @@
  * Accessible tab bar for the demo page (WAI-ARIA tabs pattern): arrow keys,
  * Home and End move between tabs, and the choice is kept in the URL hash so a
  * reload or a shared link opens the same view.
+ *
+ * Wide screens show it as a vertical rail on the left, narrow screens as a
+ * sideways-scrolling bar (styles.css). The orientation is read from the
+ * layout, so the indicator and arrow keys follow whichever is on screen.
  */
 
 export interface TabSpec {
@@ -142,6 +146,11 @@ export class Tabs {
   #placeIndicator(): void {
     const tab = this.#tabs.find((t) => t.spec.id === this.#active);
     if (!tab) return;
+    const vertical = this.#vertical();
+    tab.button.parentElement?.setAttribute(
+      'aria-orientation',
+      vertical ? 'vertical' : 'horizontal',
+    );
     // Narrow screens: keep the active tab in view in the sideways-scrolling bar
     // (scrollLeft only, so the page itself never jumps vertically).
     const list = tab.button.parentElement;
@@ -152,8 +161,15 @@ export class Tabs {
         list.scrollLeft = left - 8;
       }
     }
-    this.#indicator.style.width = `${String(tab.button.offsetWidth)}px`;
-    this.#indicator.style.transform = `translateX(${String(tab.button.offsetLeft)}px)`;
+    if (vertical) {
+      this.#indicator.style.width = '';
+      this.#indicator.style.height = `${String(tab.button.offsetHeight)}px`;
+      this.#indicator.style.transform = `translateY(${String(tab.button.offsetTop)}px)`;
+    } else {
+      this.#indicator.style.height = '';
+      this.#indicator.style.width = `${String(tab.button.offsetWidth)}px`;
+      this.#indicator.style.transform = `translateX(${String(tab.button.offsetLeft)}px)`;
+    }
     // Animate only moves between tabs, not the first placement after layout.
     if (tab.button.offsetWidth > 0 && !this.#indicator.dataset.ready) {
       requestAnimationFrame(() => {
@@ -165,10 +181,13 @@ export class Tabs {
   #onKey(e: KeyboardEvent, id: string): void {
     const i = this.#tabs.findIndex((t) => t.spec.id === id);
     const n = this.#tabs.length;
+    const vertical = this.#vertical();
+    const nextKey = vertical ? 'ArrowDown' : 'ArrowRight';
+    const prevKey = vertical ? 'ArrowUp' : 'ArrowLeft';
     const target =
-      e.key === 'ArrowRight'
+      e.key === nextKey
         ? (i + 1) % n
-        : e.key === 'ArrowLeft'
+        : e.key === prevKey
           ? (i - 1 + n) % n
           : e.key === 'Home'
             ? 0
@@ -179,6 +198,12 @@ export class Tabs {
     if (!next) return;
     e.preventDefault();
     this.select(next.spec.id, true);
+  }
+
+  /** True when the tab list is laid out as a column (the left rail). */
+  #vertical(): boolean {
+    const list = this.#tabs[0]?.button.parentElement;
+    return list ? getComputedStyle(list).flexDirection === 'column' : false;
   }
 
   #fromHash(): string | null {

@@ -1,16 +1,21 @@
+import type { LoadStateEvent } from '../core/events/types.js';
 import type { NormalisedSecond } from '../core/window/index.js';
 import type { AlarmReason } from './attention-alarm.js';
 
 /**
  * Wellbeing side panel on the Camera tab: the away/asleep alarm controls,
- * screen time with break reminders, and health tips.
+ * screen time with break reminders, a featured tip and one healthy study habit.
  *
  * Tips are general advice, shown as reminders, not as diagnoses. Which tip is
  * featured follows simple rules: tiredness signs → a walk; 20 min on screen →
  * an eye break; 30 min → movement; otherwise they rotate.
+ *
+ * The habit card shows one habit at a time, chosen from the live event-stream
+ * heuristics (engagement, fatigue, frustration, strain; see HABIT_RULES). It
+ * never repeats the featured tip, and rotates when no rule applies.
  */
 
-type TipId = 'water' | 'eyes' | 'stretch' | 'walk' | 'posture' | 'blink' | 'breathe';
+export type TipId = 'water' | 'eyes' | 'stretch' | 'walk' | 'posture' | 'blink' | 'breathe';
 
 interface Tip {
   readonly id: TipId;
@@ -72,9 +77,79 @@ const MOVE_BREAK_MS = 30 * 60_000; // a common desk-work reminder interval
 const AWAY_IS_BREAK_MS = 2 * 60_000;
 /** Featured tip rotation when nothing more specific applies. */
 const ROTATE_MS = 45_000;
+/** Habit rotation when no signal rule applies; offset so tip and habit do not change together. */
+const HABIT_ROTATE_MS = 60_000;
+
+/** The event-stream fields the habit card reads (all documented heuristics, ARCHITECTURE.md §7–8a). */
+export type HabitSignals = Pick<
+  LoadStateEvent,
+  'engagement' | 'fatigue' | 'frustration' | 'strain' | 'presence'
+>;
+
+/**
+ * Signal → habit, first match wins. Ordered by how much the habit helps right
+ * now: tiredness and frustration first, then screen strain, then attention.
+ * The reason text names the signal so the learner can see why it was picked.
+ */
+const HABIT_RULES: readonly {
+  readonly id: TipId;
+  readonly when: (s: HabitSignals) => boolean;
+  readonly reason: string;
+}[] = [
+  { id: 'walk', when: (s) => s.fatigue === 'High', reason: 'Signs of tiredness · fatigue High' },
+  {
+    id: 'breathe',
+    when: (s) => s.frustration === true,
+    reason: 'A hard stretch of work · frustration detected',
+  },
+  { id: 'eyes', when: (s) => s.strain === 'High', reason: 'Long screen time today · strain High' },
+  {
+    id: 'posture',
+    when: (s) => s.engagement === 'Low',
+    reason: 'Attention drifting from the screen · engagement Low',
+  },
+  // People blink less while concentrating on a screen, so deep focus gets the blink habit.
+  { id: 'blink', when: (s) => s.engagement === 'High', reason: 'Deep focus · engagement High' },
+  {
+    id: 'water',
+    when: (s) => s.fatigue === 'Medium',
+    reason: 'Early signs of tiredness · fatigue Medium',
+  },
+  {
+    id: 'stretch',
+    when: (s) => s.engagement === 'Medium',
+    reason: 'Steady work · engagement Medium',
+  },
+];
 /** Tiredness signs (long eye closures + yawns + nods) in 5 min that make "walk" the featured tip. */
 const TIRED_EVENTS = 2;
 const TIRED_WINDOW_S = 300;
+
+/** Reason shown when no signal rule applies and the habit is just the next in rotation. */
+export const HABIT_DEFAULT_REASON = 'Habit to keep';
+
+/**
+ * The habit to show and why: the first HABIT_RULES entry that matches the
+ * signals, else the next habit in rotation from `rotateIndex`. Never returns
+ * `featured` (the Tip card already shows it). Signals are read only while a
+ * face is present; otherwise the card just rotates. Pure, for unit tests.
+ */
+export function pickHabit(
+  signals: HabitSignals | null,
+  featured: TipId | null,
+  rotateIndex: number,
+): { id: TipId; reason: string } {
+  if (signals?.presence === 'present') {
+    for (const rule of HABIT_RULES) {
+      if (rule.id !== featured && rule.when(signals)) return { id: rule.id, reason: rule.reason };
+    }
+  }
+  for (let k = 0; k < TIPS.length; k += 1) {
+    const tip = TIPS[(rotateIndex + k) % TIPS.length];
+    if (tip && tip.id !== featured) return { id: tip.id, reason: HABIT_DEFAULT_REASON };
+  }
+  return { id: 'water', reason: HABIT_DEFAULT_REASON };
+}
 
 export type AlarmView = 'sensing-off' | 'disabled' | 'watching' | AlarmReason;
 
@@ -106,9 +181,19 @@ export class WellbeingPanel {
     reason: HTMLElement;
     play: HTMLButtonElement;
   };
+  readonly #habit: {
+    root: HTMLElement;
+    icon: HTMLElement;
+    title: HTMLElement;
+    body: HTMLElement;
+    reason: HTMLElement;
+  };
   /** Set by the page: opens the neck-stretch game from the stretch tip. */
   onPlayStretch: (() => void) | null = null;
-  readonly #listItems = new Map<TipId, HTMLElement>();
+  #signals: HabitSignals | null = null;
+  #habitIndex = 1;
+  #habitRotateAt = 0;
+  #habitId: TipId | null = null;
 
   #seconds: NormalisedSecond[] = [];
   #lastTick = 0;
@@ -215,23 +300,24 @@ export class WellbeingPanel {
       play,
     };
 
-    // ── All tips ──
-    const listCard = el('section', 'card wb-card');
-    listCard.append(el('h2', 'card-title', 'Healthy study habits'));
-    const list = el('ul', 'wb-list');
-    for (const tip of TIPS) {
-      const item = el('li', 'wb-item');
-      const ic = el('span', 'wb-item-icon');
-      ic.append(icon(tip.icon));
-      const txt = el('span', 'wb-item-text');
-      txt.append(el('strong', '', tip.title), el('span', '', tip.body));
-      item.append(ic, txt);
-      list.append(item);
-      this.#listItems.set(tip.id, item);
-    }
-    listCard.append(list);
+    // ── One healthy study habit, picked from engagement ──
+    const habitCard = el('section', 'card wb-card wb-habit');
+    habitCard.append(el('h2', 'card-title', 'Healthy study habit'));
+    const hIcon = el('div', 'wb-tip-icon');
+    const hTitle = el('p', 'wb-tip-title', '');
+    hTitle.dataset.testid = 'habit-title';
+    const hBody = el('p', 'wb-tip-body', '');
+    const hReason = el('p', 'wb-tip-reason', '');
+    hReason.dataset.testid = 'habit-reason';
+    const hText = el('div', 'wb-tip-text');
+    hText.append(hReason, hTitle, hBody);
+    const hRow = el('div', 'wb-tip-row');
+    hRow.append(hIcon, hText);
+    hRow.setAttribute('aria-live', 'polite');
+    habitCard.append(hRow);
+    this.#habit = { root: habitCard, icon: hIcon, title: hTitle, body: hBody, reason: hReason };
 
-    this.element.append(alarmCard, timeCard, tipCard, listCard);
+    this.element.append(alarmCard, timeCard, tipCard, habitCard);
     this.setAlarm('sensing-off');
     this.#renderFeatured();
     this.#renderTimes();
@@ -272,6 +358,12 @@ export class WellbeingPanel {
     this.#alarm.root.dataset.state = view;
   }
 
+  /** Latest event-stream signals for the habit card; null when sensing is off. */
+  setSignals(s: HabitSignals | null): void {
+    this.#signals = s;
+    this.#renderHabit();
+  }
+
   pushSecond(s: NormalisedSecond): void {
     this.#seconds.push(s);
     while (this.#seconds.length > TIRED_WINDOW_S) this.#seconds.shift();
@@ -300,8 +392,14 @@ export class WellbeingPanel {
       this.#rotateIndex = (this.#rotateIndex + 1) % TIPS.length;
       this.#rotateAt = now + ROTATE_MS;
     }
+    if (!this.#habitRotateAt) this.#habitRotateAt = now + HABIT_ROTATE_MS;
+    if (now >= this.#habitRotateAt) {
+      this.#habitIndex = (this.#habitIndex + 1) % TIPS.length;
+      this.#habitRotateAt = now + HABIT_ROTATE_MS;
+    }
     this.#renderTimes();
     this.#renderFeatured();
+    this.#renderHabit();
   }
 
   /** Clears the session (sensing turned off). */
@@ -352,6 +450,24 @@ export class WellbeingPanel {
     return { id: TIPS[this.#rotateIndex]?.id ?? 'water', reason: 'Reminder' };
   }
 
+  #renderHabit(): void {
+    const { id, reason } = pickHabit(this.#signals, this.#featuredId, this.#habitIndex);
+    const tip = TIPS.find((t) => t.id === id);
+    if (!tip) return;
+    const h = this.#habit;
+    h.root.dataset.suggested = String(reason !== HABIT_DEFAULT_REASON);
+    if (h.reason.textContent !== reason) h.reason.textContent = reason;
+    if (this.#habitId === id) return;
+    this.#habitId = id;
+    h.title.textContent = tip.title;
+    h.body.textContent = tip.body;
+    h.icon.replaceChildren(icon(tip.icon));
+    h.root.classList.remove('wb-swap');
+    requestAnimationFrame(() => {
+      h.root.classList.add('wb-swap');
+    });
+  }
+
   #renderFeatured(): void {
     const { id, reason } = this.#pick();
     const tip = TIPS.find((t) => t.id === id);
@@ -362,6 +478,8 @@ export class WellbeingPanel {
     if (f.reason.textContent !== reason) f.reason.textContent = reason;
     if (this.#featuredId === id) return;
     this.#featuredId = id;
+    // The habit card never shows the featured tip, so it may need to move on.
+    this.#renderHabit();
     f.title.textContent = tip.title;
     f.body.textContent = tip.body;
     f.icon.replaceChildren(icon(tip.icon));
@@ -370,7 +488,6 @@ export class WellbeingPanel {
     requestAnimationFrame(() => {
       f.root.classList.add('wb-swap');
     });
-    for (const [tid, item] of this.#listItems) item.dataset.current = String(tid === id);
   }
 
   #renderTimes(): void {

@@ -80,6 +80,8 @@ const ICONS = {
     '<path d="M12 3 5 6v5c0 4.5 3 8.4 7 10 4-1.6 7-5.5 7-10V6l-7-3z"/><path d="m9 12 2 2 4-4"/>',
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   expand: '<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>',
+  minimise: '<path d="M5 12h14"/>',
+  restore: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 9h16"/>',
   sliders:
     '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
 } as const;
@@ -92,9 +94,13 @@ function mount(root: HTMLElement): void {
   const brandMark = el('div');
   brandMark.className = 'brand-mark';
   brandMark.append(icon(ICONS.logo));
-  const eyebrow = el('p', 'AdaptLearn · Component 02');
+  const eyebrow = el('p', 'AdaptLearn · C02');
   eyebrow.className = 'brand-eyebrow';
-  const heading = el('h1', 'AdaptLearn C02 — Load sensor');
+  // Full name for screen readers; the sidebar shows the short "Load sensor".
+  const heading = el('h1');
+  const headingPrefix = el('span', 'AdaptLearn C02 — ');
+  headingPrefix.className = 'visually-hidden';
+  heading.append(headingPrefix, 'Load sensor');
   const brandText = el('div');
   brandText.append(eyebrow, heading);
   const brand = el('div');
@@ -117,13 +123,11 @@ function mount(root: HTMLElement): void {
   adminLink.target = 'adaptlearn-c2-cog-admin';
   adminLink.dataset.testid = 'open-admin';
   adminLink.append(icon(ICONS.sliders), el('span', 'Cog admin'));
-  const topActions = el('div');
-  topActions.className = 'top-actions';
-  topActions.append(adminLink, pill);
-
-  const topbar = el('header');
-  topbar.className = 'topbar';
-  topbar.append(brand, topActions);
+  const privacyNote = el('p', 'Video stays on this device. Nothing is uploaded.');
+  privacyNote.className = 'side-note';
+  const sideFoot = el('div');
+  sideFoot.className = 'side-foot';
+  sideFoot.append(pill, adminLink, privacyNote);
 
   // ── Camera stage ──
   const stage = el('div');
@@ -173,6 +177,22 @@ function mount(root: HTMLElement): void {
   expandBtn.setAttribute('aria-label', 'Open the camera view');
   expandBtn.append(icon(ICONS.expand));
 
+  // Shrinks the docked preview to a small live thumbnail so it stops covering
+  // the tab underneath. The <video> stays rendered, so frames keep flowing.
+  const dockMinBtn = el('button');
+  dockMinBtn.type = 'button';
+  dockMinBtn.className = 'dock-min';
+  dockMinBtn.dataset.testid = 'dock-min';
+  const setDockMin = (min: boolean): void => {
+    cameraPanel.dataset.dockMin = String(min);
+    dockMinBtn.setAttribute('aria-pressed', String(min));
+    dockMinBtn.setAttribute(
+      'aria-label',
+      min ? 'Enlarge the camera preview' : 'Minimise the camera preview',
+    );
+    dockMinBtn.replaceChildren(icon(min ? ICONS.restore : ICONS.minimise));
+  };
+
   const scan = el('div');
   scan.className = 'scan';
   scan.setAttribute('aria-hidden', 'true');
@@ -185,7 +205,18 @@ function mount(root: HTMLElement): void {
   const alarmText = el('span', '');
   alarmBanner.append(icon(ICONS.bell), alarmText);
 
-  stage.append(video, canvas, scan, corners, empty, hud, privacy, alarmBanner, expandBtn);
+  stage.append(
+    video,
+    canvas,
+    scan,
+    corners,
+    empty,
+    hud,
+    privacy,
+    alarmBanner,
+    expandBtn,
+    dockMinBtn,
+  );
 
   // ── Controls ──
   const enableBtn = button('Turn sensing on', 'enable', ICONS.camera, 'btn-primary');
@@ -275,7 +306,8 @@ function mount(root: HTMLElement): void {
   const cameraPanel = el('section');
   cameraPanel.id = 'panel-camera';
   cameraPanel.className = 'panel camera-panel';
-  cameraPanel.append(layout, loadCard.element, ...(recorder ? [recorder.element] : []));
+  setDockMin(false);
+  cameraPanel.append(layout, ...(recorder ? [recorder.element] : []));
   const signalsPanel = el('section');
   signalsPanel.id = 'panel-signals';
   signalsPanel.className = 'panel';
@@ -295,7 +327,8 @@ function mount(root: HTMLElement): void {
   perfSub.className = 'section-sub';
   perfTitles.append(perfTitle, perfSub);
   perfHead.append(perfTitles);
-  perfPanel.append(perfHead, perfGrid);
+  // The event stream (what C01/C03/C04 receive) lives here, beside the debug read-outs.
+  perfPanel.append(perfHead, loadCard.element, perfGrid);
   const breakPanel = new BreakPanel({
     requestSensing: () => {
       alarmSound.unlock();
@@ -342,8 +375,22 @@ function mount(root: HTMLElement): void {
   expandBtn.addEventListener('click', () => {
     tabs.select('camera', true);
   });
+  dockMinBtn.addEventListener('click', () => {
+    setDockMin(cameraPanel.dataset.dockMin !== 'true');
+  });
 
-  root.append(topbar, tabs.element, cameraPanel, signalsPanel, perfPanel, breakTabPanel, footer);
+  // Left sidebar: brand, the view tabs, then status and settings. Narrow
+  // screens flatten it into a header with the tabs as a bar (styles.css).
+  const navLabel = el('p', 'Views');
+  navLabel.className = 'side-label';
+  const side = el('aside');
+  side.className = 'side';
+  side.setAttribute('aria-label', 'Load sensor navigation');
+  side.append(brand, navLabel, tabs.element, sideFoot);
+  const main = el('div');
+  main.className = 'main';
+  main.append(cameraPanel, signalsPanel, perfPanel, breakTabPanel, footer);
+  root.append(side, main);
 
   // ── Pipeline ──
   const camera = new Camera({ video });
@@ -388,11 +435,13 @@ function mount(root: HTMLElement): void {
     });
     h.on('state', (e) => {
       loadCard.update(e);
+      wellbeing.setSignals(e);
     });
     h.on('error', (e) => {
       console.error(e);
     });
     loadCard.update(h.latest);
+    wellbeing.setSignals(h.latest);
     return h;
   }
 
@@ -678,6 +727,8 @@ function mount(root: HTMLElement): void {
         : hiddenPause
           ? 'Sensing is paused while this tab is hidden.'
           : STATUS_TEXT[s]);
+    // The pill truncates long messages (styles.css); the full text stays on hover.
+    pill.title = status.textContent;
     pill.dataset.tone = toneFor(s, loading, message !== null);
 
     const on = running || s === 'starting';
@@ -692,6 +743,7 @@ function mount(root: HTMLElement): void {
     stage.dataset.paused = String(s === 'paused');
     cameraPanel.dataset.running = String(running);
     expandBtn.hidden = tabs.active === 'camera';
+    dockMinBtn.hidden = tabs.active === 'camera';
     breakPanel.setSensing(s === 'active');
     placeDock();
     liveText.textContent = s === 'paused' ? 'PAUSED' : 'LIVE';

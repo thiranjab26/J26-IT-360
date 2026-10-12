@@ -125,8 +125,8 @@
 
 .admin-main {
   width: 100%;
-  max-width: 1040px;
-  padding: 28px 36px 80px;
+  max-width: 1120px;
+  padding: 22px 32px 40px;
 }
 
 .admin-head {
@@ -181,7 +181,7 @@
 /* ── Sections ───────────────────────────────────────────────────────── */
 
 .admin-section {
-  padding-top: 28px;
+  padding-top: 22px;
   scroll-margin-top: 8px;
 }
 
@@ -215,7 +215,7 @@
 }
 
 .admin-card {
-  padding: 20px;
+  padding: 16px;
 }
 
 .admin-hint {
@@ -392,7 +392,7 @@
 
 .admin-rows {
   display: grid;
-  margin: -20px;
+  margin: -16px;
 }
 
 .admin-row {
@@ -400,7 +400,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
-  padding: 16px 20px;
+  padding: 13px 18px;
   border-top: 1px solid var(--border);
   transition: opacity 0.2s ease;
 }

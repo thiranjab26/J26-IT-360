@@ -17,7 +17,7 @@ test.describe('cog admin', () => {
     await admin.goto('/cog-admin.html');
 
     // Sensing is still off by default (invariant 4); the panel sees the page.
-    await expect(admin.getByTestId('admin-connection')).toHaveText('Connected Â· sensing off');
+    await expect(admin.getByTestId('admin-connection')).toHaveText('Connected · sensing off');
     await expect(admin.getByTestId('admin-camera')).toHaveText('Off');
 
     // A setting changed in the panel reaches the sensor page without a reload.
