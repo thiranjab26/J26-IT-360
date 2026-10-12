@@ -23,6 +23,7 @@ import {
 } from '../core/landmarks/index.js';
 import { LoadStateHub, type SourceStatus } from '../core/events/index.js';
 import { sourceForCamera } from '../core/sensor.js';
+import type { FrameSignals } from '../core/features/index.js';
 import { FeaturePipeline } from '../core/window/index.js';
 import {
   AlarmSound,
@@ -34,6 +35,9 @@ import { BreakPanel } from './break/break-panel.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
 import { LoadStateCard } from './load-state-card.js';
+import { MoodEstimator } from './mood.js';
+import { MoodPanel } from './mood-panel.js';
+import { QualityCheckCard } from './quality-check-card.js';
 import {
   openControlChannel,
   SettingsStore,
@@ -298,6 +302,10 @@ function mount(root: HTMLElement): void {
   expressionSwitch.root.title =
     'FR3 ablation: off zeroes mouth-open and lip-thickness. Changing it restarts calibration.';
   signals.toolbar.prepend(expressionSwitch.root);
+  // Apparent mood (display only; not in the event stream or the model input).
+  const mood = new MoodEstimator(settings.value.sensing.expressionFeatures);
+  const moodPanel = new MoodPanel();
+  signals.mountAfterKpis(moodPanel.element);
   // Development builds only: the recorder is tree-shaken out of production.
   const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
   const loadCard = new LoadStateCard(`${import.meta.env.BASE_URL}consumer.html`);
@@ -328,7 +336,18 @@ function mount(root: HTMLElement): void {
   perfTitles.append(perfTitle, perfSub);
   perfHead.append(perfTitles);
   // The event stream (what C01/C03/C04 receive) lives here, beside the debug read-outs.
-  perfPanel.append(perfHead, loadCard.element, perfGrid);
+  // Measures capture resolutions on this device (numbers only, saved locally for docs/bench/).
+  const quality = new QualityCheckCard({
+    track: () =>
+      (video.srcObject instanceof MediaStream ? video.srcObject.getVideoTracks()[0] : undefined) ??
+      null,
+    trackerStats: () => tracker.stats,
+    backend: () => provider.backend ?? null,
+    onFinished: () => {
+      recalibrate(settings.value.sensing.expressionFeatures);
+    },
+  });
+  perfPanel.append(perfHead, loadCard.element, perfGrid, quality.element);
   const breakPanel = new BreakPanel({
     requestSensing: () => {
       alarmSound.unlock();
@@ -461,9 +480,13 @@ function mount(root: HTMLElement): void {
     });
   }
 
+  /** Per-frame signals of the latest landmark frame, for the quality check. */
+  let latestSignals: FrameSignals | null = null;
+
   function createPipeline(useExpressionFeatures: boolean): FeaturePipeline {
     const p = new FeaturePipeline({ useExpressionFeatures });
     p.onFrame((f) => {
+      latestSignals = f.signals;
       signals.pushFrame(f);
       breakPanel.pushPose(
         f.tMs,
@@ -475,6 +498,7 @@ function mount(root: HTMLElement): void {
     });
     p.onSecond((s) => {
       signals.pushSecond(s);
+      moodPanel.update(mood.pushSecond(s), mood.history);
       wellbeing.pushSecond(s);
       signals.setState(p.state);
       hub.pushSecond(s, p.state, p.window.classifiable ? p.window.toModelInput() : null);
@@ -509,6 +533,9 @@ function mount(root: HTMLElement): void {
       syncHub();
     }
     signals.reset();
+    mood.setExpression(useExpressionFeatures);
+    mood.reset();
+    moodPanel.reset();
     if (camera.status === 'active' || camera.status === 'paused') signals.setState(pipeline.state);
   }
 
@@ -600,7 +627,10 @@ function mount(root: HTMLElement): void {
     overlay.update(sample.face, video.videoWidth, video.videoHeight, sample.tMs);
     const aspect = video.videoWidth > 0 ? video.videoWidth / video.videoHeight : 4 / 3;
     const landmarks = sample.face?.landmarks ?? null;
+    latestSignals = null;
     pipeline.push(sample.tMs, landmarks, aspect);
+    quality.push({ tMs: sample.tMs, landmarks, aspect, signals: landmarks ? latestSignals : null });
+    mood.pushFrame({ landmarks, aspect, signals: landmarks ? latestSignals : null });
     recorder?.push(sample.tMs, landmarks, aspect);
   });
   tracker.onError((error) => {
@@ -616,6 +646,8 @@ function mount(root: HTMLElement): void {
       pipeline.reset();
       hub.reset();
       signals.reset();
+      mood.reset();
+      moodPanel.reset();
       wellbeing.reset();
     }
     // No frames while paused: start the away/asleep timers again on resume.
@@ -716,6 +748,7 @@ function mount(root: HTMLElement): void {
   function render(): void {
     const s = camera.status;
     const running = s === 'active' || s === 'paused';
+    quality.setAvailable(s === 'active' && modelState === 'ready');
     const loading = modelState === 'loading' && running;
     const hiddenPause =
       s === 'paused' && camera.pauseReasons.has('hidden') && !camera.pauseReasons.has('user');

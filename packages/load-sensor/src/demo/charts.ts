@@ -92,6 +92,13 @@ export interface StripChartOptions {
    * points stay at their own frame times.
    */
   readonly liveLeadMs?: number;
+  /**
+   * 'line' (default) for continuous signals; 'bars' for small whole-number
+   * counts per second (e.g. blinks), where a line between 0 and 1 reads as noise.
+   */
+  readonly style?: 'line' | 'bars';
+  /** Bar width in data time (ms); defaults to 1 s, one bar per second. */
+  readonly barMs?: number;
 }
 
 export class StripChart {
@@ -99,6 +106,7 @@ export class StripChart {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   readonly #value: HTMLElement;
+  readonly #empty: HTMLElement;
   readonly #opts: StripChartOptions;
   readonly #format: (v: number) => string;
   /** Read lazily: computed styles are empty until the element is in the document. */
@@ -107,6 +115,7 @@ export class StripChart {
   #bands: readonly ChartBand[] = [];
   #markers: readonly number[] = [];
   #threshold: number | null = null;
+  #emptyText = 'No data yet';
   #now = 0;
   /** Wall time (performance.now) of the last update, and the time the axis last showed. */
   #anchor = 0;
@@ -145,7 +154,14 @@ export class StripChart {
     const ctx = this.#canvas.getContext('2d');
     if (!ctx) throw new Error('2D canvas is not available');
     this.#ctx = ctx;
-    this.element.append(head, this.#canvas);
+    // Says why the chart is blank (no face, still calibrating …) instead of an empty box.
+    this.#empty = document.createElement('span');
+    this.#empty.className = 'strip-empty';
+    this.#empty.textContent = this.#emptyText;
+    const plot = document.createElement('div');
+    plot.className = 'strip-plot';
+    plot.append(this.#canvas, this.#empty);
+    this.element.append(head, plot);
 
     new ResizeObserver(() => {
       this.#resize();
@@ -160,6 +176,13 @@ export class StripChart {
     options.hover?.subscribe(() => {
       this.invalidate();
     });
+  }
+
+  /** Message shown over the chart while it has no points to draw. */
+  setEmptyText(text: string): void {
+    if (text === this.#emptyText) return;
+    this.#emptyText = text;
+    this.#empty.textContent = text;
   }
 
   /** Re-reads colours after a theme change. */
@@ -294,6 +317,25 @@ export class StripChart {
     }
     ctx.stroke();
 
+    const hasData = values.length > 0;
+    this.#empty.hidden = hasData;
+
+    if (this.#opts.style === 'bars') {
+      // One bar per second from the baseline; zero draws nothing, a gap stays a gap.
+      const barMs = this.#opts.barMs ?? 1000;
+      const bw = Math.max(1, (barMs / span) * w - 2);
+      const base = y(Math.max(lo, Math.min(hi, 0)));
+      ctx.fillStyle = th.line;
+      for (const p of visible) {
+        if (p.v === null || p.v === 0) continue;
+        const top = y(p.v);
+        const cx = x(p.t);
+        ctx.beginPath();
+        ctx.roundRect(cx - bw / 2, Math.min(top, base), bw, Math.max(1.5, Math.abs(base - top)), 2);
+        ctx.fill();
+      }
+    }
+
     // Area wash + 2 px line, broken at gaps. Monotone curve through every
     // point: smooth, but never overshoots, so a blink dip or a peak is drawn
     // exactly as deep as the data (a plain spline would exaggerate it).
@@ -301,7 +343,11 @@ export class StripChart {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.strokeStyle = th.line;
-    ctx.fillStyle = th.lineSoft;
+    // Wash fades towards the baseline so the line itself stays the strongest mark.
+    const wash = ctx.createLinearGradient(0, 0, 0, h);
+    wash.addColorStop(0, th.lineSoft);
+    wash.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = wash;
     let run: ChartPoint[] = [];
     const flush = (): void => {
       if (run.length === 0) return;
@@ -322,11 +368,22 @@ export class StripChart {
       ctx.fill();
       run = [];
     };
-    for (const p of visible) {
-      if (p.v === null) flush();
-      else run.push(p);
+    if (this.#opts.style !== 'bars') {
+      for (const p of visible) {
+        if (p.v === null) flush();
+        else run.push(p);
+      }
+      flush();
+
+      // Live end point: the newest value, so the eye finds "now" at once.
+      const last = visible[visible.length - 1];
+      if (last?.v != null) {
+        ctx.fillStyle = th.line;
+        ctx.beginPath();
+        ctx.arc(x(last.t), y(last.v), 2.75, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    flush();
 
     // Hover crosshair, and the header value follows it.
     const hoverT = this.#opts.hover?.t ?? null;

@@ -57,6 +57,9 @@ export class SignalsPanel {
   readonly #modeButtons: Record<ValueMode, HTMLButtonElement>;
 
   #mode: ValueMode = 'raw';
+  #kpisEl: HTMLElement | null = null;
+  /** Sensing on (a pipeline state has been set since the last reset). */
+  #sensing = false;
   #earPoints: ChartPoint[] = [];
   #blinkMarks: number[] = [];
   #seconds: NormalisedSecond[] = [];
@@ -175,6 +178,7 @@ export class SignalsPanel {
       format: (v) => v.toFixed(3),
       hover: new HoverBus(),
     });
+    this.#earChart.setEmptyText('Turn sensing on to see the eye trace.');
     earCard.append(earHead, this.#earChart.element, timeAxis(EAR_SPAN_MS));
 
     // ── Feature small multiples ──
@@ -200,13 +204,16 @@ export class SignalsPanel {
         unit: f.unit,
         description: f.description,
         spanMs: FEATURE_SPAN_MS,
-        height: 46,
+        height: 56,
         compact: true,
         // One update per second.
         liveLeadMs: 1000,
         hover: this.#hover,
         format: formatter(f.unit),
+        // Whole-number counts per second read better as bars than as a 0↔1 zigzag.
+        ...(f.unit === 'count' ? { style: 'bars' as const, include: [0] } : {}),
       });
+      chart.setEmptyText('Turn sensing on to see this signal.');
       chart.element.dataset.testid = `feature-${f.name}`;
       this.#featureCharts.set(index, chart);
       body.append(chart.element);
@@ -218,6 +225,7 @@ export class SignalsPanel {
       el('span', 'grid-legend-axis', 'Last 90 s · hover to compare all features at one moment'),
     );
 
+    this.#kpisEl = kpis;
     this.element.append(head, calib, kpis, earCard, legend, grid);
     this.setMode('raw');
     this.setState(null);
@@ -226,6 +234,11 @@ export class SignalsPanel {
       this.#earChart.refreshTheme();
       for (const c of this.#featureCharts.values()) c.refreshTheme();
     });
+  }
+
+  /** Places a card (the mood read-out) right under the KPI tiles. */
+  mountAfterKpis(node: HTMLElement): void {
+    this.#kpisEl?.after(node);
   }
 
   setMode(mode: ValueMode): void {
@@ -245,6 +258,9 @@ export class SignalsPanel {
     while ((this.#blinkMarks[0] ?? Infinity) < cutoff) this.#blinkMarks.shift();
     if (f.reference) this.#threshold = f.reference.ear * FEATURE_CONFIG.blink.closeRatio;
 
+    this.#earChart.setEmptyText(
+      'No face in view yet. Face the camera in even, front-facing light.',
+    );
     this.#earChart.update({
       points: this.#earPoints,
       now: f.tMs,
@@ -284,6 +300,9 @@ export class SignalsPanel {
 
   setState(state: PipelineState | null): void {
     const c = this.#calib;
+    const wasSensing = this.#sensing;
+    this.#sensing = state !== null;
+    if (wasSensing !== this.#sensing) this.#renderFeatures();
     if (!state) {
       c.root.dataset.phase = 'idle';
       c.text.textContent = 'Turn sensing on to start your baseline';
@@ -311,6 +330,7 @@ export class SignalsPanel {
     this.#blinkMarks = [];
     this.#seconds = [];
     this.#threshold = null;
+    this.#earChart.setEmptyText('Turn sensing on to see the eye trace.');
     this.#earChart.update({ points: [], now: this.#now });
     this.#renderFeatures();
     this.#renderKpis();
@@ -368,13 +388,28 @@ export class SignalsPanel {
     const now = this.#seconds.length
       ? (this.#seconds[this.#seconds.length - 1]?.startMs ?? 0) + 1000
       : this.#now;
+    const empty = this.#emptyReason();
     for (const [index, chart] of this.#featureCharts) {
+      chart.setEmptyText(empty);
       const points = this.#seconds.map((s) => {
         const value = this.#mode === 'z' ? s.z?.[index] : s.raw[index];
         return { t: s.startMs + 500, v: s.valid && value !== undefined ? value : null };
       });
       chart.update({ points, now, bands });
     }
+  }
+
+  /** Why the feature charts have nothing to draw yet, in plain words. */
+  #emptyReason(): string {
+    if (!this.#sensing && this.#seconds.length === 0) return 'Turn sensing on to see this signal.';
+    if (this.#seconds.length === 0) return 'Collecting the first second…';
+    if (!this.#seconds.some((s) => s.valid)) {
+      return 'No face in view yet. Face the camera in even light.';
+    }
+    if (this.#mode === 'z') {
+      return `z-scores start after the ${String(FEATURE_CONFIG.baseline.seconds)} s baseline. Switch to Raw to see values now.`;
+    }
+    return 'No face in view for this stretch.';
   }
 
   #setKpi(key: string, value: string, caption: string): void {

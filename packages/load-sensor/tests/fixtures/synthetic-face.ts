@@ -32,6 +32,10 @@ export interface FaceParams {
   readonly mouthOpen?: number;
   /** Total lip thickness in IOD (neutral 0.2). */
   readonly lipThickness?: number;
+  /** Mouth corners above the lip centre in IOD: + smile, − corners pulled down (neutral 0). */
+  readonly smile?: number;
+  /** Corner-to-corner mouth width in IOD (neutral 0.9). */
+  readonly mouthWidth?: number;
   /** Face size: inter-ocular distance in frame heights. */
   readonly size?: number;
   /** Face centre in normalised frame coordinates. */
@@ -60,6 +64,8 @@ export function syntheticFace(params: FaceParams = {}, aspect = DEFAULT_ASPECT):
   const gap = params.browInnerGap ?? 0.3;
   const open = params.mouthOpen ?? 0;
   const thick = params.lipThickness ?? 0.2;
+  const smile = params.smile ?? 0;
+  const halfMouth = (params.mouthWidth ?? 0.9) / 2;
 
   const pts = new Map<number, P>([
     // Right eye (subject's right; image left), centre (−0.5, 0).
@@ -91,6 +97,9 @@ export function syntheticFace(params: FaceParams = {}, aspect = DEFAULT_ASPECT):
     [14, [0, MOUTH_Y + open / 2, 0]],
     [0, [0, MOUTH_Y - open / 2 - thick / 2, 0]],
     [17, [0, MOUTH_Y + open / 2 + thick / 2, 0]],
+    // Mouth corners (61 = subject's right, image left).
+    [61, [-halfMouth, MOUTH_Y - smile, 0]],
+    [291, [halfMouth, MOUTH_Y - smile, 0]],
   ]);
   // Irises: centre + 4 rim points, offset in eye widths (2 × half width).
   for (const [centre, eyeX] of [

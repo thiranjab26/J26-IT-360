@@ -59,7 +59,7 @@
   /* Charts: one hue for every single-series strip; text never uses series colour.
      Calibration uses violet so it never reads as the blue data line. */
   --chart-line: #335bd5;
-  --chart-line-soft: rgba(51, 91, 213, 0.08);
+  --chart-line-soft: rgba(51, 91, 213, 0.16);
   --chart-grid: rgba(15, 23, 46, 0.06);
   --chart-threshold: #b45309;
   --chart-marker: #c2410c;
@@ -67,6 +67,18 @@
   --chart-calibration: rgba(124, 58, 237, 0.07);
   --chart-calibration-edge: #7c3aed;
   --chart-crosshair: rgba(15, 23, 46, 0.4);
+
+  /* Mood: one categorical hue per state (Signals tab). */
+  --mood-happy: #d29a00;
+  --mood-focused: #15803d;
+  --mood-neutral: #8a93a8;
+  --mood-surprised: #0e97a8;
+  --mood-confused: #e0731a;
+  --mood-frustrated: #d63b3b;
+  --mood-sad: #4f5bd5;
+  --mood-drowsy: #8b5cf6;
+  --mood-distracted: #5b6578;
+  --mood-no-face: #c3cad8;
 }
 
 /* Opt-in dark theme: midnight navy with a luminous blue signal colour. */
@@ -99,7 +111,7 @@
   --good: #4ade80;
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
   --chart-line: #7c9bff;
-  --chart-line-soft: rgba(124, 155, 255, 0.1);
+  --chart-line-soft: rgba(124, 155, 255, 0.18);
   --chart-grid: rgba(232, 235, 243, 0.07);
   --chart-threshold: #ffbe3d;
   --chart-marker: #ff7a59;
@@ -107,6 +119,16 @@
   --chart-calibration: rgba(167, 139, 250, 0.1);
   --chart-calibration-edge: #a78bfa;
   --chart-crosshair: rgba(232, 235, 243, 0.5);
+  --mood-happy: #f2c14e;
+  --mood-focused: #4ade80;
+  --mood-neutral: #9aa3b8;
+  --mood-surprised: #38c9da;
+  --mood-confused: #fb9a4b;
+  --mood-frustrated: #f87171;
+  --mood-sad: #8b95ff;
+  --mood-drowsy: #b197fc;
+  --mood-distracted: #7d879b;
+  --mood-no-face: #3a4256;
 }
 
 *,
@@ -1923,6 +1945,28 @@ h1 {
   border-radius: 4px;
 }
 
+.strip-plot {
+  position: relative;
+}
+
+/* Why a chart is blank, centred over it; hidden as soon as there is data. */
+.strip-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 12px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+}
+
+.strip-empty[hidden] {
+  display: none;
+}
+
 .grid-legend {
   display: flex;
   flex-wrap: wrap;
@@ -2406,4 +2450,479 @@ h1 {
   .shell:has(.camera-panel[data-active='false'][data-running='true']:not([data-dock='slot'])) {
     padding-bottom: 0;
   }
+}
+
+/* ── Camera quality check (Performance tab) ── */
+.quality-card {
+  margin-top: 16px;
+  padding-bottom: 16px;
+}
+
+.quality-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quality-intro,
+.quality-status {
+  max-width: 78ch;
+  margin: 8px 18px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.quality-status {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.quality-table-wrap {
+  overflow-x: auto;
+  margin: 12px 18px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.quality-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.quality-table th,
+.quality-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.quality-table th:first-child,
+.quality-table td:first-child {
+  text-align: left;
+}
+
+.quality-table th {
+  background: var(--tile);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: help;
+}
+
+.quality-table td {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.quality-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.quality-table tr[data-best='true'] td {
+  background: var(--accent-soft);
+}
+
+.quality-table .quality-empty {
+  color: var(--text-faint);
+  font-family: var(--font);
+  text-align: center;
+}
+
+/* ── Mood (Signals tab) ── */
+.mood-card {
+  --mood: var(--mood-no-face);
+  padding-bottom: 16px;
+  /* Layout follows the card's own width, so it fits any column. */
+  container-type: inline-size;
+}
+
+.mood-card[data-mood='happy'] {
+  --mood: var(--mood-happy);
+}
+.mood-card[data-mood='focused'] {
+  --mood: var(--mood-focused);
+}
+.mood-card[data-mood='neutral'] {
+  --mood: var(--mood-neutral);
+}
+.mood-card[data-mood='surprised'] {
+  --mood: var(--mood-surprised);
+}
+.mood-card[data-mood='confused'] {
+  --mood: var(--mood-confused);
+}
+.mood-card[data-mood='frustrated'] {
+  --mood: var(--mood-frustrated);
+}
+.mood-card[data-mood='sad'] {
+  --mood: var(--mood-sad);
+}
+.mood-card[data-mood='drowsy'] {
+  --mood: var(--mood-drowsy);
+}
+.mood-card[data-mood='distracted'] {
+  --mood: var(--mood-distracted);
+}
+
+.mood-seg[data-mood='happy'],
+.mood-swatch[data-mood='happy'] {
+  background: var(--mood-happy);
+}
+.mood-seg[data-mood='focused'],
+.mood-swatch[data-mood='focused'] {
+  background: var(--mood-focused);
+}
+.mood-seg[data-mood='neutral'],
+.mood-swatch[data-mood='neutral'] {
+  background: var(--mood-neutral);
+}
+.mood-seg[data-mood='surprised'],
+.mood-swatch[data-mood='surprised'] {
+  background: var(--mood-surprised);
+}
+.mood-seg[data-mood='confused'],
+.mood-swatch[data-mood='confused'] {
+  background: var(--mood-confused);
+}
+.mood-seg[data-mood='frustrated'],
+.mood-swatch[data-mood='frustrated'] {
+  background: var(--mood-frustrated);
+}
+.mood-seg[data-mood='sad'],
+.mood-swatch[data-mood='sad'] {
+  background: var(--mood-sad);
+}
+.mood-seg[data-mood='drowsy'],
+.mood-swatch[data-mood='drowsy'] {
+  background: var(--mood-drowsy);
+}
+.mood-seg[data-mood='distracted'],
+.mood-swatch[data-mood='distracted'] {
+  background: var(--mood-distracted);
+}
+.mood-seg[data-mood='no-face'],
+.mood-swatch[data-mood='no-face'] {
+  background: var(--mood-no-face);
+}
+
+.mood-status {
+  padding: 2px 9px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.mood-status:empty {
+  display: none;
+}
+
+.mood-status[data-tone='live'] {
+  border-color: color-mix(in srgb, var(--accent-text) 35%, var(--border));
+  color: var(--accent-text);
+}
+
+.mood-status[data-tone='warn'] {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--border));
+  color: var(--warn);
+}
+
+.mood-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: 18px 28px;
+  align-items: center;
+  padding: 16px 18px 0;
+}
+
+@container (max-width: 720px) {
+  .mood-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container (max-width: 420px) {
+  .mood-now {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mood-ev-row {
+    grid-template-columns: 110px minmax(0, 1fr) 42px;
+  }
+}
+
+.mood-now {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.mood-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mood) 14%, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mood) 35%, transparent);
+  color: var(--mood);
+  transition:
+    background 0.3s ease,
+    color 0.3s ease;
+}
+
+.mood-icon svg {
+  width: 50px;
+  height: 50px;
+}
+
+.mood-swap {
+  animation: mood-pop 0.35s cubic-bezier(0.3, 0.7, 0.2, 1);
+}
+
+@keyframes mood-pop {
+  from {
+    transform: scale(0.85);
+    opacity: 0.4;
+  }
+}
+
+.mood-text {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mood-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.mood-what {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.mood-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.mood-strength {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mood-strength-track {
+  position: relative;
+  overflow: hidden;
+  width: 88px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+.mood-strength-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--mood);
+  transition: width 0.4s ease;
+}
+
+.mood-sub {
+  margin: 0 0 8px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mood-evidence {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.mood-ev-row {
+  display: grid;
+  grid-template-columns: 136px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.mood-ev-name {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mood-ev-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-3);
+}
+
+/* z rows: the centre tick is your baseline; bars grow left (below) or right (above). */
+.mood-ev-row[data-kind='z'] .mood-ev-bar::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  width: 1px;
+  background: var(--border-strong);
+}
+
+.mood-ev-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mood) 45%, var(--border-strong));
+  transition:
+    left 0.4s ease,
+    width 0.4s ease;
+}
+
+.mood-ev-row[data-high='true'] .mood-ev-fill,
+.mood-ev-row[data-kind='share'] .mood-ev-fill {
+  background: var(--mood);
+}
+
+.mood-ev-value {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mood-ev-row[data-off='true'] {
+  opacity: 0.45;
+}
+
+.mood-history {
+  margin: 18px 18px 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.mood-history-head {
+  display: flex;
+  justify-content: space-between;
+}
+
+.mood-timeline {
+  position: relative;
+  overflow: hidden;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+
+.mood-seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 1px;
+  box-shadow: inset -1px 0 0 var(--surface);
+}
+
+.mood-timeline-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+
+.mood-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.mood-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mood-swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.mood-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mood-change {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--tile);
+  font-size: 12.5px;
+}
+
+.mood-change-label {
+  font-weight: 600;
+}
+
+.mood-change-dur,
+.mood-change-ago {
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.mood-change-empty {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.mood-note {
+  margin: 14px 18px 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.45;
 }
