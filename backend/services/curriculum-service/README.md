@@ -19,6 +19,7 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | GET | `/api/v1/curriculum/graph?module=dsa` | signed in | Prerequisite graph: concepts with depth, edges, stats; a module view keeps its cross-module prerequisites | done |
 | GET | `/api/v1/curriculum/me/mastery?module=prog` | signed in | My BKT mastery per concept (`null` = no evidence yet) | done |
 | GET | `/api/v1/curriculum/me/recommendation?module=dsa` | signed in | Next concept, readiness, one-sentence explanation, locked concepts and their weak prerequisite (`gat-v2`, or `rules-v1` without the model); syllabus order for the comparison group | done |
+| POST | `/api/v1/curriculum/me/recommendation/feedback?module=dsa` | signed in | Rate my current explanation helpful or not; the sentence and model are copied from the stored recommendation, so a stale card or a comparison learner (no sentence) gets 409 | done |
 | GET | `/api/v1/curriculum/me/tests?module=prog` | signed in | Current phase, which test is open, my results (never my group) | done |
 | POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/start?module=prog` | signed in | Start or resume my test; questions without answers | done |
 | POST | `/api/v1/curriculum/me/tests/{pretest\|posttest}/submit?module=prog` | signed in | Submit once, scored on the server; a repeat returns the stored result | done |
@@ -39,7 +40,6 @@ Owner: Abeyrathne E.D.V.N (IT23265110). Research code and notebooks live in
 | POST | `/api/v1/curriculum/me/practice/answer` | signed in, stub mode only | Checked on the server, written with C3's contract columns, updates my mastery; reveals the right option | done |
 | POST | `/api/v1/curriculum/dev/attempts` | signed in, dev + stub only | C3 stand-in: record one practice answer for me and update my mastery | done |
 
-Arriving next: explanation feedback (helpful / not helpful).
 
 ## Pre/post tests and gain
 
@@ -181,6 +181,16 @@ Load test papers (refuses to replace a paper that learners have already sat):
 ```bash
 uv run python -m scripts.import_tests item_bank/dsa.json --dry-run   # validate, write nothing
 uv run python -m scripts.import_tests item_bank/dsa.json             # writes test_paper, test_item
+```
+
+Seed a labelled synthetic cohort for the demo (simulated learners, ids start with
+`de30de30-`, curriculum schema only; never evidence). Remove it before the real study or
+before re-importing a test bank, because starting a test locks its paper:
+
+```bash
+uv run python -m scripts.seed_demo --dry-run          # checks papers and model, writes nothing
+uv run python -m scripts.seed_demo --learners 20      # writes tests, practice evidence, mastery
+uv run python -m scripts.seed_demo --remove           # deletes every synthetic row
 ```
 
 ## Tests
