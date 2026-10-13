@@ -1,16 +1,17 @@
 import { Link } from 'react-router-dom';
 
 import { Card, cx } from '@/shared/components/ui';
-import { useExplanationFeedback, usePlan } from '../api/curriculumApi';
+import { useExplanationFeedback, useMastery, usePlan } from '../api/curriculumApi';
 import { percent } from '../lib/modules';
 import { ErrorCard } from './common';
 
 /**
- * What to study next and why. The study group, reason and model version are never
- * shown, so learners stay blind to their group; comparison learners simply get no sentence.
+ * What to study next and why. The study group, reason, model version and readiness are
+ * never shown, so learners stay blind to their group; comparison learners simply get no sentence.
  */
 export function RecommendationCard({ moduleId }: { moduleId: string }) {
   const plan = usePlan(moduleId);
+  const mastery = useMastery(moduleId);
 
   if (plan.error) return <ErrorCard error={plan.error} what="your next step" />;
   if (!plan.data) {
@@ -28,6 +29,10 @@ export function RecommendationCard({ moduleId }: { moduleId: string }) {
       </Card>
     );
   }
+
+  const score = mastery.data?.concepts.find(
+    (c) => c.concept_id === rec.next_concept.concept_id,
+  )?.mastery_score;
 
   return (
     <Card className="border-brand-soft px-[20px] py-[18px]">
@@ -56,10 +61,11 @@ export function RecommendationCard({ moduleId }: { moduleId: string }) {
           )}
         </div>
         <div className="flex flex-col items-end gap-[10px]">
+          {/* Mastery, not readiness: readiness means different things per group and would reveal it. */}
           <div className="text-right">
-            <p className="text-[11px] text-ink-muted">Readiness</p>
+            <p className="text-[11px] text-ink-muted">Your mastery</p>
             <p className="font-mono text-[18px] font-semibold text-ink">
-              {percent(rec.readiness)}
+              {score === null || score === undefined ? 'Not started' : percent(score)}
             </p>
           </div>
           <Link

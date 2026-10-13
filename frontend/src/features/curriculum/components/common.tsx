@@ -32,7 +32,8 @@ export function ModuleHeader({ moduleId, phase }: { moduleId: string; phase?: Ph
       </div>
       <nav
         aria-label="Module sections"
-        className="mt-[16px] flex gap-[4px] overflow-x-auto border-b border-line"
+        // Inset shadow draws the base line, so tabs need no -1px overlap that would add a scrollbar.
+        className="mt-[16px] flex gap-[4px] overflow-x-auto shadow-[inset_0_-1px_0_var(--color-line)]"
       >
         <Tab to={`/curriculum/${moduleId}`} end>
           Progress
@@ -57,7 +58,7 @@ function Tab({ to, end, children }: { to: string; end?: boolean; children: strin
       end={end}
       className={({ isActive }) =>
         cx(
-          '-mb-px shrink-0 border-b-2 px-[12px] py-[8px] text-[13px] transition-colors',
+          'shrink-0 border-b-2 px-[12px] py-[8px] text-[13px] transition-colors',
           isActive
             ? 'border-brand font-medium text-ink'
             : 'border-transparent text-ink-muted hover:text-ink',
