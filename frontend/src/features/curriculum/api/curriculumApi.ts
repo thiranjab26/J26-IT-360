@@ -249,6 +249,35 @@ export interface Paper extends PaperSummary {
 
 export type ItemInput = Omit<StaffItem, 'item_id' | 'position'> & { position?: number | null };
 
+export type GraphEditAction = 'add_edge' | 'remove_edge';
+
+/** `prerequisite_id` must be learned before `concept_id`. */
+export interface GraphEditInput {
+  action: GraphEditAction;
+  concept_id: string;
+  prerequisite_id: string;
+  /** kept in the audit log */
+  reason: string;
+}
+
+export interface GraphEditResult {
+  graph_version: string;
+  edges: number;
+  action: GraphEditAction;
+  concept_id: string;
+  prerequisite_id: string;
+}
+
+export interface GraphAuditEntry {
+  changed_at: string | null;
+  actor: string;
+  action: string;
+  concept_id: string | null;
+  prerequisite_id: string | null;
+  graph_version: string;
+  details: { reason?: string; previous_version?: string; [key: string]: unknown };
+}
+
 /* ------------------------------------------------------------------- Hooks */
 
 export const curriculumKeys = {
@@ -262,6 +291,7 @@ export const curriculumKeys = {
   staff: (moduleId: string) => ['curriculum', 'staff', moduleId] as const,
   papers: (moduleId: string) => ['curriculum', 'staff', moduleId, 'papers'] as const,
   paper: (paperId: string) => ['curriculum', 'staff', 'paper', paperId] as const,
+  graphAudit: ['curriculum', 'staff', 'graph-audit'] as const,
 };
 
 function moduleQuery(moduleId?: string): string {
@@ -425,6 +455,31 @@ export function useSnapshotValidation(moduleId: string) {
   return useQuery({
     queryKey: [...curriculumKeys.staff(moduleId), 'snapshot'],
     queryFn: () => request<SnapshotValidation>(`${BASE}/study/${moduleId}/snapshot-validation`),
+  });
+}
+
+/* ------------------------------------------------------------ Graph editor */
+
+export function useGraphAudit() {
+  return useQuery({
+    queryKey: curriculumKeys.graphAudit,
+    queryFn: () => request<GraphAuditEntry[]>(`${BASE}/graph/audit?limit=50`),
+  });
+}
+
+/** The server validates (no loop, no duplicate) and logs every edit with its reason. */
+export function useGraphEdit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: GraphEditInput) =>
+      request<GraphEditResult>(`${BASE}/graph/edits`, { method: 'POST', body }),
+    // Readiness and explanations read the graph, so plans change too.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['curriculum', 'graph'] }),
+        queryClient.invalidateQueries({ queryKey: ['curriculum', 'plan'] }),
+        queryClient.invalidateQueries({ queryKey: curriculumKeys.graphAudit }),
+      ]),
   });
 }
 

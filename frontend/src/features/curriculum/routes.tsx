@@ -2,6 +2,7 @@ import type { RouteObject } from 'react-router-dom';
 
 import { CurriculumHomePage } from './pages/CurriculumHomePage';
 import { GainPage } from './pages/GainPage';
+import { GraphEditPage } from './pages/GraphEditPage';
 import { ModuleProgressPage } from './pages/ModuleProgressPage';
 import { PaperEditorPage } from './pages/PaperEditorPage';
 import { PracticePage } from './pages/PracticePage';
@@ -20,5 +21,6 @@ export const curriculumRoutes: RouteObject[] = [
   { path: 'curriculum/:moduleId/gain', element: <GainPage /> },
   { path: 'curriculum/:moduleId/staff', element: <StaffPage /> },
   { path: 'curriculum/:moduleId/questions', element: <QuestionsPage /> },
+  { path: 'curriculum/:moduleId/graph', element: <GraphEditPage /> },
   { path: 'curriculum/:moduleId/questions/:paperId', element: <PaperEditorPage /> },
 ];

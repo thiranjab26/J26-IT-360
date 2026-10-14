@@ -44,6 +44,7 @@ export function ModuleHeader({ moduleId, phase }: { moduleId: string; phase?: Ph
           <>
             <Tab to={`/curriculum/${moduleId}/staff`}>Lecturer</Tab>
             <Tab to={`/curriculum/${moduleId}/questions`}>Questions</Tab>
+            <Tab to={`/curriculum/${moduleId}/graph`}>Graph</Tab>
           </>
         )}
       </nav>
