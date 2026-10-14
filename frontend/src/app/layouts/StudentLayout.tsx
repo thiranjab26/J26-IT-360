@@ -1,6 +1,6 @@
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
 
-import { useModules } from '@/features/tutor';
+import { PlayerHud, useModules } from '@/features/tutor';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { cx } from '@/shared/components/ui';
 
@@ -12,7 +12,7 @@ import { cx } from '@/shared/components/ui';
  * disabled tabs rather than links to nowhere.
  */
 export function StudentLayout() {
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const { data: modules } = useModules();
 
@@ -22,14 +22,6 @@ export function StudentLayout() {
     signOut();
     navigate('/login', { replace: true });
   }
-
-  const initials =
-    user?.full_name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('') ?? '?';
 
   return (
     <div className="min-h-screen">
@@ -49,24 +41,14 @@ export function StudentLayout() {
             <nav aria-label="Sections" className="hidden items-center gap-[4px] sm:flex">
               {current && <Tab to={`/modules/${current.module_id}`}>Quest Map</Tab>}
               <Tab to="/dashboard">Modules</Tab>
+              <Tab to="/profile">Profile</Tab>
               <DisabledTab>Practicals</DisabledTab>
               <DisabledTab>Course material</DisabledTab>
             </nav>
           </div>
 
           <div className="flex items-center gap-[12px]">
-            {current && (
-              <span className="hidden max-w-[260px] truncate rounded-full border border-line bg-surface-muted px-[11px] py-[4px] font-mono text-[10.5px] text-ink-muted md:inline">
-                {current.name}
-              </span>
-            )}
-            <span
-              aria-hidden="true"
-              className="flex size-[28px] items-center justify-center rounded-full border border-line bg-surface-muted font-mono text-[10.5px] text-ink-muted"
-              title={user?.full_name}
-            >
-              {initials}
-            </span>
+            <PlayerHud />
             <button
               type="button"
               onClick={onSignOut}

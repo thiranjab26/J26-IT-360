@@ -4,6 +4,11 @@ import { request } from '@/shared/api/client';
 
 export type Phase = 'hook' | 'teach' | 'checkpoint' | 'feedback' | 'reteach' | 'ended';
 export type TextSource = 'generated' | 'authored';
+/**
+ * What the faithfulness gate did with a text: verified (passed), unchecked (generated
+ * with no gate), blocked (the model's wording was rejected, so this is the course text).
+ */
+export type TextCheck = 'verified' | 'unchecked' | 'blocked';
 
 export interface SessionOption {
   letter: string;
@@ -20,6 +25,7 @@ export interface SessionQuestion {
   max_attempts: number;
   hint: string | null;
   hint_source: TextSource | null;
+  hint_check: TextCheck | null;
 }
 
 export interface SessionFeedback {
@@ -32,6 +38,48 @@ export interface SessionFeedback {
   tries_left: number | null;
 }
 
+export type Rarity = 'common' | 'rare' | 'epic';
+
+export interface Bonus {
+  kind: string;
+  label: string;
+  amount: number;
+}
+
+export interface BadgeInfo {
+  id: string;
+  name: string;
+  description: string;
+  rarity: Rarity;
+}
+
+export interface Level {
+  number: number;
+  name: string;
+  total_xp: number;
+  xp_into_level: number;
+  /** XP between this level and the next; null at the top level. */
+  xp_for_next: number | null;
+  percent: number;
+  next_name: string | null;
+}
+
+export interface LevelUp {
+  from_level: number;
+  to_level: number;
+  name: string;
+}
+
+/** What one action paid out, for the celebration on screen. */
+export interface Rewards {
+  xp_gained: number;
+  points: number;
+  bonuses: Bonus[];
+  badges: BadgeInfo[];
+  level: Level;
+  level_up: LevelUp | null;
+}
+
 export interface SessionSummary {
   exit_reason: string;
   xp_earned: number;
@@ -39,6 +87,15 @@ export interface SessionSummary {
   gating_total: number;
   mastery: number | null;
   can_resume: boolean;
+  bonuses: Bonus[];
+  badges: BadgeInfo[];
+}
+
+/** A passage an explanation was built from: the main one, and each the retriever added. */
+export interface Source {
+  chunk_id: string;
+  label: string;
+  kind: 'main' | 'retrieved';
 }
 
 export interface Session {
@@ -56,10 +113,34 @@ export interface Session {
   heading: string | null;
   text: string | null;
   text_source: TextSource | null;
+  text_check: TextCheck | null;
   source_text: string | null;
+  sources: Source[] | null;
   question: SessionQuestion | null;
   feedback: SessionFeedback | null;
   summary: SessionSummary | null;
+  rewards: Rewards | null;
+}
+
+/** A part already read, for looking back. */
+export interface HistoryPart {
+  step_number: number;
+  heading: string;
+  text: string;
+  text_source: TextSource | null;
+  text_check: TextCheck | null;
+  sources: Source[] | null;
+}
+
+export function useSessionHistory(sessionId: string | undefined) {
+  return useQuery({
+    queryKey: ['tutor', 'session', sessionId, 'history'],
+    queryFn: () =>
+      request<{ parts: HistoryPart[] }>(`/v1/tutor/sessions/${sessionId}/history`),
+    enabled: Boolean(sessionId),
+    staleTime: 0,
+    retry: false,
+  });
 }
 
 export interface ConceptProgress {
@@ -76,6 +157,16 @@ export interface ConceptProgress {
   }>;
 }
 
+export interface Quest {
+  topic: string;
+  concept_ids: string[];
+  mastered: number;
+  total: number;
+  complete: boolean;
+  reward_xp: number;
+  reward_claimed: boolean;
+}
+
 export interface Progress {
   module_id: string;
   policy: 'mastery_gated' | 'points_only';
@@ -83,6 +174,59 @@ export interface Progress {
   next_concept_id: string | null;
   active_session_id: string | null;
   concepts: ConceptProgress[];
+  quests: Quest[];
+  level: Level | null;
+}
+
+export interface Streak {
+  current: number;
+  longest: number;
+  /** False with current > 0 means "learn today to keep it". */
+  learned_today: boolean;
+}
+
+export interface BadgeStatus extends BadgeInfo {
+  earned: boolean;
+  earned_at: string | null;
+}
+
+export interface Profile {
+  total_xp: number;
+  level: Level;
+  streak: Streak;
+  badges: BadgeStatus[];
+  completed_sessions: number;
+}
+
+export interface LeaderEntry {
+  rank: number;
+  name: string;
+  xp: number;
+  level_number: number;
+  level_name: string;
+  is_you: boolean;
+}
+
+export interface Leaderboard {
+  entries: LeaderEntry[];
+  you: LeaderEntry | null;
+}
+
+export function useProfile() {
+  return useQuery({
+    queryKey: ['tutor', 'profile'],
+    queryFn: () => request<Profile>('/v1/tutor/profile'),
+    // Level, streak and badges move with every answer, so never serve a stale copy.
+    staleTime: 0,
+  });
+}
+
+export function useLeaderboard() {
+  return useQuery({
+    queryKey: ['tutor', 'leaderboard'],
+    queryFn: () => request<Leaderboard>('/v1/tutor/leaderboard?limit=8'),
+    staleTime: 0,
+  });
 }
 
 export function useProgress(moduleId: string | undefined) {
@@ -118,7 +262,10 @@ function useSessionAction<TInput>(send: (input: TInput) => Promise<Session>) {
     mutationFn: send,
     onSuccess: (session) => {
       queryClient.setQueryData(sessionKey(session.session_id), session);
+      // XP, level, streak, badges, unlocks and the leaderboard may all have moved.
       void queryClient.invalidateQueries({ queryKey: ['tutor', 'progress'] });
+      void queryClient.invalidateQueries({ queryKey: ['tutor', 'profile'] });
+      void queryClient.invalidateQueries({ queryKey: ['tutor', 'leaderboard'] });
     },
   });
 }

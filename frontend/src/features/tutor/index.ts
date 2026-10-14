@@ -4,4 +4,5 @@
  */
 export { tutorRoutes } from './routes';
 export { useModules } from './api/tutorApi';
+export { PlayerHud } from './components/PlayerHud';
 export type { Concept, Module, ModuleConcepts, ModuleStatus, Topic } from './api/tutorApi';

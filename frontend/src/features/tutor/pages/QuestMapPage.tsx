@@ -2,8 +2,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Badge, Banner, Button, Card, cx } from '@/shared/components/ui';
-import { useStartSession, useProgress, type ConceptProgress } from '../api/sessionApi';
+import {
+  useProgress,
+  useStartSession,
+  type ConceptProgress,
+  type Quest,
+} from '../api/sessionApi';
 import { useModuleConcepts, type Concept, type Topic } from '../api/tutorApi';
+import { fireConfetti, useCountUp } from '../components/fx';
+import { BoltIcon, CheckIcon, LockIcon, PlayIcon, TrophyIcon } from '../components/icons';
+import { Leaderboard } from '../components/Leaderboard';
 
 /**
  * The module as a path of topics, in teaching order, with the student's own progress:
@@ -48,6 +56,8 @@ export function QuestMapPage() {
     (progress?.concepts ?? []).map((c) => [c.concept_id, c]),
   );
 
+  const quests = new Map<string, Quest>((progress?.quests ?? []).map((q) => [q.topic, q]));
+
   const masteredCount = [...status.values()].filter((c) => c.mastered).length;
   const masteredPercent = module.concept_count
     ? Math.round((masteredCount / module.concept_count) * 100)
@@ -72,11 +82,7 @@ export function QuestMapPage() {
         </Link>
         <div className="mt-[10px] flex flex-wrap items-center justify-between gap-[12px]">
           <h1 className="text-[23px] font-semibold tracking-tight text-ink">{module.name}</h1>
-          {progress && (
-            <span className="rounded-full border border-brand-soft bg-brand-wash px-[12px] py-[4px] font-mono text-[12px] font-semibold text-brand">
-              {progress.total_xp} XP
-            </span>
-          )}
+          {progress && <XpPill xp={progress.total_xp} />}
         </div>
         {module.description && (
           <p className="mt-[6px] max-w-[640px] text-[13px] leading-[1.6] text-ink-muted">
@@ -135,6 +141,7 @@ export function QuestMapPage() {
                 last={index === topics.length - 1}
                 conceptNames={conceptNames}
                 status={status}
+                quest={quests.get(topic.name)}
                 current={nextId}
                 busy={start.isPending}
                 onStart={begin}
@@ -161,6 +168,8 @@ export function QuestMapPage() {
             </div>
           </Card>
 
+          <Leaderboard />
+
           <Card className="px-[18px] py-[16px]">
             <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
               How progress works
@@ -184,13 +193,24 @@ export function QuestMapPage() {
           <div className="flex items-start gap-[8px] px-[4px]">
             <Shield />
             <p className="text-[11.5px] leading-[1.5] text-ink-faint">
-              Explanations are written from this module's course material. A fact-check gate for
-              them is being built; until it is on, AI-written text is labelled as such.
+              Explanations are written from this module's course material, and each one is
+              checked against it before you see it. If a check fails you get the original course
+              text instead.
             </p>
           </div>
         </aside>
       </div>
     </div>
+  );
+}
+
+function XpPill({ xp }: { xp: number }) {
+  const shown = useCountUp(xp, 900);
+  return (
+    <span className="inline-flex items-center gap-[5px] rounded-full border border-gold bg-gold-wash px-[12px] py-[4px] font-mono text-[12px] font-semibold text-gold-ink">
+      <BoltIcon className="size-[13px] text-gold-deep" />
+      {shown} XP
+    </span>
   );
 }
 
@@ -200,6 +220,7 @@ function TopicStep({
   last,
   conceptNames,
   status,
+  quest,
   current,
   busy,
   onStart,
@@ -209,47 +230,120 @@ function TopicStep({
   last: boolean;
   conceptNames: Map<string, string>;
   status: Map<string, ConceptProgress>;
+  quest: Quest | undefined;
   current: string | null;
   busy: boolean;
   onStart: (conceptId: string) => void;
 }) {
-  const mastered = topic.concepts.filter((c) => status.get(c.concept_id)?.mastered).length;
-  const done = mastered === topic.concepts.length;
+  const total = topic.concepts.length;
+  const mastered = quest?.mastered ?? topic.concepts.filter((c) => status.get(c.concept_id)?.mastered).length;
+  const complete = quest?.complete ?? mastered === total;
   const open = topic.concepts.some((c) => c.concept_id === current);
+  const locked =
+    !complete &&
+    topic.concepts.length > 0 &&
+    topic.concepts.every((c) => {
+      const progress = status.get(c.concept_id);
+      return progress !== undefined && !progress.unlocked;
+    });
+  const reward = quest?.reward_xp ?? 150;
 
   return (
-    <li className="grid grid-cols-[38px_1fr] gap-[14px]">
+    <li
+      style={{ animationDelay: `${number * 70}ms` }}
+      className="grid animate-slide-up grid-cols-[38px_1fr] gap-[14px]"
+    >
       {/* Node and the line down to the next topic */}
       <div className="flex flex-col items-center">
         <span
           className={cx(
-            'flex size-[34px] shrink-0 items-center justify-center rounded-full',
-            'font-mono text-[12.5px] font-semibold',
-            done
-              ? 'bg-verified text-white'
+            'flex size-[36px] shrink-0 items-center justify-center rounded-full',
+            'font-mono text-[12.5px] font-semibold transition-all',
+            complete
+              ? 'bg-gradient-to-br from-gold to-gold-deep text-white shadow-gold'
               : open
-                ? 'bg-brand text-white shadow-[0_0_0_4px_oklch(0.52_0.14_265/0.14)]'
-                : 'border border-line-strong bg-surface text-ink-muted',
+                ? 'animate-pulse-ring bg-brand text-white'
+                : locked
+                  ? 'border border-dashed border-line-strong bg-surface-muted text-ink-faint'
+                  : 'border border-line-strong bg-surface text-ink-muted',
           )}
         >
-          {done ? '✓' : number}
+          {complete ? (
+            <TrophyIcon className="size-[18px]" />
+          ) : locked ? (
+            <LockIcon className="size-[15px]" />
+          ) : (
+            number
+          )}
         </span>
-        {!last && <span className="my-[4px] w-px flex-1 bg-line" />}
+        {!last && (
+          <span
+            className={cx(
+              'my-[4px] w-[2px] flex-1 rounded-full',
+              complete ? 'bg-gradient-to-b from-gold to-line' : 'bg-line',
+            )}
+          />
+        )}
       </div>
 
       <div className={cx(last ? 'pb-0' : 'pb-[18px]')}>
-        <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-[8px] border-b border-line-soft px-[18px] py-[12px]">
-            <h3 className="text-[14.5px] font-semibold tracking-tight text-ink">{topic.name}</h3>
+        <Card
+          className={cx(
+            'overflow-hidden transition-shadow',
+            complete && 'border-gold shadow-gold',
+            open && !complete && 'border-brand-soft',
+          )}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-[8px] px-[18px] pt-[12px] pb-[10px]">
+            <div>
+              <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+                Quest {number}
+              </p>
+              <h3 className="text-[14.5px] font-semibold tracking-tight text-ink">{topic.name}</h3>
+            </div>
             <div className="flex items-center gap-[7px]">
               {open && <Badge tone="brand">Up next</Badge>}
-              <Badge tone={done ? 'verified' : 'neutral'}>
-                {mastered} of {topic.concepts.length} mastered
-              </Badge>
+              {complete ? (
+                <span className="inline-flex items-center gap-[5px] rounded-full border border-gold bg-gold-wash px-[9px] py-[3px] font-mono text-[10.5px] text-gold-ink">
+                  <TrophyIcon className="size-[12px]" />
+                  Complete{quest?.reward_claimed ? ` +${reward} XP` : ''}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-[5px] rounded-full border border-line bg-surface-muted px-[9px] py-[3px] font-mono text-[10.5px] text-ink-muted">
+                  <TrophyIcon className="size-[12px]" />+{reward} XP reward
+                </span>
+              )}
             </div>
           </div>
 
-          <ul className="divide-y divide-line-soft">
+          <div className="mx-[18px] mb-[12px] flex items-center gap-[10px]">
+            <div
+              className="h-[7px] flex-1 overflow-hidden rounded-full bg-surface-sunken"
+              role="progressbar"
+              aria-valuenow={mastered}
+              aria-valuemin={0}
+              aria-valuemax={total}
+              aria-label={`${topic.name} quest progress`}
+            >
+              <div
+                className={cx(
+                  'h-full rounded-full',
+                  complete
+                    ? 'bg-gradient-to-r from-gold to-gold-deep'
+                    : 'bg-gradient-to-r from-brand to-violet',
+                )}
+                style={{
+                  width: `${total ? (100 * mastered) / total : 0}%`,
+                  transition: 'width 0.9s cubic-bezier(0.22, 1, 0.36, 1)',
+                }}
+              />
+            </div>
+            <span className="font-mono text-[10.5px] text-ink-muted">
+              {mastered}/{total}
+            </span>
+          </div>
+
+          <ul className="divide-y divide-line-soft border-t border-line-soft">
             {topic.concepts.map((concept) => (
               <ConceptItem
                 key={concept.concept_id}
@@ -284,20 +378,27 @@ function ConceptItem({
   onStart: (conceptId: string) => void;
 }) {
   const locked = progress ? !progress.unlocked : false;
+  const mastered = Boolean(progress?.mastered);
   const unmet = (progress?.unmet ?? []).map((r) =>
     r.concept_id ? (names.get(r.concept_id) ?? r.concept_id) : `${Math.ceil(r.required)} XP`,
   );
 
   return (
-    <li className={cx('flex items-start justify-between gap-[14px] px-[18px] py-[13px]', locked && 'opacity-70')}>
-      <div className="min-w-0">
+    <li
+      className={cx(
+        'flex items-start gap-[12px] px-[18px] py-[13px] transition-colors',
+        locked ? 'opacity-70' : 'hover:bg-surface-muted',
+      )}
+    >
+      <StatusDot mastered={mastered} locked={locked} next={isNext} />
+
+      <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-[8px]">
           <h4 className="text-[13.5px] font-medium text-ink">{concept.name}</h4>
-          {progress?.mastered && <Badge tone="verified">mastered</Badge>}
-          {progress && !progress.mastered && progress.mastery !== null && (
+          {mastered && <Badge tone="verified">mastered</Badge>}
+          {progress && !mastered && progress.mastery !== null && (
             <Badge tone="caution">{Math.round(progress.mastery * 100)}%</Badge>
           )}
-          {locked && <Badge>locked</Badge>}
         </div>
 
         {concept.description && (
@@ -325,14 +426,46 @@ function ConceptItem({
       {progress && !locked && (
         <Button
           variant={isNext ? 'primary' : 'secondary'}
-          className="shrink-0 px-[14px] py-[7px] text-[12.5px]"
-          onClick={() => onStart(concept.concept_id)}
+          className={cx('shrink-0 px-[14px] py-[7px] text-[12.5px]', isNext && 'animate-pulse-ring')}
+          onClick={() => {
+            if (isNext) fireConfetti('small', { x: 0.5, y: 0.5 });
+            onStart(concept.concept_id);
+          }}
           disabled={busy}
         >
-          {progress.mastered ? 'Review' : progress.mastery !== null ? 'Practise' : 'Start'}
+          {mastered ? 'Review' : progress.mastery !== null ? 'Practise' : 'Start'}
         </Button>
       )}
     </li>
+  );
+}
+
+/** Where a concept stands at a glance: mastered, locked, next up, or just open. */
+function StatusDot({ mastered, locked, next }: { mastered: boolean; locked: boolean; next: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cx(
+        'mt-[1px] flex size-[24px] shrink-0 items-center justify-center rounded-full',
+        mastered
+          ? 'animate-pop-in bg-verified text-white'
+          : locked
+            ? 'border border-dashed border-line-strong bg-surface-muted text-ink-faint'
+            : next
+              ? 'bg-brand text-white'
+              : 'border border-line-strong bg-surface text-ink-faint',
+      )}
+    >
+      {mastered ? (
+        <CheckIcon className="size-[13px]" />
+      ) : locked ? (
+        <LockIcon className="size-[12px]" />
+      ) : next ? (
+        <PlayIcon className="size-[11px]" />
+      ) : (
+        <span className="size-[6px] rounded-full bg-line-strong" />
+      )}
+    </span>
   );
 }
 

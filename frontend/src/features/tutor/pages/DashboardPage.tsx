@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { Badge, Card, cx } from '@/shared/components/ui';
 import { useModules, type Module } from '../api/tutorApi';
+import { Leaderboard } from '../components/Leaderboard';
+import { HeroStats } from '../components/ProfileStats';
 
 export function DashboardPage() {
   const { user } = useAuth();
   const { data: modules, isPending, error } = useModules();
 
   const firstName = user?.full_name.split(' ')[0] ?? 'there';
-  const open = modules?.find((module) => module.status === 'available');
 
   return (
     <div className="flex flex-col gap-[28px]">
@@ -27,17 +28,11 @@ export function DashboardPage() {
           </p>
         </div>
 
-        {/*
-         * Zero-state until sessions exist. These are placeholders for the
-         * progress API that arrives with phase P5, not data from the server.
-         */}
-        <div className="grid grid-cols-3 gap-[10px]">
-          <Stat label="XP" value="0" />
-          <Stat label="Streak" value="0 days" />
-          <Stat label="Mastered" value={open ? `0 of ${open.topic_count}` : '0'} />
-        </div>
       </header>
 
+      <HeroStats />
+
+      <div className="grid items-start gap-[22px] lg:grid-cols-[1fr_320px]">
       <section>
         <div className="mb-[12px] flex items-baseline justify-between">
           <h2 className="text-[13px] font-medium text-ink">Your modules</h2>
@@ -61,22 +56,18 @@ export function DashboardPage() {
         )}
 
         {modules && (
-          <div className="grid gap-[14px] sm:grid-cols-2">
+          <div className="grid gap-[14px]">
             {modules.map((module) => (
               <ModuleCard key={module.module_id} module={module} />
             ))}
           </div>
         )}
       </section>
-    </div>
-  );
-}
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-[88px] rounded-[10px] border border-line bg-surface px-[13px] py-[9px]">
-      <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">{label}</p>
-      <p className="mt-[2px] text-[17px] font-semibold tracking-tight text-ink">{value}</p>
+      <aside>
+        <Leaderboard />
+      </aside>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,8 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
-import { Badge, Banner, Button, Card } from '@/shared/components/ui';
+import { Badge, Banner, Button, Card, cx } from '@/shared/components/ui';
 import {
   useAnswerSession,
   useContinueSession,
@@ -9,8 +10,14 @@ import {
   useResumeSession,
   useSession,
   useStartSession,
+  type Rewards,
   type Session,
 } from '../api/sessionApi';
+import { fireConfetti, useCountUp, useElapsedSeconds } from '../components/fx';
+import { GeneratingCard } from '../components/GeneratingCard';
+import { ReviewPanel } from '../components/ReviewPanel';
+import { BoltIcon } from '../components/icons';
+import { RewardCelebration } from '../components/RewardCelebration';
 import {
   FeedbackCard,
   HookCard,
@@ -24,7 +31,7 @@ import {
  * A guided session on one concept: the tutor leads, the student reads, answers and
  * moves on. The server owns every rule (what comes next, what a wrong answer costs,
  * when a session ends); this page only shows the state it is given and sends what the
- * student does.
+ * student does, and celebrates what the server says was earned.
  */
 export function SessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -36,6 +43,34 @@ export function SessionPage() {
   const end = useEndSession();
   const resume = useResumeSession();
   const restart = useStartSession();
+
+  // The full-screen moments (a level up, a badge). Everything else is shown inline.
+  const [celebration, setCelebration] = useState<{ key: number; rewards: Rewards } | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  // Moving on can mean preparing the next part (retrieve, write, check), which takes a while.
+  // Once it is clearly slow, a progress card replaces the page so it never looks frozen.
+  // Ordinary steps return in a second or two, so the card waits until a request is clearly slow.
+  const elapsed = useElapsedSeconds(next.isPending);
+  const preparing = next.isPending && elapsed >= 3;
+  const counter = useRef(0);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+
+  const react = useCallback((response: Session) => {
+    if (response.feedback?.outcome === 'correct') fireConfetti('small', { x: 0.5, y: 0.3 });
+    const rewards = response.rewards;
+    if (rewards && (rewards.level_up || rewards.badges.length > 0)) {
+      // A beat after the answer, so the student sees what they got right first.
+      const id = window.setTimeout(() => {
+        counter.current += 1;
+        setCelebration({ key: counter.current, rewards });
+      }, 900);
+      timers.current.push(id);
+    } else if (response.summary && ['completed', 'mastery_satisfied'].includes(response.summary.exit_reason)) {
+      fireConfetti('big', { x: 0.5, y: 0.25 });
+    }
+  }, []);
+  const closeCelebration = useCallback(() => setCelebration(null), []);
 
   if (isPending) return <SessionSkeleton />;
 
@@ -61,6 +96,7 @@ export function SessionPage() {
   const busy =
     next.isPending || answer.isPending || end.isPending || resume.isPending || restart.isPending;
   const failure = [next, answer, end, resume, restart].find((action) => action.error)?.error;
+  const goNext = () => next.mutate(session.session_id, { onSuccess: react });
 
   return (
     <div className="mx-auto flex max-w-[760px] flex-col gap-[16px]">
@@ -78,26 +114,39 @@ export function SessionPage() {
         />
       )}
 
-      {session.phase === 'hook' && (
-        <HookCard session={session} busy={busy} onNext={() => next.mutate(session.session_id)} />
+      {session.position.step_number > 1 && !preparing && (
+        <button
+          type="button"
+          onClick={() => setReviewing((open) => !open)}
+          className="self-start rounded-full border border-line bg-surface px-[12px] py-[5px] text-[12px] font-medium text-ink-soft transition-colors hover:border-brand-soft hover:text-brand"
+        >
+          {reviewing ? 'Back to where I was' : 'Review earlier parts'}
+        </button>
       )}
-      {session.phase === 'teach' && (
-        <TeachCard session={session} busy={busy} onNext={() => next.mutate(session.session_id)} />
+
+      {preparing && <GeneratingCard elapsed={elapsed} />}
+      {reviewing && !preparing && (
+        <ReviewPanel sessionId={session.session_id} onClose={() => setReviewing(false)} />
       )}
+
+      {!preparing && !reviewing && (
+        <>
+      {session.phase === 'hook' && <HookCard session={session} busy={busy} onNext={goNext} />}
+      {session.phase === 'teach' && <TeachCard session={session} busy={busy} onNext={goNext} />}
       {session.phase === 'checkpoint' && session.question && (
         <QuestionCard
           session={session}
           question={session.question}
           busy={busy}
-          onAnswer={(text) => answer.mutate({ sessionId: session.session_id, answer: text })}
+          onAnswer={(text) =>
+            answer.mutate({ sessionId: session.session_id, answer: text }, { onSuccess: react })
+          }
         />
       )}
       {session.phase === 'feedback' && (
-        <FeedbackCard session={session} busy={busy} onNext={() => next.mutate(session.session_id)} />
+        <FeedbackCard session={session} busy={busy} onNext={goNext} />
       )}
-      {session.phase === 'reteach' && (
-        <ReteachCard session={session} busy={busy} onNext={() => next.mutate(session.session_id)} />
-      )}
+      {session.phase === 'reteach' && <ReteachCard session={session} busy={busy} onNext={goNext} />}
       {session.phase === 'ended' && session.summary && (
         <SummaryCard
           session={session}
@@ -110,6 +159,16 @@ export function SessionPage() {
             })
           }
           onBack={backToMap}
+        />
+      )}
+        </>
+      )}
+
+      {celebration && (
+        <RewardCelebration
+          key={celebration.key}
+          rewards={celebration.rewards}
+          onDone={closeCelebration}
         />
       )}
     </div>
@@ -129,9 +188,7 @@ function SessionHeader({
 }) {
   const { step_number, total_steps, gating_done, gating_total } = session.position;
   const ended = session.phase === 'ended';
-  const percent = ended
-    ? 100
-    : Math.round(((step_number - 1) / Math.max(1, total_steps)) * 100);
+  const xp = useCountUp(session.xp_earned);
 
   return (
     <header>
@@ -147,9 +204,10 @@ function SessionHeader({
           {/* Re-keyed on every change so the badge pops when XP is earned. */}
           <span
             key={session.xp_earned}
-            className="animate-pop inline-flex items-center rounded-full border border-brand-soft bg-brand-wash px-[11px] py-[3px] font-mono text-[11.5px] font-semibold text-brand"
+            className="inline-flex animate-pop items-center gap-[5px] rounded-full border border-gold bg-gold-wash px-[11px] py-[3px] font-mono text-[11.5px] font-semibold text-gold-ink"
           >
-            {session.xp_earned} XP
+            <BoltIcon className="size-[12px] text-gold-deep" />
+            {xp} XP
           </span>
           {!ended && (
             <Button variant="ghost" onClick={onEnd} busy={ending} className="px-[10px] py-[5px]">
@@ -164,24 +222,38 @@ function SessionHeader({
       </h1>
 
       <div className="mt-[12px] flex items-center gap-[12px]">
-        <div
-          className="h-[7px] flex-1 overflow-hidden rounded-full bg-surface-sunken"
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Session progress"
-        >
-          <div
-            className="h-full rounded-full bg-brand transition-[width] duration-500"
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-        <Badge>
+        <StepTrail current={ended ? total_steps : step_number} total={total_steps} />
+        <Badge tone={gating_done >= gating_total && gating_total > 0 ? 'verified' : 'neutral'}>
           {gating_done} of {gating_total} checkpoints
         </Badge>
       </div>
     </header>
+  );
+}
+
+/** One segment per step: done ones filled, the current one glowing, the rest empty. */
+function StepTrail({ current, total }: { current: number; total: number }) {
+  return (
+    <ol
+      className="flex flex-1 gap-[4px]"
+      aria-label={`Step ${Math.min(current, total)} of ${total}`}
+    >
+      {Array.from({ length: total }, (_, i) => {
+        const done = i + 1 < current || current > total;
+        const here = i + 1 === current;
+        return (
+          <li
+            key={i}
+            className={cx(
+              'h-[8px] flex-1 rounded-full transition-all duration-500',
+              done && 'bg-gradient-to-r from-brand to-violet',
+              here && !done && 'animate-pulse-ring bg-brand',
+              !done && !here && 'bg-surface-sunken',
+            )}
+          />
+        );
+      })}
+    </ol>
   );
 }
 

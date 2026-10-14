@@ -1,6 +1,7 @@
 import type { RouteObject } from 'react-router-dom';
 
 import { DashboardPage } from './pages/DashboardPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { QuestMapPage } from './pages/QuestMapPage';
 import { SessionPage } from './pages/SessionPage';
 
@@ -9,4 +10,5 @@ export const tutorRoutes: RouteObject[] = [
   { path: 'dashboard', element: <DashboardPage /> },
   { path: 'modules/:moduleId', element: <QuestMapPage /> },
   { path: 'sessions/:sessionId', element: <SessionPage /> },
+  { path: 'profile', element: <ProfilePage /> },
 ];
