@@ -7,6 +7,8 @@ retrieval and the faithfulness gate arrive in P1 to P3.
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -15,9 +17,17 @@ from app.api.v1.routes import health
 from app.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import RequestContextMiddleware, configure_logging
+from app.sessions.factory import preload_in_background
 
 SERVICE_NAME = "tutor-service"
 API_PREFIX = "/api/v1/tutor"
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Load the faithfulness gate's model in the background at start-up."""
+    preload_in_background()
+    yield
 
 
 def create_app() -> FastAPI:
@@ -30,6 +40,7 @@ def create_app() -> FastAPI:
         description="C3 VeriTutor. Faithfulness-verified, mastery-gated AI tutor.",
         docs_url="/docs",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
 
     app.add_middleware(RequestContextMiddleware)

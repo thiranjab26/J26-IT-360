@@ -24,6 +24,8 @@ Design docs: `docs/c3/Implementation-plan.md`, `docs/c3/dsa-module-plan.md`,
 | POST | `/api/v1/tutor/sessions/{id}/end` | The student stops. Resumable for 48 hours | P2 |
 | POST | `/api/v1/tutor/sessions/{id}/resume` | Pick up after the last passed checkpoint (`student_ended`, `load_exit`, `timeout` only) | P2 |
 | GET | `/api/v1/tutor/progress?module_id=prog` | XP, mastery per concept, what is unlocked and why not, the suggested next concept | P2 |
+| GET | `/api/v1/tutor/profile` | Level, XP towards the next level, streak and every badge (earned or locked) | P5 |
+| GET | `/api/v1/tutor/leaderboard?limit=10` | Top students by XP, names shortened to a first name and an initial, plus the caller's own rank if outside the top | P5 |
 
 The session routes are for students only (`403 students_only` otherwise), and a session is visible only to the student who started it. The answer key never appears in a response before the student has answered: a wrong gating answer gets no explanation, so the retry means something. Two settings shape them: `TUTOR_SESSION_POLICY` (`mastery_gated` or `points_only`, the two study conditions) and `TUTOR_ENFORCE_UNLOCKS` (`false` opens every concept, handy for demos).
 
@@ -136,6 +138,47 @@ It ends by showing what the session opens under each of the study's two conditio
 ## LLM providers
 
 `TUTOR_LLM_PROVIDER` selects `gemini` (cloud) or `ollama` (local fallback). Put your key in `TUTOR_GEMINI_API_KEY` in `.env`; it is held as a secret value, so it cannot appear in logs or in a printed settings object, and an empty value counts as not configured. Check `TUTOR_GEMINI_MODEL` against the models Google AI Studio currently offers. The Ollama fallback defaults to `qwen2.5-coder:7b`; on a CPU-only machine generation is slow (the 1.5B model measured 2.6 tokens per second), which matters for the offline-fallback claim. The provider layer (`app/llm/providers.py`) reads these settings: Gemini first, optionally Ollama after it (`TUTOR_LLM_FALLBACK_PROVIDER=ollama`), each with a timeout (`TUTOR_LLM_TIMEOUT_SECONDS`), and a provider that just failed is skipped for a minute. `app/sessions/writer.py` uses it to write explanations, hints and re-teaches from one authored course passage; no prompt ever contains an answer key, and a hint that states the expected output is replaced by a generic one. If no key is set, or a call fails, the session shows the authored course text instead and never breaks. Whatever was shown at each point is saved in `tutor.session_texts` (so a refresh shows the same words, and the faithfulness gate in P3 has the exact text to check). Generated text is labelled in the API (`text_source: generated`) and in the interface until that gate exists.
+
+## Gamification
+
+Levels, bonus XP, badges, streaks and topic quests sit on top of the checkpoint points. Every value is in `app/gamification/progression.py` and written up, with the rules behind them, in [`docs/c3/gamification-spec.md`](../../../docs/c3/gamification-spec.md); a unit test fails if the two disagree. The rewards are identical in both study conditions (mastery-gated and points-only): only what XP may unlock differs.
+
+| Piece | What it does |
+|---|---|
+| `app/gamification/progression.py` | Pure rules: the ten levels, the five bonuses, the ten badges, streak counting, what makes a run flawless |
+| `app/sessions/rewards.py` | Applies them to a real student's history after an answer or the end of a session, and pays each bonus once |
+| `tutor.xp_events` | Bonus XP. `(user_id, kind, ref)` is unique, so a replayed request can never pay twice |
+| `tutor.user_badges` | Which badges a student holds and when they earned them |
+
+Answer and continue responses carry a `rewards` object (XP gained, bonuses, badges, level, level-up) so the screen can celebrate exactly what was earned; a finished session's summary lists them again. A "day" for streaks follows `TUTOR_TIMEZONE`.
+
+## Faithfulness gate
+
+Generated text is checked against the course passage it came from before a student sees it (`app/verification/`). The method, the numbers behind the settings and their limits are in `research/c3-RAG tutor/README.md`; this is how to run it.
+
+| Piece | What it does |
+|---|---|
+| `claims.py` | Splits a response into claims (model-written atomic claims, or sentences if the model fails) and checks that any code lines come from the passage's own code. `passage_windows` gives the short stretches of a passage used as extra evidence |
+| `nli.py` | The NLI model (`TUTOR_NLI_MODEL`, a DeBERTa-v3 fact-verification model, forced to float32). Loaded in the background at start-up |
+| `gate.py` | PASS only if every claim reaches `TUTOR_GATE_THRESHOLD` on P(entailment). One unsupported claim blocks the response |
+| `cli.py` | `prebuild` and `status`, below |
+
+What a student sees (`text_check` in the session API): `verified` (generated and passed), `blocked` (the model's wording failed twice, so this is the course text), `unchecked` (generated while the gate is off), or null (authored course text). Every verdict is logged to `tutor.gate_events`, and a passed explanation or re-teach is shared with every later session through `tutor.verified_explanations`, keyed on the passage text, prompt, model and gate settings.
+
+**Explanations are built with retrieval.** An explanation of one part is not written from that part alone. `app/sessions/grounding.py` asks the hybrid retriever (the index the evaluation measured) for the course material most related to it within the concept, and the best three passages, such as an example, a common mistake or the quick facts, go to the model as support. The gate accepts a claim that the main passage or any retrieved one supports, and the screen shows what the text was built from ("Built from the course index"). If the index is not available on a machine, the explanation falls back to the main passage alone.
+
+**Clicking Continue prepares the part, and it is shown only when it has passed.** If no verified explanation exists yet for the next part, the request retrieves the related passages, has the model write the explanation and checks it, then returns the finished text. While that runs the screen shows a progress card (finding passages, writing, checking); it never shows course text first and swaps it later. To keep the wait short, the next part is prepared in the background while the student reads the current one (`app/verification/fill.py`), so a click is usually instant and only a quick reader waits. A part the checker rejects after two attempts and a trim shows the course text, labelled as such, and a part that just failed is not retried for ten minutes. A session can also be read backwards: `GET /sessions/{id}/history` returns the parts already read, as the student saw them, without moving the session.
+
+**A failed check removes the failing sentence, not the whole explanation.** After the regeneration also fails, the sentences that carry the unsupported claims are cut and what remains is checked again by the same gate; it is shown only if it passes. If a claim cannot be matched to a sentence, too much would go, or the text contains code that is not in the course, the explanation is dropped instead.
+
+**Run `prebuild` before real use.** Checking one explanation takes about 20 s on a CPU and a model call or two, and a strict gate passes only some first attempts, so doing it while a student waits is slow and rate-limit-prone. Prebuild does it once, ahead of time, with up to four attempts per passage:
+
+```bash
+uv run python -m app.verification.cli prebuild --attempts 4 --pause 3   # resumable
+uv run python -m app.verification.cli status                            # what is still missing
+```
+
+A change to the course text, the prompt, the model, the retrieval or any gate setting changes the cache key, so run `prebuild` again afterwards. Passages the gate keeps blocking are reported and left uncached; students then see the authored text for them. Changing the threshold, windows, prompt, decomposer or model changes the cache key, so run `prebuild` again afterwards. The Gemini free tier allows 500 requests a day; a full prebuild is about two requests per attempt, so it can take more than one day on the free tier.
 
 ## Schemas and migrations
 

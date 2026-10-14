@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     )
 
     # --- guided sessions ----------------------------------------------------
+    # The local time zone for "a day" in streaks. A streak is consecutive local days.
+    timezone: str = Field(default="Asia/Colombo", alias="TUTOR_TIMEZONE")
     # mastery_gated | points_only. The two study conditions: what unlocks the next concept.
     session_policy: str = Field(default="mastery_gated", alias="TUTOR_SESSION_POLICY")
     # False opens every concept, for demos and for testing a late concept without
@@ -74,7 +76,28 @@ class Settings(BaseSettings):
     # Optional second provider tried when the first fails: "ollama" or empty for none.
     # Ollama on a CPU is slow, so it only helps if the timeout below is generous.
     llm_fallback_provider: str = Field(default="", alias="TUTOR_LLM_FALLBACK_PROVIDER")
-    llm_timeout_seconds: float = Field(default=25.0, alias="TUTOR_LLM_TIMEOUT_SECONDS")
+    llm_timeout_seconds: float = Field(default=15.0, alias="TUTOR_LLM_TIMEOUT_SECONDS")
+
+    # --- faithfulness gate (P3) --------------------------------------------
+    # Every generated text is checked against the passage it came from before a student
+    # sees it. Off means generated text is shown unchecked and labelled as such.
+    gate_enabled: bool = Field(default=True, alias="TUTOR_GATE_ENABLED")
+    nli_model: str = Field(
+        default="MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli", alias="TUTOR_NLI_MODEL"
+    )
+    # P(entailment) a claim must reach to count as supported. A measured value, not a
+    # default: see research/c3-RAG tutor/README.md.
+    gate_threshold: float = Field(default=0.77, alias="TUTOR_GATE_THRESHOLD")
+    # claim (judge each statement) or whole_response (judge the text as one; the baseline).
+    gate_granularity: str = Field(default="claim", alias="TUTOR_GATE_GRANULARITY")
+    # llm (atomic claims written by the model) or sentences (rule-based splitting).
+    gate_decomposer: str = Field(default="llm", alias="TUTOR_GATE_DECOMPOSER")
+    # Also judge each claim against short stretches of the passage, not just the whole.
+    gate_windows: bool = Field(default=True, alias="TUTOR_GATE_WINDOWS")
+    # Extra tries after a blocked text, each told which statements were unsupported.
+    gate_max_regenerations: int = Field(default=1, alias="TUTOR_GATE_MAX_REGENERATIONS")
+    # Which kinds of text the gate checks: explain, reteach, hint.
+    gate_kinds: str = Field(default="explain,reteach,hint", alias="TUTOR_GATE_KINDS")
 
     ollama_base_url: str = Field(default="http://localhost:11434", alias="TUTOR_OLLAMA_BASE_URL")
     ollama_model: str = Field(default="qwen2.5-coder:7b", alias="TUTOR_OLLAMA_MODEL")

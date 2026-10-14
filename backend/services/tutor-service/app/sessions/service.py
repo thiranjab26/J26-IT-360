@@ -29,6 +29,16 @@ from datetime import UTC, datetime
 
 from app.domain.questions import AnswerKey, BankEntry, Question, shuffled
 from app.gamification.mastery import MIN_EVIDENCE, CheckpointResult, estimate
+from app.gamification.progression import (
+    BADGE_BY_ID,
+    BADGES,
+    BONUS_LABELS,
+    BONUSES,
+    Badge,
+    current_streak,
+    level_for,
+    longest_streak,
+)
 from app.gamification.rules import (
     Policy,
     UnlockRules,
@@ -40,20 +50,43 @@ from app.gamification.rules import (
 from app.gamification.xp import xp_for_checkpoint
 from app.grading.deterministic import grade
 from app.models.sessions import (
+    BadgeOut,
+    BadgeStatusOut,
+    BonusOut,
     ConceptProgressOut,
     FeedbackOut,
+    HistoryOut,
+    HistoryPartOut,
+    LeaderboardOut,
+    LeaderEntryOut,
+    LevelOut,
+    LevelUpOut,
     OptionOut,
     PositionOut,
+    ProfileOut,
     ProgressOut,
     QuestionOut,
+    QuestOut,
     RequirementOut,
+    RewardsOut,
     SessionOut,
+    SourceOut,
+    StreakOut,
     SummaryOut,
 )
 from app.retrieval.hybrid import BM25, tokens
 from app.sessions.catalog import Course, UnknownModule
+from app.sessions.gate_log import record_audits
+from app.sessions.grounding import Grounding, primary_only
 from app.sessions.plan import build_plan
-from app.sessions.repository import AttemptRecord, SessionRepository, StoredSession, StoredText
+from app.sessions.repository import (
+    AttemptRecord,
+    CachedExplanation,
+    SessionRepository,
+    StoredSession,
+    StoredText,
+)
+from app.sessions.rewards import Earned, RewardEngine
 from app.sessions.state_machine import (
     Answer,
     Continue,
@@ -70,11 +103,52 @@ from app.sessions.state_machine import (
     step,
 )
 from app.sessions.writer import EXPLAIN, HINT, RETEACH, TutorWriter, gives_away
+from app.verification.fill import Filler
 
 GENERIC_HINT = (
     "Look back at the explanation you just read, then trace the code one line at a time. "
     "Write down the value of each variable after every step."
 )
+
+
+def _check(text: StoredText) -> str | None:
+    """How a stored text relates to the faithfulness gate, for the screen."""
+    if text.source == "generated":
+        return "verified" if text.verified else "unchecked"
+    return "blocked" if text.verified is False else None
+
+
+def _sources_out(text: StoredText) -> list[SourceOut] | None:
+    if text.source != "generated" or not text.sources:
+        return None
+    return [SourceOut(**item) for item in text.sources]
+
+
+def _badge_out(badge: Badge) -> BadgeOut:
+    return BadgeOut(
+        id=badge.id, name=badge.name, description=badge.description, rarity=badge.rarity
+    )
+
+
+def _level_out(total_xp: int) -> LevelOut:
+    p = level_for(total_xp)
+    return LevelOut(
+        number=p.level.number,
+        name=p.level.name,
+        total_xp=total_xp,
+        xp_into_level=p.xp_into_level,
+        xp_for_next=p.xp_for_next,
+        percent=p.percent,
+        next_name=p.next_level.name if p.next_level else None,
+    )
+
+
+def _short_name(full_name: str) -> str:
+    """First name and the initial of the last, so a leaderboard names nobody in full."""
+    parts = full_name.split()
+    if len(parts) < 2:
+        return full_name or "Student"
+    return f"{parts[0]} {parts[-1][0]}."
 
 
 class SessionProblem(Exception):
@@ -132,6 +206,10 @@ class SessionService:
         rules: Rules | None = None,
         unlock_rules: UnlockRules | None = None,
         writer: TutorWriter | None = None,
+        timezone: str = "Asia/Colombo",
+        grounding: Callable[[Course, str], Grounding] | None = None,
+        filler: Filler | None = None,
+        fill_wait: float = 150.0,
     ) -> None:
         self.repo = repo
         self._courses = courses
@@ -141,6 +219,11 @@ class SessionService:
         self.rules = rules or Rules()
         self.unlock_rules = unlock_rules or UnlockRules()
         self.writer = writer or TutorWriter(None)
+        self.timezone = timezone
+        self._grounding = grounding
+        self.filler = filler
+        self.fill_wait = fill_wait
+        self.rewards = RewardEngine(repo, self.unlock_rules, self._estimate, timezone)
 
     # ------------------------------------------------------------------ actions
     def start(self, user_id: str, concept_id: str) -> SessionOut:
@@ -195,7 +278,10 @@ class SessionService:
         stored, course = self._load(user_id, session_id)
         self._require_open(stored)
         stored = self._advance(stored, Continue())
-        return self._view(stored, course)
+        earned = None
+        if stored.state.is_over:  # the last Continue completes a session
+            earned = self._pay(stored.state, course, now=self.clock())
+        return self._view(stored, course, earned=earned)
 
     def answer(self, user_id: str, session_id: str, text: str) -> SessionOut:
         stored, course = self._load(user_id, session_id)
@@ -239,17 +325,31 @@ class SessionService:
         transition = step(state, Answer(verdict.outcome), now)
         new_state = transition.state
 
+        correct = verdict.outcome == "correct"
+        history = self.repo.gating_attempts(state.user_id) if gating and correct else None
+
         # A correct gating answer may lift mastery enough to finish early.
-        if gating and verdict.outcome == "correct":
-            level = self._estimate(
-                course, state.concept_id, self._concept_results(state.user_id, state.concept_id)
-            )
+        if history is not None:
+            results = results_from_attempts(history, self.rules.max_attempts)
+            level = self._estimate(course, state.concept_id, results.get(state.concept_id, []))
             if level is not None and level >= self.unlock_rules.early_exit_mastery:
                 new_state = step(new_state, MasteryReached(), now).state
 
         stored = replace(stored, state=new_state)
         self.repo.save(stored)
-        return self._view(stored, course, with_feedback=True)
+
+        earned = None
+        if correct:  # a wrong or unreadable answer pays nothing
+            earned = self._pay(
+                new_state,
+                course,
+                now=now,
+                points=xp,
+                history=history,
+                gating_passed=gating,
+                attempt_no=attempt_no,
+            )
+        return self._view(stored, course, with_feedback=True, earned=earned)
 
     def end(self, user_id: str, session_id: str) -> SessionOut:
         stored, course = self._load(user_id, session_id)
@@ -305,6 +405,8 @@ class SessionService:
             active_session_id=(
                 active.state.session_id if active and not active.state.is_over else None
             ),
+            level=_level_out(total_xp),
+            quests=self._quests(user_id, course, mastery),
             concepts=[
                 ConceptProgressOut(
                     concept_id=s.concept_id,
@@ -325,6 +427,70 @@ class SessionService:
                 for s in statuses
             ],
         )
+
+    def profile(self, user_id: str) -> ProfileOut:
+        """The student's level, streak and badges, across every module."""
+        now = self.clock()
+        today = self.rewards.today(now)
+        days = self.repo.activity_days(user_id, self.timezone)
+        held = self.repo.badges(user_id)
+        total = self.repo.total_xp(user_id)
+        return ProfileOut(
+            total_xp=total,
+            level=_level_out(total),
+            streak=StreakOut(
+                current=current_streak(days, today),
+                longest=longest_streak(days),
+                learned_today=today in set(days),
+            ),
+            badges=[
+                BadgeStatusOut(
+                    **_badge_out(b).model_dump(), earned=b.id in held, earned_at=held.get(b.id)
+                )
+                for b in BADGES
+            ],
+            completed_sessions=self.repo.completed_session_count(user_id),
+        )
+
+    def leaderboard(self, user_id: str, limit: int = 10) -> LeaderboardOut:
+        rows = self.repo.leaderboard(limit + 50)  # a little past the top, to find the caller
+        names = self.repo.display_names([r.user_id for r in rows])
+
+        def entry(rank: int, row) -> LeaderEntryOut:
+            lvl = level_for(row.xp).level
+            return LeaderEntryOut(
+                rank=rank,
+                name=_short_name(names.get(row.user_id, "Student")),
+                xp=row.xp,
+                level_number=lvl.number,
+                level_name=lvl.name,
+                is_you=row.user_id == user_id,
+            )
+
+        ranked = [entry(i, r) for i, r in enumerate(rows, 1)]
+        top = ranked[:limit]
+        you = None if any(e.is_you for e in top) else next((e for e in ranked if e.is_you), None)
+        return LeaderboardOut(entries=top, you=you)
+
+    def _quests(
+        self, user_id: str, course: Course, mastery: dict[str, float | None]
+    ) -> list[QuestOut]:
+        claimed = self.repo.bonus_refs(user_id, "quest")
+        quests = []
+        for topic, members in course.topics.items():
+            done = sum(is_mastered(mastery.get(c), self.unlock_rules) for c in members)
+            quests.append(
+                QuestOut(
+                    topic=topic,
+                    concept_ids=list(members),
+                    mastered=done,
+                    total=len(members),
+                    complete=done == len(members),
+                    reward_xp=BONUSES.quest,
+                    reward_claimed=topic in claimed,
+                )
+            )
+        return quests
 
     # ------------------------------------------------------------------ helpers
     def _course_of(self, concept_id: str) -> Course:
@@ -436,8 +602,62 @@ class SessionService:
         return shuffled(entry.question, entry.key, rng)
 
     # -------------------------------------------------------------------- views
+    def _pay(
+        self,
+        state: SessionState,
+        course: Course,
+        *,
+        now: datetime,
+        points: int = 0,
+        history=None,
+        gating_passed: bool = False,
+        attempt_no: int = 0,
+    ) -> Earned:
+        """Bonus XP and badges for what just happened. See rewards.py."""
+        needs_history = gating_passed or state.is_over
+        if history is None and needs_history:
+            history = self.repo.gating_attempts(state.user_id)
+        results = results_from_attempts(history, self.rules.max_attempts) if history else {}
+        return self.rewards.award(
+            user_id=state.user_id,
+            course=course,
+            state=state,
+            now=now,
+            results=results,
+            gating_attempts=history or [],
+            points=points,
+            gating_passed=gating_passed,
+            attempt_no=attempt_no,
+            reteach_after=self.rules.reteach_after,
+        )
+
+    def _rewards_out(self, earned: Earned | None) -> RewardsOut | None:
+        if earned is None or not earned.anything or earned.total_xp is None:
+            return None
+        before = level_for(earned.total_xp - earned.xp_gained).level
+        after = level_for(earned.total_xp)
+        return RewardsOut(
+            xp_gained=earned.xp_gained,
+            points=earned.points,
+            bonuses=[BonusOut(kind=b.kind, label=b.label, amount=b.amount) for b in earned.bonuses],
+            badges=[_badge_out(b) for b in earned.badges],
+            level=_level_out(earned.total_xp),
+            level_up=(
+                LevelUpOut(
+                    from_level=before.number, to_level=after.level.number, name=after.level.name
+                )
+                if after.level.number > before.number
+                else None
+            ),
+        )
+
     def _view(
-        self, stored: StoredSession, course: Course, *, with_feedback: bool = False
+        self,
+        stored: StoredSession,
+        course: Course,
+        *,
+        with_feedback: bool = False,
+        earned: Earned | None = None,
     ) -> SessionOut:
         state = stored.state
         attempts = self.repo.attempts(state.session_id)
@@ -458,12 +678,26 @@ class SessionService:
 
         last = attempts[-1] if attempts else None
         phase = state.phase
+        if phase is not Phase.ENDED:
+            self._prefetch(state, course)
+
+        out.rewards = self._rewards_out(earned)
 
         if phase is Phase.ENDED:
             results = self._concept_results(state.user_id, state.concept_id)
+            recorded = self.repo.session_rewards(state.session_id)
+            bonuses = [
+                BonusOut(kind=r.kind, label=BONUS_LABELS[r.kind], amount=r.amount)
+                for r in recorded
+                if r.kind != "badge"
+            ]
+            bonus_xp = sum(b.amount for b in bonuses)
+            out.xp_earned = xp + bonus_xp
             out.summary = SummaryOut(
                 exit_reason=state.exit.value if state.exit else "completed",
-                xp_earned=xp,
+                xp_earned=xp + bonus_xp,
+                bonuses=bonuses,
+                badges=[_badge_out(BADGE_BY_ID[r.ref]) for r in recorded if r.kind == "badge"],
                 gating_done=state.gating_done,
                 gating_total=state.gating_total,
                 mastery=self._estimate(course, state.concept_id, results),
@@ -481,9 +715,11 @@ class SessionService:
             out.heading = course.titles[state.concept_id]
             passage = course.chunk_text[step_.ref]
             shown = self._words(
-                state, f"teach:{step_.ref}", EXPLAIN, course, passage=passage, fallback=passage
+                state, f"teach:{step_.ref}", EXPLAIN, course, passage_id=step_.ref, fallback=passage
             )
             out.text, out.text_source = shown.text, shown.source
+            out.text_check = _check(shown)
+            out.sources = _sources_out(shown)
             out.source_text = passage if shown.source == "generated" else None
         elif phase is Phase.CHECKPOINT:
             entry = course.bank[step_.ref]
@@ -495,7 +731,7 @@ class SessionService:
                     f"hint:{step_.ref}:{state.attempts}",
                     HINT,
                     course,
-                    passage=self._reteach_passage(course, state, step_.ref),
+                    passage_id=self._closest_ref(course, state, step_.ref),
                     fallback=GENERIC_HINT,
                     question=question.stem,
                     expected_output=key.expected_output,
@@ -510,6 +746,7 @@ class SessionService:
                 max_attempts=state.rules.max_attempts,
                 hint=hint.text if hint else None,
                 hint_source=hint.source if hint else None,
+                hint_check=_check(hint) if hint else None,
             )
             if last is not None and last.question_id == step_.ref and last.outcome == "unreadable":
                 out.feedback = self._feedback(last, state, course)
@@ -518,19 +755,64 @@ class SessionService:
                 out.feedback = self._feedback(last, state, course)
             if phase is Phase.RETEACH:
                 out.heading = "Let's look at that again"
-                passage = self._reteach_passage(course, state, step_.ref)
+                ref = self._closest_ref(course, state, step_.ref)
+                passage = course.chunk_text[ref]
                 shown = self._words(
                     state,
                     f"reteach:{step_.ref}:{state.attempts}",
                     RETEACH,
                     course,
-                    passage=passage,
+                    passage_id=ref,
                     fallback=passage,
-                    question=course.bank[step_.ref].question.stem,
                 )
                 out.text, out.text_source = shown.text, shown.source
+                out.text_check = _check(shown)
+                out.sources = _sources_out(shown)
                 out.source_text = passage if shown.source == "generated" else None
         return out
+
+    def _prefetch(self, state: SessionState, course: Course) -> None:
+        """While the student reads, prepare the next explanation so it is ready when they
+        click. It never waits; if they are quicker than it, the click waits for it instead."""
+        if self.filler is None or self.writer.cache_fingerprint(EXPLAIN) is None:
+            return
+        upcoming = next((st for st in state.steps[state.index + 1 :] if st.kind == "teach"), None)
+        if upcoming is not None:
+            self.filler.prefetch(EXPLAIN, course.module_id, upcoming.ref)
+
+    def history(self, user_id: str, session_id: str) -> HistoryOut:
+        """The parts already read, in order, exactly as the student saw them."""
+        stored, course = self._load(user_id, session_id)
+        state = stored.state
+        shown = self.repo.session_texts(session_id)
+        parts: list[HistoryPartOut] = []
+        for number, step_ in enumerate(state.steps[: state.index], 1):
+            if step_.kind == "hook":
+                parts.append(
+                    HistoryPartOut(
+                        step_number=number,
+                        heading="What you will be able to do",
+                        text=course.objectives(state.concept_id) or course.titles[state.concept_id],
+                        text_source="authored",
+                    )
+                )
+            elif step_.kind == "teach":
+                text = shown.get(f"teach:{step_.ref}")
+                parts.append(
+                    HistoryPartOut(
+                        step_number=number,
+                        heading=course.titles[state.concept_id],
+                        text=text.text if text else course.chunk_text[step_.ref],
+                        text_source=text.source if text else "authored",
+                        text_check=_check(text) if text else None,
+                        sources=_sources_out(text) if text else None,
+                    )
+                )
+        return HistoryOut(parts=parts)
+
+    def _ground(self, course: Course, passage_id: str) -> Grounding:
+        """The main passage and the passages retrieved to help with it."""
+        return (self._grounding or primary_only)(course, passage_id)
 
     def _words(
         self,
@@ -539,7 +821,7 @@ class SessionService:
         kind: str,
         course: Course,
         *,
-        passage: str,
+        passage_id: str,
         fallback: str,
         question: str | None = None,
         expected_output: str | None = None,
@@ -549,14 +831,79 @@ class SessionService:
         if saved is not None:
             return saved
 
-        made = self.writer.write(
-            kind, concept=course.titles[state.concept_id], passage=passage, question=question
+        # A hint is about one question and short, so it is built from the main passage alone.
+        ground = (
+            primary_only(course, passage_id) if kind == HINT else self._ground(course, passage_id)
         )
+        fingerprint = self.writer.cache_fingerprint(kind)
+        digest = ground.digest
+        sources = [s.as_json() for s in ground.sources] if kind != HINT else None
+
+        if fingerprint is not None:
+            # An explanation the gate already passed for this material, prompt, model and gate
+            # setting is shared: no model call, no new check, and the student still gets text
+            # that was verified.
+            hit = self.repo.get_verified(passage_id, digest, fingerprint)
+            if hit is not None:
+                saved = StoredText(
+                    hit.text, "generated", hit.provider, hit.model, True, hit.output_id, hit.sources
+                )
+                self.repo.put_text(state.session_id, key, saved)
+                return saved
+
+            if self.filler is not None:
+                # Not prepared yet, and the student has just asked for this part. Prepare it
+                # now (retrieve, write, check) and wait, so what they see is the finished,
+                # checked text. Never the course text first and a swap later.
+                self.repo.commit()  # hold no connection or lock while the model and checker run
+                self.filler.wait(kind, course.module_id, passage_id, self.fill_wait)
+                hit = self.repo.get_verified(passage_id, digest, fingerprint)
+                if hit is not None:
+                    saved = StoredText(
+                        hit.text,
+                        "generated",
+                        hit.provider,
+                        hit.model,
+                        True,
+                        hit.output_id,
+                        hit.sources,
+                    )
+                else:
+                    # The checker rejected every attempt, or the model could not be reached.
+                    # Say which, and keep what the student saw so it never changes under them.
+                    failed = self.filler.recently_failed(kind, course.module_id, passage_id)
+                    saved = StoredText(fallback, "authored", verified=False if failed else None)
+                self.repo.put_text(state.session_id, key, saved)
+                return saved
+
+        result = self.writer.write(
+            kind,
+            concept=course.titles[state.concept_id],
+            passage=ground.primary,
+            question=question,
+            support=ground.support if kind != HINT else (),
+        )
+        output_id = record_audits(self.repo, result.audits, passage_id)
+
+        made = result.generated
         if made is not None and not (kind == HINT and gives_away(made.text, expected_output)):
-            saved = StoredText(made.text, "generated", made.provider, made.model)
+            saved = StoredText(
+                made.text, "generated", made.provider, made.model, made.verified, output_id, sources
+            )
         else:
-            saved = StoredText(fallback, "authored")
+            # Nothing generated reached the student: the authored text is shown. `verified`
+            # is False when the gate was the reason, so the screen can say so.
+            saved = StoredText(fallback, "authored", verified=False if result.blocked else None)
         self.repo.put_text(state.session_id, key, saved)
+        if fingerprint is not None and saved.source == "generated" and saved.verified is True:
+            self.repo.put_verified(
+                passage_id,
+                digest,
+                fingerprint,
+                CachedExplanation(
+                    saved.text, saved.provider or "", saved.model or "", output_id, sources
+                ),
+            )
         return saved
 
     def _feedback(self, last: AttemptRecord, state: SessionState, course: Course) -> FeedbackOut:
@@ -597,10 +944,10 @@ class SessionService:
         )
 
     @staticmethod
-    def _reteach_passage(course: Course, state: SessionState, question_id: str) -> str:
+    def _closest_ref(course: Course, state: SessionState, question_id: str) -> str:
         """The explanation part closest to the question the student keeps missing."""
         refs = course.theory[state.concept_id]
         stem = course.bank[question_id].question.stem
         scores = BM25([tokens(course.chunk_text[r]) for r in refs]).scores(tokens(stem))
         best = max(scores, key=scores.__getitem__) if scores else 0
-        return course.chunk_text[refs[best]]
+        return refs[best]

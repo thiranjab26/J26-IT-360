@@ -7,7 +7,7 @@ shared by every request. Edit a file and restart the service to see the change.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,6 +27,10 @@ class Course:
     theory: dict[str, tuple[str, ...]]  # concept id -> theory chunk ids, in reading order
     chunk_text: dict[str, str]
     bank: dict[str, BankEntry]
+    # A topic is a quest: master every concept in it. Topic name -> its concepts, in order.
+    chunk_heading: dict[str, str] = field(default_factory=dict)  # chunk id -> heading path
+    topics: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    topic_of: dict[str, str] = field(default_factory=dict)
 
     def has_concept(self, concept_id: str) -> bool:
         return concept_id in self.titles
@@ -56,6 +60,9 @@ def load_course(content_root: Path, module_id: str) -> Course:
     chunks = [c for u in load_content(content_root, module_id) for c in chunk_unit(u)]
 
     known = {u.concept_id for u in units}
+    topics: dict[str, list[str]] = {}
+    for u in units:
+        topics.setdefault(u.topic or "General", []).append(u.concept_id)
     return Course(
         module_id=module_id,
         order=tuple(u.concept_id for u in units),
@@ -72,7 +79,10 @@ def load_course(content_root: Path, module_id: str) -> Course:
             for u in units
         },
         chunk_text={c.chunk_id: c.text for c in chunks},
+        chunk_heading={c.chunk_id: c.heading_path for c in chunks},
         bank=build_question_bank(chunks),
+        topics={name: tuple(ids) for name, ids in topics.items()},
+        topic_of={c: name for name, ids in topics.items() for c in ids},
     )
 
 

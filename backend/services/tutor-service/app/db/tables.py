@@ -29,6 +29,7 @@ from sqlalchemy import (
     SmallInteger,
     Table,
     Text,
+    UniqueConstraint,
     func,
     text,
 )
@@ -304,7 +305,91 @@ session_texts = Table(
     Column("source", Text, nullable=False),
     Column("provider", Text),
     Column("model", Text),
+    # True: the faithfulness gate passed it. False: the gate blocked the model's wording
+    # and the authored passage was shown instead. Null: no gate ran.
+    Column("verified", Boolean),
+    # The generated output this text came from (tutor.gate_events.output_id).
+    Column("output_id", UUID(as_uuid=True)),
+    # What the text was built from: the main passage and the passages retrieved to help.
+    Column("sources", JSONB),
     Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
     CheckConstraint(_in("source", ("generated", "authored")), name="ck_session_texts_source"),
     schema=TUTOR_SCHEMA,
 )
+
+# ---------------------------------------------------------------------------
+# tutor.verified_explanations: gate-checked explanations shared across sessions
+#
+# An explanation depends only on the passage it explains. Once the faithfulness gate has
+# passed one, every later session reads it from here instead of calling a model, which cuts
+# cost and means every student sees text that was checked. `fingerprint` holds the prompt,
+# model and gate settings, and `passage_hash` the passage text, so changing any of them
+# misses the cache rather than serving a stale explanation. Only PASSED texts are stored.
+# ---------------------------------------------------------------------------
+verified_explanations = Table(
+    "verified_explanations",
+    metadata,
+    Column("passage_id", Text, primary_key=True),
+    Column("passage_hash", Text, primary_key=True),
+    Column("fingerprint", Text, primary_key=True),
+    Column("text", Text, nullable=False),
+    Column("provider", Text, nullable=False),
+    Column("model", Text, nullable=False),
+    Column("output_id", UUID(as_uuid=True)),
+    Column("sources", JSONB),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    schema=TUTOR_SCHEMA,
+)
+
+# ---------------------------------------------------------------------------
+# tutor.xp_events: bonus XP beyond the per-checkpoint points
+#
+# A student's total XP is the points in checkpoint_attempts plus these bonuses (concept
+# cleared, flawless run, concept mastered, quest complete, streak). `ref` is what the bonus
+# was earned FOR (a session, a concept, a topic, a day) and (user_id, kind, ref) is unique,
+# so the same bonus can never be paid twice however often a request is replayed.
+# The values and rules are in docs/c3/gamification-spec.md.
+# ---------------------------------------------------------------------------
+XP_EVENT_KINDS = ("concept_clear", "flawless", "mastery", "quest", "streak")
+
+xp_events = Table(
+    "xp_events",
+    metadata,
+    Column("event_id", UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()),
+    Column("user_id", UUID(as_uuid=True), nullable=False),
+    # Kept if the session is later deleted: the points were earned.
+    Column(
+        "session_id",
+        UUID(as_uuid=True),
+        ForeignKey(f"{TUTOR_SCHEMA}.sessions.session_id", ondelete="SET NULL"),
+    ),
+    Column("kind", Text, nullable=False),
+    Column("ref", Text, nullable=False),
+    Column("amount", Integer, nullable=False),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint(_in("kind", XP_EVENT_KINDS), name="ck_xp_events_kind"),
+    CheckConstraint("amount > 0", name="ck_xp_events_amount"),
+    UniqueConstraint("user_id", "kind", "ref", name="uq_xp_events_once"),
+    schema=TUTOR_SCHEMA,
+)
+Index("ix_xp_events_user", xp_events.c.user_id)
+Index("ix_xp_events_session", xp_events.c.session_id)
+
+# ---------------------------------------------------------------------------
+# tutor.user_badges: the badges a student holds. The catalogue lives in code
+# (app/gamification/progression.py); this records who earned which and when.
+# ---------------------------------------------------------------------------
+user_badges = Table(
+    "user_badges",
+    metadata,
+    Column("user_id", UUID(as_uuid=True), primary_key=True),
+    Column("badge_id", Text, primary_key=True),
+    Column(
+        "session_id",
+        UUID(as_uuid=True),
+        ForeignKey(f"{TUTOR_SCHEMA}.sessions.session_id", ondelete="SET NULL"),
+    ),
+    Column("earned_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    schema=TUTOR_SCHEMA,
+)
+Index("ix_user_badges_session", user_badges.c.session_id)
