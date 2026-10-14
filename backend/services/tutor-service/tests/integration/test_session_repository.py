@@ -75,7 +75,7 @@ def test_a_whole_session_round_trips_through_the_database(db, course) -> None:
     ended = play(service, user, course, started)
 
     assert ended.summary.exit_reason == "completed"
-    assert ended.summary.xp_earned == 2 * 10 + 2 * 120
+    assert ended.summary.xp_earned == (2 * 10 + 2 * 120) + 50 + 50 + 100  # with bonuses
 
     # A fresh service on the same transaction sees the same thing: it was really stored.
     again = service_for(db, course).view(user, started.session_id)
@@ -134,5 +134,106 @@ def test_progress_reads_mastery_and_xp_back_from_stored_attempts(db, course) -> 
 
     by_id = {c.concept_id: c for c in progress.concepts}
     assert by_id[LOOPS].mastery == 1.0
-    assert progress.total_xp == 2 * 10 + 2 * 120
+    assert progress.total_xp == (2 * 10 + 2 * 120) + 50 + 50 + 100
     assert progress.active_session_id is None
+
+
+def test_gate_events_texts_and_the_shared_cache_round_trip(db, course) -> None:
+    from app.sessions.repository import CachedExplanation, GateEvent, StoredText
+
+    user = str(uuid.uuid4())
+    service = service_for(db, course)
+    repo = service.repo
+    session_id = service.start(user, LOOPS).session_id
+    output_id = str(uuid.uuid4())
+
+    repo.add_gate_events(
+        [
+            GateEvent(
+                output_id,
+                1,
+                "claim",
+                "prog.loops#theory-01",
+                "A loop repeats.",
+                "m",
+                "entailment",
+                0.97,
+                "pass",
+                12,
+            ),
+            GateEvent(
+                output_id,
+                1,
+                "claim",
+                "prog.loops#theory-01",
+                "Code line",
+                "code-verbatim",
+                None,
+                None,
+                "block",
+                0,
+            ),
+        ]
+    )
+    stored = db.execute(
+        text(
+            "SELECT decision, nli_score FROM tutor.gate_events "
+            "WHERE output_id = :o ORDER BY decision"
+        ),
+        {"o": output_id},
+    ).all()
+    assert [(r.decision, r.nli_score) for r in stored] == [("block", None), ("pass", 0.97)]
+
+    repo.put_text(
+        session_id, "teach:x", StoredText("words", "generated", "gemini", "m", True, output_id)
+    )
+    repo.put_text(session_id, "teach:x", StoredText("other", "authored"))  # first write wins
+    saved = repo.get_text(session_id, "teach:x")
+    assert (saved.text, saved.verified, saved.output_id) == ("words", True, output_id)
+
+    assert repo.get_verified("p", "h", "f") is None
+    repo.put_verified("p", "h", "f", CachedExplanation("shared", "gemini", "m", output_id))
+    repo.put_verified("p", "h", "f", CachedExplanation("later", "gemini", "m"))
+    hit = repo.get_verified("p", "h", "f")
+    assert (hit.text, hit.output_id) == ("shared", output_id)
+    assert repo.get_verified("p", "h2", "f") is None, "a changed passage must miss"
+
+
+def test_gamification_records_round_trip_and_never_pay_twice(db, course) -> None:
+    user = str(uuid.uuid4())
+    service = service_for(db, course, timezone="UTC")
+    repo = service.repo
+    session_id = service.start(user, LOOPS).session_id
+
+    assert repo.add_xp_event(user, session_id, "mastery", LOOPS, 100) is True
+    assert repo.add_xp_event(user, session_id, "mastery", LOOPS, 100) is False, "unique per ref"
+    assert repo.add_xp_event(user, session_id, "quest", "Control Flow", 150) is True
+    assert repo.total_xp(user) == 250
+    assert repo.bonus_refs(user, "quest") == {"Control Flow"}
+
+    assert repo.award_badge(user, "first_steps", session_id) is True
+    assert repo.award_badge(user, "first_steps", session_id) is False
+    assert set(repo.badges(user)) == {"first_steps"}
+
+    kinds = {(r.kind, r.ref) for r in repo.session_rewards(session_id)}
+    assert kinds == {("mastery", LOOPS), ("quest", "Control Flow"), ("badge", "first_steps")}
+
+
+def test_streak_days_leaderboard_and_names_come_back_from_the_database(db, course) -> None:
+    user = str(uuid.uuid4())
+    service = service_for(db, course, timezone="UTC")
+    play(service, user, course, service.start(user, LOOPS))
+    repo = service.repo
+
+    assert len(repo.activity_days(user, "UTC")) == 1
+    assert len(repo.activity_days(user, "Asia/Colombo")) == 1
+    assert repo.completed_session_count(user) == 1
+
+    board = repo.leaderboard(500)
+    mine = next(row for row in board if row.user_id == user)
+    assert mine.xp == repo.total_xp(user) and mine.xp > 0
+    assert repo.display_names([user]) == {}, "a test user is not in core.users"
+
+    profile = service.profile(user)
+    assert profile.streak.current == 1 and profile.level.total_xp == mine.xp
+    assert {b.id for b in profile.badges if b.earned} >= {"first_steps", "concept_master"}

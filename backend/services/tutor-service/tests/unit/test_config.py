@@ -50,3 +50,13 @@ def test_the_service_paths_and_model_have_defaults(name: str) -> None:
 
 def test_the_default_embedding_model_is_the_measured_choice() -> None:
     assert settings().embedding_model == "sentence-transformers/all-MiniLM-L6-v2"
+
+
+def test_the_app_starts_and_serves_health_with_its_lifespan() -> None:
+    """Start-up hooks (the gate's model preload) must not break the app from starting."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    with TestClient(create_app()) as client:
+        assert client.get("/health").json() == {"status": "ok"}

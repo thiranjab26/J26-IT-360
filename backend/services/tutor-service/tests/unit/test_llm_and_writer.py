@@ -155,10 +155,10 @@ def test_no_key_means_no_model_and_a_key_means_a_gemini_chain() -> None:
 
 # ---------------------------------------------------------------------- writer
 def test_the_writer_returns_none_without_a_model_and_when_the_model_fails() -> None:
-    assert TutorWriter(None).write("explain", concept="Loops", passage="p") is None
+    assert TutorWriter(None).write("explain", concept="Loops", passage="p").generated is None
 
     failing = TutorWriter(Scripted("g", LLMError("down")))
-    assert failing.write("explain", concept="Loops", passage="p") is None
+    assert failing.write("explain", concept="Loops", passage="p").generated is None
 
 
 def test_the_prompt_holds_only_the_passage_and_the_question() -> None:

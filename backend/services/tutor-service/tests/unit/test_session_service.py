@@ -73,7 +73,8 @@ def test_a_perfect_session_completes_with_full_xp(course) -> None:
     ended = play(service, course, STUDENT, view)
 
     assert ended.summary.exit_reason == "completed"
-    assert ended.summary.xp_earned == 2 * 10 + 2 * 120
+    # two quick checks and two gating checkpoints, plus clear, flawless and mastery bonuses
+    assert ended.summary.xp_earned == (2 * 10 + 2 * 120) + 50 + 50 + 100
     assert ended.summary.mastery == 1.0
     assert (ended.summary.gating_done, ended.summary.gating_total) == (2, 2)
 
