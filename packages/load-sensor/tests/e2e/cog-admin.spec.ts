@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { turnSensingOn } from './helpers.js';
 
 // Cog admin panel (cog-admin.html): settings reach the sensor page in another tab,
 // session commands work over the BroadcastChannel, and nothing leaves the origin.
@@ -31,7 +32,7 @@ test.describe('cog admin', () => {
     await expect(admin.getByTestId('set-alarm')).toBeChecked();
 
     // Sensing is turned on from the sensor page; the panel can pause and stop it.
-    await sensor.getByTestId('enable').click();
+    await turnSensingOn(sensor);
     await expect(admin.getByTestId('admin-camera')).toHaveText(/Live|Starting/, {
       timeout: 60_000,
     });

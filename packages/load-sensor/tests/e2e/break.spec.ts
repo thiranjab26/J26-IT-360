@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { acceptConsent } from './helpers.js';
 
 test.describe('Break tab games', () => {
   test('memory match can be played to the end with no network requests', async ({ page }) => {
@@ -35,6 +36,7 @@ test.describe('Break tab games', () => {
     await page.getByTestId('play-neck').click();
     await expect(page.getByTestId('ns-camera')).toBeVisible();
     await page.getByTestId('ns-camera').click();
+    await acceptConsent(page);
     // Sensing starts from inside the game; the fake camera shows no face.
     await expect(page.getByTestId('sensor-status')).toHaveText('Sensing is on.', {
       timeout: 60_000,

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Request } from '@playwright/test';
+import { turnSensingOn } from './helpers.js';
 
 // TODO A5: the sensor tab publishes LoadStateEvents on the same-origin
 // BroadcastChannel and the mock consumer (another tab, importing only
@@ -34,7 +35,7 @@ test.describe('event stream to other components (FR6, NFR2, NFR8)', () => {
     await expect(sensor.getByTestId('event-status')).toHaveText('disabled');
     await expect(consumer.getByTestId('consumer-load')).toHaveText('null');
 
-    await sensor.getByTestId('enable').click();
+    await turnSensingOn(sensor);
     await expect(sensor.getByTestId('sensor-status')).toHaveText('Sensing is on.', {
       timeout: 60_000,
     });

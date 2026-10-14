@@ -145,11 +145,18 @@ Preparation material for every item below (question lists, request text, checkli
 
 ### A6. Consent and control UI [survey findings: 45.8 % not comfortable, 54.2 % want a toggle]
 
-- [ ] Plain-language consent screen: what is processed, that nothing is uploaded or recorded, how to turn it off
-- [ ] Sensing off by default; visible on/off toggle; visible "camera active" indicator
+- [x] Plain-language consent screen: what is processed, that nothing is uploaded or recorded, how to turn it off
+  - `src/demo/consent.ts`: native modal `<dialog>` (browser focus trap, Esc, inert page). Esc, close, backdrop and "Not now" all decline; focus starts on the title so a stray Enter cannot consent. Every way to turn sensing on (button, sidebar switch, neck-stretch game) goes through `requestSensing()` in `main.ts`, so `getUserMedia` is never called before agreement (e2e counts the calls).
+  - Consent is remembered on this device as `{ version, at }` under `adaptlearn.c2.consent`; it never turns the camera on by itself. Bump `CONSENT_VERSION` when the notice changes meaning. "Privacy & consent" re-opens it with the date and a **Withdraw** button (record deleted, camera off at once).
+  - For the ethics application: the notice wording lives in `consent.ts`; check it says what the approved information sheet says.
+- [x] Sensing off by default; visible on/off toggle; visible "camera active" indicator
   - If `cameraPolicy: 'required'` is approved (A0), this becomes a "turn on the camera to start studying" gate instead of an off-by-default toggle; the indicator and the off switch stay.
-- [ ] App remains usable with sensing off
-- [ ] Short calibration prompt ("look at the screen normally for a minute")
+  - `src/demo/sensing-control.ts`: Camera switch (`role="switch"`) + lamp in the sidebar on every tab (header bar on narrow screens); red pulsing lamp and "On · live" while the camera runs. The browser tab title gets a `● Camera on ·` prefix, so it shows even when the page is behind others.
+- [x] App remains usable with sensing off
+  - e2e `consent.spec.ts`: after declining, Signals, Performance and Break (memory game) all work, the event stream reports `disabled`, and no camera request was made.
+- [x] Short calibration prompt ("look at the screen normally for a minute")
+  - `src/demo/calibration-prompt.ts`: card over the video with a countdown and progress bar during the 60 s baseline; "Move into view" (amber) when no face is seen; "Calibration done" for 3.5 s, then it hides. Shows again after a recalibration. View logic is pure and unit-tested.
+  - Not yet seen with a real face (the fake camera has none): check once by hand that "Look at the screen…" → "Calibration done" appears.
 
 ### A7. Privacy, offline and performance evidence [NFR1, NFR2, NFR6]
 

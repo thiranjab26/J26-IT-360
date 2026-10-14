@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Request } from '@playwright/test';
+import { turnSensingOn } from './helpers.js';
 
 // Runs the real camera + TF.js face mesh pipeline in Chromium with the synthetic
 // fake camera (playwright.config.ts). The fake camera shows a test pattern, not
@@ -29,7 +30,7 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
     await expect(page.getByTestId('sensor-status')).toHaveText('Sensing is off.');
     await expect(page.getByTestId('live-tracks')).toHaveText('0');
 
-    await page.getByTestId('enable').click();
+    await turnSensingOn(page);
 
     await expect(page.getByTestId('camera-status')).toHaveText('active');
     await expect(page.getByTestId('sensor-status')).toHaveText('Sensing is on.', {
@@ -105,7 +106,7 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
 
   test('pause and resume stop and restart frame delivery', async ({ page }) => {
     await page.goto('/');
-    await page.getByTestId('enable').click();
+    await turnSensingOn(page);
     await expect(page.getByTestId('camera-status')).toHaveText('active');
 
     await page.getByTestId('pause').click();
@@ -134,7 +135,7 @@ test('camera permission denied is reported, not thrown (A2)', async ({ browser }
     });
   });
   await page.goto('/');
-  await page.getByTestId('enable').click();
+  await turnSensingOn(page);
   await expect(page.getByTestId('camera-status')).toHaveText('permission_denied');
   await expect(page.getByTestId('sensor-status')).toContainText('permission was denied');
   await expect(page.getByTestId('enable')).toBeEnabled();

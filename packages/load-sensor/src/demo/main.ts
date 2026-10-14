@@ -5,14 +5,17 @@
 // - Signals: calibration, KPIs, EAR trace and the per-second features.
 // - Performance: fps, backend, frame time and pipeline read-outs.
 // - Break: two short calm games (neck stretch steered by head pose, memory match).
-// The consent screen comes with TODO A6.
+// Consent and control (A6): a privacy notice before the first camera start,
+// an always-visible Camera switch and indicator in the sidebar, and a
+// calibration prompt over the video.
 //
 // It composes the core parts itself (the overlay and charts need landmarks and
 // per-frame features), but publishes through the same LoadStateHub and status
 // mapping as createLoadSensor(), so the events on `adaptlearn.load-state` are
 // the ones teammates get. consumer.html shows them from another tab (A5).
 //
-// Sensing is off until the user presses "Turn sensing on" (invariant 4).
+// Sensing is off until the user agrees to the notice and turns it on
+// (invariant 4). Nothing turns the camera on by itself, even with consent on record.
 
 import './styles.css';
 import { Camera, type CameraStatus } from '../core/camera/index.js';
@@ -32,12 +35,15 @@ import {
   type AlarmReason,
 } from './attention-alarm.js';
 import { BreakPanel } from './break/break-panel.js';
+import { CalibrationPrompt } from './calibration-prompt.js';
+import { ConsentDialog, ConsentStore } from './consent.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
 import { FixtureRecorder } from './fixture-recorder.js';
 import { LoadStateCard } from './load-state-card.js';
 import { MoodEstimator } from './mood.js';
 import { MoodPanel } from './mood-panel.js';
 import { QualityCheckCard } from './quality-check-card.js';
+import { SensingControl, type SensingIndicator } from './sensing-control.js';
 import {
   openControlChannel,
   SettingsStore,
@@ -129,9 +135,16 @@ function mount(root: HTMLElement): void {
   adminLink.append(icon(ICONS.sliders), el('span', 'Cog admin'));
   const privacyNote = el('p', 'Video stays on this device. Nothing is uploaded.');
   privacyNote.className = 'side-note';
+  const sensingControl = new SensingControl();
   const sideFoot = el('div');
   sideFoot.className = 'side-foot';
-  sideFoot.append(pill, adminLink, privacyNote);
+  sideFoot.append(sensingControl.element, pill, adminLink, privacyNote);
+
+  // ── Consent (A6) ──
+  const consent = new ConsentStore();
+  const consentDialog = new ConsentDialog();
+  document.body.append(consentDialog.element);
+  const baseTitle = document.title;
 
   // ── Camera stage ──
   const stage = el('div');
@@ -209,6 +222,9 @@ function mount(root: HTMLElement): void {
   const alarmText = el('span', '');
   alarmBanner.append(icon(ICONS.bell), alarmText);
 
+  // What to do during the baseline minute, over the video (A6).
+  const calibPrompt = new CalibrationPrompt();
+
   stage.append(
     video,
     canvas,
@@ -217,6 +233,7 @@ function mount(root: HTMLElement): void {
     empty,
     hud,
     privacy,
+    calibPrompt.element,
     alarmBanner,
     expandBtn,
     dockMinBtn,
@@ -350,8 +367,7 @@ function mount(root: HTMLElement): void {
   perfPanel.append(perfHead, loadCard.element, perfGrid, quality.element);
   const breakPanel = new BreakPanel({
     requestSensing: () => {
-      alarmSound.unlock();
-      void enable();
+      void requestSensing();
     },
     stopSensing: () => {
       disable();
@@ -661,9 +677,14 @@ function mount(root: HTMLElement): void {
   });
 
   enableBtn.addEventListener('click', () => {
-    // Unlock audio inside the click, before any await (autoplay policy).
-    alarmSound.unlock();
-    void enable();
+    void requestSensing();
+  });
+  sensingControl.onToggle((on) => {
+    if (on) void requestSensing();
+    else disable();
+  });
+  sensingControl.onReview(() => {
+    void reviewConsent();
   });
   pauseBtn.addEventListener('click', () => {
     camera.pause('user');
@@ -674,6 +695,34 @@ function mount(root: HTMLElement): void {
   disableBtn.addEventListener('click', () => {
     disable();
   });
+
+  /**
+   * Every "turn sensing on" (buttons, sidebar switch, Break game) comes here:
+   * no camera before the learner has agreed to the notice (A6, invariant 4).
+   */
+  async function requestSensing(): Promise<void> {
+    // Unlock audio inside the click, before any await (autoplay policy).
+    alarmSound.unlock();
+    if (!consent.granted) {
+      const choice = await consentDialog.show('ask');
+      if (choice !== 'accept') return;
+      consent.grant();
+    }
+    await enable();
+  }
+
+  /** "Privacy & consent": read the notice again, or withdraw (camera off at once). */
+  async function reviewConsent(): Promise<void> {
+    if (!consent.granted) {
+      await requestSensing();
+      return;
+    }
+    const choice = await consentDialog.show('review', consent.record);
+    if (choice === 'withdraw') {
+      consent.withdraw();
+      disable();
+    }
+  }
 
   function disable(): void {
     tracker.stop();
@@ -762,7 +811,11 @@ function mount(root: HTMLElement): void {
           : STATUS_TEXT[s]);
     // The pill truncates long messages (styles.css); the full text stays on hover.
     pill.title = status.textContent;
-    pill.dataset.tone = toneFor(s, loading, message !== null);
+    const tone = toneFor(s, loading, message !== null);
+    pill.dataset.tone = tone;
+    sensingControl.set(indicatorFor(tone));
+    // The browser tab shows the camera is on even when this page is behind others.
+    document.title = running ? `● Camera on · ${baseTitle}` : baseTitle;
 
     const on = running || s === 'starting';
     enableBtn.hidden = on;
@@ -781,6 +834,16 @@ function mount(root: HTMLElement): void {
     placeDock();
     liveText.textContent = s === 'paused' ? 'PAUSED' : 'LIVE';
     renderFaceChip();
+    renderCalibration();
+  }
+
+  function renderCalibration(): void {
+    const running = camera.status === 'active' || camera.status === 'paused';
+    calibPrompt.update(
+      camera.status === 'active' && tracker.running,
+      face === 'found',
+      running ? pipeline.state : null,
+    );
   }
 
   function renderAlarm(): void {
@@ -838,6 +901,7 @@ function mount(root: HTMLElement): void {
     stats.set('tensors', String(provider.numTensors ?? '–'));
     stats.set('errors', String(st.errors));
     renderFaceChip();
+    renderCalibration();
     renderTabMeta();
     wellbeing.tick(camera.status === 'active', face === 'found');
     publishStatus();
@@ -921,6 +985,21 @@ function toneFor(status: CameraStatus, loading: boolean, failed: boolean): Tone 
       return 'idle';
     default:
       return 'error';
+  }
+}
+
+function indicatorFor(tone: Tone): SensingIndicator {
+  switch (tone) {
+    case 'live':
+      return 'on';
+    case 'busy':
+      return 'starting';
+    case 'paused':
+      return 'paused';
+    case 'error':
+      return 'error';
+    case 'idle':
+      return 'off';
   }
 }
 
