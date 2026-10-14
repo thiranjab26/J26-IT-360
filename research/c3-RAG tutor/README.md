@@ -69,3 +69,43 @@ What this points to, to be checked on the real evaluation set:
 - The model trained on fact verification (MNLI, FEVER and ANLI) separates supported from unsupported claims with usable margins (supported 0.22 to 0.99, unsupported at most 0.14). The plain MNLI cross-encoder gives supported claims probabilities of 0.01 to 0.07, which no threshold can use reliably.
 - **Force float32.** The fact-verification checkpoint loads as float16, which on a CPU made it nine times slower (1.65 s per claim) until converted. The verifier wrapper must convert explicitly.
 - HHEM was not tested here: it needs custom model code that may not work with the installed `transformers` version. It stays in the P3 comparison as planned.
+
+> **Update (P3, 2026-10-13).** The probe above was later tested on 1,003 labelled claims (next section). Two of its pointers did not hold: the 0.21 threshold blocked only 82% of unsupported claims (not the clean separation 10 claims suggested), and the top-label rule performed about the same as a tuned threshold, so it was not shown to over-block. The model choice and the float32 finding stand.
+
+## Faithfulness gate (P3, `experiments/gate_eval.py`)
+
+Everything the tutor generates is checked against the course passage it was written from before a student sees it. The gate (service code in `app/verification/`) splits a response into claims, asks an NLI model whether the passage supports each, and blocks the response if any claim falls below a threshold on P(entailment). Code in a response is not language, so each code line must instead appear in the passage's own code. A blocked text is regenerated once, told which statements failed; if that is blocked too, the student sees the authored passage. Every verdict, passed or blocked, is logged to `tutor.gate_events`.
+
+### How it was measured
+
+`gate_eval.py` has three stages, all importing the production gate code.
+
+1. **build.** For each of 69 theory passages a language model wrote statements the passage supports, statements it contradicts, and statements it neither states nor implies. An independent second call judged every statement against the passage and only items where the judge agreed with the construction were kept: **1,003 claims (428 supported, 280 contradiction, 295 addition)**. Three passages produced unusable output and were skipped.
+2. **calibrate.** The threshold is chosen on the claims of 7 concepts (dev) and reported on the other 6 (test). The split is by concept so near-duplicate statements about one passage cannot sit on both sides.
+3. **audit.** 40 real tutor explanations (one per passage, random order) were run through the gate at several thresholds.
+
+### Results
+
+| | Whole passage as premise | Plus short stretches of it ("windows") |
+|---|---|---|
+| AUROC, supported vs unsupported (test) | 0.948 | **0.961** |
+| AUROC, supported vs contradictions only (test) | 0.931 | 0.939 |
+| Threshold: lowest that blocks at least 90% of unsupported claims on dev | 0.67 | **0.77** |
+| Supported claims passed (test) | 80.5% | **87.7%** |
+| Unsupported claims blocked (test) | 93.9% | 91.3% |
+| Contradictions / additions blocked (test) | 90.0% / 97.7% | 85.4% / 97.0% |
+
+- **Model.** The fact-verification model (MoritzLaurer/DeBERTa-v3-base-mnli-fever-anli) is clearly better than the plain NLI cross-encoder (AUROC 0.86, and no threshold gave it a usable pass rate).
+- **Windows.** Judging a claim against each paragraph as well as the whole passage lifts the share of supported claims passed by about 7 to 10 points at a matched block rate (checked two ways: the full set above, and a fixed 300-claim subset run both ways). A whole passage that covers several topics makes a model call a true claim about one of them a contradiction, for example "Text written between double quotes is a string literal" scored 0.13 against the whole passage and 1.00 against its paragraph. Windows make each check about eight times slower (about 20 s for a 10-claim response on this CPU).
+- **The cost of strictness.** One unsupported claim blocks the whole response, so a per-claim false-block rate compounds. On real tutor explanations (mean 10.5 claims) the first-try pass rate at threshold 0.77 was **40%** with windows (32% with sentence splitting, 18% to 28% without windows). A response-level rule that tolerates one low claim would let a single injected error through, so it was not adopted. The practical answer is to generate explanations offline with up to four attempts (each told what failed) and serve the verified text from a shared cache: `uv run python -m app.verification.cli prebuild`.
+- **Claim-level against whole-response checking.** At the same threshold, judging the whole response as one hypothesis passed **95%** of real explanations, against 40% for claim-level checking. It cannot say which statement is wrong, and the injected-error test above is exactly where it is weak. This is the ablation the project's third claim needs; the per-claim comparison on injected errors is still to be run on person-labelled data.
+- **What the gate catches in practice.** The model repeatedly adds general-knowledge claims that are not in the passage (for example "writing raw machine instructions would be very difficult for humans" for a passage that never says it), re-adding them even after being told they were unsupported. The gate blocks these, which is the behaviour the design intends, and those passages stay uncached and show the course text.
+- **Contradictions are the weak spot.** About 15% of constructed contradictions still pass at 0.77. No combination of the entailment and contradiction probabilities improved on the single entailment threshold (tested: entailment with a contradiction ceiling, their difference, and their ratio).
+
+### Limits (read before quoting any number)
+
+- **The labels are not human labels.** They come from construction plus a language-model judge. The judge agreed with the construction on 99.5% of items, which says the set is easy and the judge shares the generator's blind spots; it does not say the labels are correct. Treat the figures as calibration, not as the gate's accuracy.
+- **Recall is optimistic.** The false statements were written by a language model that was asked to write plausible false statements, which is easier to catch than the subtle errors a tutor model makes unprompted.
+- **The audit's flagged claims have not been checked by a person.** Many look like false alarms on true statements, but that is my reading, not a result. `audit` wrote `results/gate-human-labels-*.csv` (60 claims, shuffled so the gate decision is not visible to the labeller, with a blank `human_label` column). Labelling it is what turns these numbers into a reportable precision and recall.
+- **One module, one language, one model family.** The threshold is for this course's style of text and this tutor prompt. Changing the prompt, the model or the passage text changes what was measured; the cache key includes all three for that reason.
+- **HHEM was not compared** (it needs custom model code). The model comparison here is two NLI cross-encoders.
