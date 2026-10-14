@@ -113,6 +113,12 @@ def choose_cell(
     return Enrolment(chosen_group, order)
 
 
+def choose_adaptive(counts: Mapping[tuple[str, str], int], group: Group | None = None) -> Enrolment:
+    """Demo mode: new learners join the adaptive group (form order still balanced);
+    a learner already in a group keeps it, so one group per learner still holds."""
+    return choose_cell(counts, group or "adaptive")
+
+
 # (cell counts in this module, the learner's existing group or None) -> enrolment
 Chooser = Callable[[Mapping[tuple[str, str], int], Group | None], Enrolment]
 

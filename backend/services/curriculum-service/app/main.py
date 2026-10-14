@@ -27,6 +27,7 @@ from app.db.mastery_store import MasteryStore
 from app.db.paper_store import PaperStore
 from app.db.practice_store import PracticeStore
 from app.db.session import get_engine
+from app.domain.assessment import choose_adaptive, choose_cell
 from app.domain.gat import GatModel, ModelError, load_model
 from app.domain.learner import Learner
 from app.domain.papers import Papers
@@ -83,7 +84,8 @@ def create_app() -> FastAPI:
         MasteryStore(get_engine(), attempts_relation(settings.integration_mode)),
         load_readiness_model(settings),
     )
-    app.state.study = Study(AssessmentStore(get_engine()), app.state.learner)
+    chooser = choose_adaptive if settings.group_assignment == "adaptive" else choose_cell
+    app.state.study = Study(AssessmentStore(get_engine()), app.state.learner, chooser)
     app.state.practice = Practice(PracticeStore(get_engine()), app.state.learner)
     app.state.cohort = CohortStore(get_engine())
     app.state.papers = Papers(PaperStore(get_engine()))
@@ -113,6 +115,7 @@ def create_app() -> FastAPI:
             "graph_store": "neo4j" if settings.neo4j_enabled else "postgres (edits, then core)",
             "dev_tools": settings.dev_tools_enabled,
             "recommender": app.state.learner.recommender_version,
+            "group_assignment": settings.group_assignment,
         },
     )
     return app

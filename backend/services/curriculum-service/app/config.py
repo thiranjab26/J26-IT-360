@@ -62,6 +62,13 @@ class Settings(BaseSettings):
         alias="CURRICULUM_MODEL_SHA256",
     )
 
+    # How new learners get a study group. balanced = random among the least-filled cells
+    # (the study design). adaptive = demo mode: every new learner is adaptive, form order
+    # still balanced; learners already in a group keep it. Comparison code stays in place.
+    group_assignment: Literal["balanced", "adaptive"] = Field(
+        default="balanced", alias="CURRICULUM_GROUP_ASSIGNMENT"
+    )
+
     @field_validator("database_url", "migration_database_url")
     @classmethod
     def normalise_driver(cls, value: str | None) -> str | None:

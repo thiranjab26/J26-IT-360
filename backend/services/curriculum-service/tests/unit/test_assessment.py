@@ -17,6 +17,7 @@ from app.domain.assessment import (
     Response,
     auc,
     check_bank,
+    choose_adaptive,
     choose_cell,
     form_for,
     gain_report,
@@ -86,6 +87,30 @@ def test_a_learner_with_a_group_keeps_it_and_only_the_form_order_is_chosen() -> 
     counts = {cell: 0 for cell in CELLS} | {("comparison", "AB"): 3}
     assert choose_cell(counts, group="comparison") == Enrolment("comparison", "BA")
     assert choose_cell(counts, group="adaptive").group == "adaptive"
+
+
+def test_demo_mode_puts_every_new_learner_in_the_adaptive_group() -> None:
+    counts: Counter[tuple[str, str]] = Counter()
+    for _ in range(20):
+        e = choose_adaptive(counts)
+        counts[(e.group, e.form_order)] += 1
+    assert {group for group, _ in counts} == {"adaptive"}
+    assert counts[("adaptive", "AB")] == counts[("adaptive", "BA")] == 10  # form order balanced
+
+
+def test_demo_mode_keeps_an_existing_comparison_learner_there() -> None:
+    assert choose_adaptive({}, group="comparison").group == "comparison"
+
+
+def test_the_setting_picks_the_chooser(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.config import get_settings
+    from app.main import create_app
+
+    for value, chooser in (("adaptive", choose_adaptive), ("balanced", choose_cell)):
+        monkeypatch.setenv("CURRICULUM_GROUP_ASSIGNMENT", value)
+        get_settings.cache_clear()
+        assert create_app().state.study._choose is chooser
+    get_settings.cache_clear()
 
 
 def test_option_order_is_a_stable_permutation_per_attempt() -> None:
