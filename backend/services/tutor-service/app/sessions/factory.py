@@ -15,6 +15,7 @@ from app.config import Settings, get_settings
 from app.content.embedder import SentenceTransformerEmbedder
 from app.content.indexer import open_store
 from app.llm.providers import build_provider
+from app.practicals.runner import CodeRunner, LocalJavaRunner
 from app.retrieval.retriever import Retriever
 from app.sessions.catalog import Course, get_course
 from app.sessions.grounding import Grounding, build_grounding
@@ -119,6 +120,15 @@ def get_filler() -> Filler:
         )
 
     return Filler(work)
+
+
+@lru_cache
+def get_runner() -> CodeRunner | None:
+    """The code runner for practicals, or None when it is switched off."""
+    settings = get_settings()
+    if settings.practicals_runner.strip().lower() == "off":
+        return None
+    return LocalJavaRunner(run_timeout=settings.practicals_run_timeout)
 
 
 def get_writer() -> TutorWriter:
