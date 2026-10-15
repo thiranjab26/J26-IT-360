@@ -167,8 +167,6 @@ class TutorWriter:
         tries = 1 + (self._regenerations if gated else 0)
         audits: list[GateAudit] = []
         prompt = base
-        last_text, last_verdict = "", None
-        last_provider = last_model = ""
 
         for attempt in range(1, tries + 1):
             try:
@@ -185,7 +183,6 @@ class TutorWriter:
                 return WriteResult(None, tuple(audits))
 
             text = result.text.strip()
-            last_provider, last_model = result.provider, result.model
             if not text or len(text) > MAX_CHARS:
                 return WriteResult(None, tuple(audits))
 
@@ -206,29 +203,26 @@ class TutorWriter:
                 return WriteResult(
                     Generated(text, result.provider, result.model, True), tuple(audits)
                 )
-            prompt = base + _retry_note([v.text for v in verdict.unsupported])
-            last_text, last_verdict = text, verdict
+            # Something in this text is unsupported. Before spending another model call on a
+            # rewrite, cut just the sentences that failed and check what is left with the same
+            # gate. Measured on the operators concept, rewriting never produced a passing text
+            # (four rewrites in a row failed) while cutting the failing sentences did, so
+            # cutting comes first. The result is shown only if it passes.
+            if all(v.kind == "claim" for v in verdict.unsupported):
+                trimmed = trim_unsupported(text, [v.text for v in verdict.unsupported])
+                if trimmed is not None:
+                    try:
+                        recheck = self._gate.check(trimmed, [passage, *(t for _, t in support)])
+                    except Exception:
+                        log.exception("faithfulness gate failed to run")
+                        return WriteResult(None, tuple(audits), blocked=True)
+                    audits.append(GateAudit(len(audits) + 1, trimmed, recheck))
+                    if recheck.passed:
+                        return WriteResult(
+                            Generated(trimmed, result.provider, result.model, True), tuple(audits)
+                        )
 
-        # Every attempt had something unsupported in it. Rather than throw the whole
-        # explanation away over a stray sentence, cut the sentences that failed and check
-        # what is left with the same gate. It is shown only if it passes.
-        if (
-            gated
-            and last_verdict is not None
-            and all(v.kind == "claim" for v in last_verdict.unsupported)
-        ):
-            trimmed = trim_unsupported(last_text, [v.text for v in last_verdict.unsupported])
-            if trimmed is not None:
-                try:
-                    recheck = self._gate.check(trimmed, [passage, *(t for _, t in support)])
-                except Exception:
-                    log.exception("faithfulness gate failed to run")
-                    return WriteResult(None, tuple(audits), blocked=True)
-                audits.append(GateAudit(len(audits) + 1, trimmed, recheck))
-                if recheck.passed:
-                    return WriteResult(
-                        Generated(trimmed, last_provider, last_model, True), tuple(audits)
-                    )
+            prompt = base + _retry_note([v.text for v in verdict.unsupported])
 
         return WriteResult(None, tuple(audits), blocked=True)
 

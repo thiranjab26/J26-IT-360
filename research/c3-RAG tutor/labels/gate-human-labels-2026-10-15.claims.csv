@@ -1,0 +1,848 @@
+id,passage_id,claim,passage,human_label,gate,p_entailment
+1,prog.conditionals#theory-03,Code without braces is easy to misread.,"### Separate ifs Versus else if
+
+Two separate `if` statements are independent: both may run. An `else if` runs only when all conditions above it were false.
+
+```java
+if (n > 0) { System.out.println(""positive""); }
+if (n > 10) { System.out.println(""large""); }      // can also run
+
+if (n > 10) { System.out.println(""large""); }
+else if (n > 0) { System.out.println(""positive""); }   // runs only if n <= 10
+```
+
+Use a chain when the outcomes are mutually exclusive, and separate `if` statements when each check stands alone.
+
+### Nested Conditionals and Braces
+
+A conditional can contain another conditional. Without braces, an `if` or `else` controls only the **single next statement**, and an `else` always belongs to the **nearest unmatched `if`**. Indentation does not change this, which makes code without braces easy to misread. Always use braces, even for one-line blocks.",,pass,0.996
+2,prog.variables_types#theory-05,"Because `String` is a class rather than a primitive type, the name of `String` starts with a capital letter.","### String
+
+`String` holds a sequence of characters, such as a name or a sentence. String literals use **double quotes**: `""Colombo""`. `String` is not a primitive type; it is a class, which is why it starts with a capital letter. You will see what that means in the concept on classes and objects.
+
+Two useful operations for now:
+
+- `s.length()` returns the number of characters in `s`.
+- `s.charAt(i)` returns the character at position `i`, counting from `0`.
+
+A `char` uses **single quotes** and holds exactly one character; a `String` uses **double quotes** and can hold any number, including zero. `'A'` and `""A""` are different types.
+
+To read a single character with `Scanner`, read a word and take its first character: `char c = sc.next().charAt(0);`
+
+### Constants
+
+A variable declared with the keyword `final` cannot be reassigned after it is given a value. It is a **constant**.
+
+```java
+final double PI = 3.14159;
+final int MAX_STUDENTS = 40;
+```
+
+Trying to assign a new value to a `final` variable is a compile-time error. Constants make programs easier to read and change, because a meaningful name replaces a bare number.",,pass,0.999
+3,prog.variables_types#theory-04,"To store a single character enclosed in single quotes, we use `char`.","### Primitive Types
+
+Java has eight **primitive types**. These six are used throughout this course:
+
+| Type | Holds | Size | Example literal |
+|---|---|---|---|
+| `int` | Whole numbers from about -2.1 billion to 2.1 billion | 32 bits | `42`, `-7` |
+| `long` | Very large whole numbers | 64 bits | `9000000000L` |
+| `double` | Decimal numbers | 64 bits | `3.14`, `-0.5` |
+| `float` | Decimal numbers with less precision | 32 bits | `3.14f` |
+| `char` | A single character | 16 bits | `'A'`, `'7'`, `'#'` |
+| `boolean` | `true` or `false` | | `true` |
+
+The remaining two, `byte` and `short`, are smaller whole-number types used mainly to save memory.
+
+Use `int` for counts and whole numbers, `double` for measurements and money calculations in simple programs, `boolean` for yes/no facts, and `char` for a single character. A `long` literal needs an `L` suffix, and a `float` literal needs an `f` suffix.",,pass,0.893
+4,prog.call_flow#theory-01,The caller resumes exactly where it paused.,"## Theory
+
+### What Happens During a Call
+
+When a method is called, the **caller pauses** at the exact point of the call. The **called method** (the callee) runs from its first statement. When the callee finishes, by reaching `return` or the end of its body, execution **resumes in the caller at the point where it paused**, using the returned value if there is one.
+
+The caller does not restart, and the rest of the caller's statements have not run yet: they run after the callee returns.",,pass,0.995
+5,prog.classes_objects#theory-02,"For numbers, the default value is 0.","### Defining a Class
+
+```java
+class Student {
+    String name;        // fields: each Student object has its own
+    int mark;
+
+    Student(String name, int mark) {    // constructor
+        this.name = name;
+        this.mark = mark;
+    }
+
+    boolean hasPassed() {               // instance method
+        return mark >= 40;
+    }
+}
+```
+
+**Fields** (also called instance variables) are declared inside the class but outside any method, **without** `static`. Every object gets its own set. Fields that are not given a value receive defaults: 0, `false` or `null`.",,flag,0.034
+6,prog.operators_expressions#theory-04,Java provides shorthand ways to update variables.,"### Compound Assignment, Increment and Decrement
+
+| Form | Equivalent to |
+|---|---|
+| `x += 5` | `x = x + 5` |
+| `x -= 5` | `x = x - 5` |
+| `x *= 5` | `x = x * 5` |
+| `x /= 5` | `x = x / 5` |
+| `x %= 5` | `x = x % 5` |
+| `x++` or `++x` | `x = x + 1` |
+| `x--` or `--x` | `x = x - 1` |
+
+As a standalone statement, `x++` and `++x` do the same thing. They differ only inside a larger expression: `x++` (postfix) uses the old value and then increments, while `++x` (prefix) increments first and then uses the new value. If `x` is `5`, then `int y = x++;` sets `y` to `5` and `x` to `6`, while `int z = ++x;` would increment first. To keep code readable, use `++` as a standalone statement.",,flag,0.013
+7,prog.call_flow#theory-02,`main` resumes and finishes the program.,"### Chains of Calls
+
+Methods can call methods that call further methods. Suppose `main` calls `a`, and `a` calls `b`:
+
+1. `main` starts and pauses at the call to `a`.
+2. `a` starts and pauses at the call to `b`.
+3. `b` runs to completion and returns to `a`.
+4. `a` resumes, finishes, and returns to `main`.
+5. `main` resumes and finishes.
+
+The **last method to start is the first to finish**. `b` started last and finished first; `main` started first and finishes last. This ""last in, first out"" order is exactly how a **stack** behaves, and Java manages calls with a structure called the **call stack**. You will study it in detail in the Data Structures and Algorithms module.",,pass,0.962
+8,prog.loops#theory-05,Each loop fits a different situation.,"### Choosing a Loop
+
+| Situation | Loop |
+|---|---|
+| Number of iterations known in advance | `for` |
+| Repeat until something happens, possibly zero times | `while` |
+| Must run at least once, then check | `do-while` |",,flag,0.039
+9,prog.nested_loops#theory-03,"When `n` is 10, nested loops do 100 units of work.","### Why Nested Loops Get Slow
+
+A single loop over `n` items does about `n` units of work. A loop nested inside another, both over `n`, does about `n × n = n²`. The difference grows quickly:
+
+| n | Single loop, n | Nested loops, n² |
+|---|---|---|
+| 10 | 10 | 100 |
+| 100 | 100 | 10,000 |
+| 1,000 | 1,000 | 1,000,000 |
+| 10,000 | 10,000 | 100,000,000 |
+
+Doubling `n` doubles the work of a single loop but **quadruples** the work of a nested loop. Measuring how work grows with input size is the subject of Big-O analysis in the Data Structures and Algorithms module.",,flag,0.459
+10,prog.operators_expressions#theory-04,"This shorthand also works for subtraction, multiplication, division, and remainder operations using `-=`, `*=`, `/=`, and `%=`.","### Compound Assignment, Increment and Decrement
+
+| Form | Equivalent to |
+|---|---|
+| `x += 5` | `x = x + 5` |
+| `x -= 5` | `x = x - 5` |
+| `x *= 5` | `x = x * 5` |
+| `x /= 5` | `x = x / 5` |
+| `x %= 5` | `x = x % 5` |
+| `x++` or `++x` | `x = x + 1` |
+| `x--` or `--x` | `x = x - 1` |
+
+As a standalone statement, `x++` and `++x` do the same thing. They differ only inside a larger expression: `x++` (postfix) uses the old value and then increments, while `++x` (prefix) increments first and then uses the new value. If `x` is `5`, then `int y = x++;` sets `y` to `5` and `x` to `6`, while `int z = ++x;` would increment first. To keep code readable, use `++` as a standalone statement.",,flag,0.005
+11,prog.arrays#theory-04,You use a loop to read each element into the array.,"### Filling an Array from Input
+
+When the first input value is the number of elements, create the array with that size and fill it with a loop:
+
+```java
+int n = sc.nextInt();
+int[] values = new int[n];
+for (int i = 0; i < n; i++) {
+    values[i] = sc.nextInt();
+}
+```
+
+The condition `i < n` (equivalently `i < values.length`) visits exactly the valid indexes.
+
+### Printing an Array
+
+`System.out.println(values)` does not print the elements. It prints something like `[I@1b6d3586`: a type code and an identifier for the array object. To see the contents, loop over the elements, or use `Arrays.toString` from `java.util.Arrays`:
+
+```java
+import java.util.Arrays;
+System.out.println(Arrays.toString(values));   // [4, 8, 15]
+```
+
+### Arrays and Strings
+
+A `String` is similar to an array of characters: `s.charAt(i)` is like indexing, with indexes from 0 to `s.length() - 1`. `s.toCharArray()` returns an actual `char[]` containing the String's characters. Unlike arrays, Strings cannot be changed element by element.",,pass,0.975
+12,prog.operators_expressions#theory-03,"Java decides the order of calculations using operator precedence, much like standard math rules.","### Precedence and Associativity
+
+Java evaluates operators in a fixed order of **precedence**:
+
+1. Parentheses `( )`
+2. Unary operators such as `-x`, `!`, `++`, `--` and casts
+3. `*`, `/`, `%`
+4. `+`, `-`
+5. Relational `<`, `>`, `<=`, `>=`
+6. Equality `==`, `!=`
+7. Logical AND `&&`
+8. Logical OR `||`
+9. Assignment `=`, `+=` and similar
+
+Operators on the same level are evaluated **left to right**, except assignment, which works right to left. So `2 + 3 * 4` is `14`, `(2 + 3) * 4` is `20`, and `20 / 4 * 2` is `10`, because `20 / 4` is evaluated first.
+
+When in doubt, use parentheses. They cost nothing and make intent clear.",,flag,0.525
+13,prog.loops#theory-03,"In the loop `for (int i = 0; i < n; i++)`, `i` goes from `0` to `n - 1`.","### The do-while Loop
+
+```java
+do {
+    // body
+} while (condition);
+```
+
+The body runs **first** and the condition is checked afterwards, so the body always runs **at least once**. This suits tasks such as reading input until it is valid, where you must read at least once before you can check it. Note the semicolon after the condition.
+
+### Counting Iterations and Off-by-One Errors
+
+`for (int i = 0; i < n; i++)` runs exactly `n` times, with `i` taking values `0` to `n - 1`.
+`for (int i = 1; i <= n; i++)` also runs `n` times, with `i` taking values `1` to `n`.
+`for (int i = 0; i <= n; i++)` runs `n + 1` times.
+
+Using `<=` where `<` was intended, or starting at the wrong value, gives one iteration too many or too few. This is an **off-by-one error**, one of the most common bugs in programming. When writing a loop, check the first and last values of the loop variable explicitly.",,flag,0.621
+14,prog.code_tracing#theory-02,"In a trace table, a new row is written each time something changes.","### The Trace Table
+
+A **trace table** has one column per variable (and one for output) and one row per step. Write a new row each time something changes, and write only the values that change. Reading down a column shows the history of that variable.
+
+For a loop, a practical layout is one row per iteration, with columns for the loop variable, the condition, the values updated in the body, and any output. Always include the final condition check that ends the loop; that row confirms how many iterations ran.",,pass,0.999
+15,prog.call_flow#theory-04,The scope of a variable is the region of code where the name of the variable can be used.,"### Scope
+
+The **scope** of a variable is the region of code where its name can be used. In Java, a local variable's scope runs from its declaration to the end of the **block** (the pair of braces) in which it is declared.
+
+```java
+public static void demo(int x) {       // x: whole method
+    int total = 0;                     // total: from here to end of method
+    for (int i = 0; i < x; i++) {      // i: only inside the for loop
+        int square = i * i;            // square: only inside the loop body
+        total += square;
+    }
+    // i and square cannot be used here
+    if (total > 10) {
+        String msg = ""big"";            // msg: only inside this if block
+        System.out.println(msg);
+    }
+    // msg cannot be used here
+}
+```
+
+Using a variable outside its scope is a compile-time error (""cannot find symbol""). Declaring a second local variable with the same name while the first is still in scope is also a compile-time error.
+
+A useful rule: **declare variables in the smallest scope that works.** A variable that only the loop needs belongs inside the loop.",,pass,0.996
+16,prog.classes_objects#theory-02,"For booleans, the default value is `false`.","### Defining a Class
+
+```java
+class Student {
+    String name;        // fields: each Student object has its own
+    int mark;
+
+    Student(String name, int mark) {    // constructor
+        this.name = name;
+        this.mark = mark;
+    }
+
+    boolean hasPassed() {               // instance method
+        return mark >= 40;
+    }
+}
+```
+
+**Fields** (also called instance variables) are declared inside the class but outside any method, **without** `static`. Every object gets its own set. Fields that are not given a value receive defaults: 0, `false` or `null`.",,flag,0.287
+17,prog.code_tracing#theory-01,"A program state includes the current value of every variable, the contents of arrays and objects, any active method calls, and the output produced so far.","## Theory
+
+### What Tracing Is
+
+**Tracing** means executing a program by hand, one statement at a time, exactly as the computer would, and recording how its **state** changes. A program's state is the current value of every variable, the contents of every array and object, the active method calls, and the output produced so far.
+
+Tracing matters for two reasons:
+
+- **Predicting behaviour.** Before running code, you can say what it will do, which is the clearest evidence that you understand it.
+- **Finding logic errors.** Logic errors produce wrong results without any error message. Tracing shows the exact step where the program's state diverges from what you intended.
+
+The golden rule is: **trace what the code says, not what you meant it to say.** Most tracing mistakes come from silently ""correcting"" the code in your head.",,flag,0.685
+18,prog.nested_loops#theory-03,"When `n` grows to 10,000, the nested loops do 100,000,000 units of work.","### Why Nested Loops Get Slow
+
+A single loop over `n` items does about `n` units of work. A loop nested inside another, both over `n`, does about `n × n = n²`. The difference grows quickly:
+
+| n | Single loop, n | Nested loops, n² |
+|---|---|---|
+| 10 | 10 | 100 |
+| 100 | 100 | 10,000 |
+| 1,000 | 1,000 | 1,000,000 |
+| 10,000 | 10,000 | 100,000,000 |
+
+Doubling `n` doubles the work of a single loop but **quadruples** the work of a nested loop. Measuring how work grows with input size is the subject of Big-O analysis in the Data Structures and Algorithms module.",,flag,0.332
+19,prog.code_tracing#theory-01,Tracing helps you find the exact step where the program state diverges from what you intended.,"## Theory
+
+### What Tracing Is
+
+**Tracing** means executing a program by hand, one statement at a time, exactly as the computer would, and recording how its **state** changes. A program's state is the current value of every variable, the contents of every array and object, the active method calls, and the output produced so far.
+
+Tracing matters for two reasons:
+
+- **Predicting behaviour.** Before running code, you can say what it will do, which is the clearest evidence that you understand it.
+- **Finding logic errors.** Logic errors produce wrong results without any error message. Tracing shows the exact step where the program's state diverges from what you intended.
+
+The golden rule is: **trace what the code says, not what you meant it to say.** Most tracing mistakes come from silently ""correcting"" the code in your head.",,pass,0.997
+20,prog.array_iteration#theory-04,"You swap index 0 with `n - 1`, index 1 with `n - 2`, and continue this pattern until you reach the middle.","### Reversing in Place
+
+To reverse an array without a second array, swap pairs from the outside in: index 0 with `n - 1`, 1 with `n - 2`, and so on. Stop at the middle:
+
+```java
+for (int i = 0; i < a.length / 2; i++) {
+    int temp = a[i];
+    a[i] = a[a.length - 1 - i];
+    a[a.length - 1 - i] = temp;
+}
+```
+
+If the loop ran to `a.length` instead of `a.length / 2`, every pair would be swapped twice and the array would end up unchanged. For an odd length, the middle element stays where it is.
+
+### Copying an Array
+
+To copy, create a new array of the same length and copy each element, or use `Arrays.copyOf(a, a.length)`. Writing `int[] b = a;` does **not** copy the array; it makes `b` refer to the same array as `a`. That behaviour is explained in the concept on references.",,pass,0.860
+21,prog.code_tracing#theory-02,The extra row for the final condition check is important because it confirms the exact number of iterations that ran.,"### The Trace Table
+
+A **trace table** has one column per variable (and one for output) and one row per step. Write a new row each time something changes, and write only the values that change. Reading down a column shows the history of that variable.
+
+For a loop, a practical layout is one row per iteration, with columns for the loop variable, the condition, the values updated in the body, and any output. Always include the final condition check that ends the loop; that row confirms how many iterations ran.",,flag,0.693
+22,prog.conditionals#theory-01,Every statement in a program runs one after another from top to bottom up to now.,"## Theory
+
+### Why Programs Need Decisions
+
+So far every statement in `main` has run, one after another, from top to bottom. Real programs must choose: a mark of 80 should print a distinction, a mark of 30 should not. A **conditional** runs a block of statements only when a boolean condition is `true`. This is the first form of **control flow**, which is the order in which statements actually execute.
+
+### The if Statement
+
+```java
+if (condition) {
+    // runs only when condition is true
+}
+```
+
+The condition must be a `boolean` expression. In Java, `if (x = 5)` does not compile, because `x = 5` is an `int`, not a `boolean`. This protects you from a common mistake in other languages.
+
+### if-else
+
+```java
+if (mark >= 40) {
+    System.out.println(""Pass"");
+} else {
+    System.out.println(""Fail"");
+}
+```
+
+Exactly one of the two blocks runs, never both and never neither.",,pass,0.993
+23,prog.nested_loops#theory-01,"When `i` is 1, the inner variable `j` goes through 1, 2, 3, and 4.","## Theory
+
+### A Loop Inside a Loop
+
+A **nested loop** is a loop whose body contains another loop. The outer loop controls rows, rounds or first choices; the inner loop does the work for each of them.
+
+```java
+for (int i = 1; i <= 3; i++) {          // outer loop
+    for (int j = 1; j <= 4; j++) {      // inner loop
+        System.out.print(""*"");
+    }
+    System.out.println();
+}
+```
+
+The key rule: **for every single iteration of the outer loop, the inner loop runs from its start to its end.** Here, when `i` is 1, `j` goes 1, 2, 3, 4. Then `i` becomes 2, and `j` starts again from 1. The output is 3 rows of 4 stars.
+
+By convention the outer variable is `i` and the inner one is `j`. They must be different variables: reusing `i` in the inner loop would overwrite the outer counter.",,pass,0.932
+24,prog.operators_expressions#theory-07,"You can pick the larger or smaller of two values using `Math.max(a, b)` and `Math.min(a, b)`.","### Useful Math Methods
+
+| Method | Returns |
+|---|---|
+| `Math.abs(x)` | Absolute value |
+| `Math.max(a, b)`, `Math.min(a, b)` | Larger or smaller of two values |
+| `Math.pow(a, b)` | `a` raised to the power `b`, as a `double` |
+| `Math.sqrt(x)` | Square root, as a `double` |
+| `Math.round(x)` | `x` rounded to the nearest whole number (a `long` for a `double` argument) |
+
+### Division by Zero
+
+Integer division by zero, such as `5 / 0`, throws an `ArithmeticException` at runtime and stops the program. Floating-point division by zero does not throw: `5.0 / 0` evaluates to `Infinity`.",,pass,0.976
+25,prog.operators_expressions#theory-05,Relational operators always produce a `boolean` result.,"### Relational Operators
+
+Relational operators compare two values and produce a `boolean`.
+
+| Operator | Meaning |
+|---|---|
+| `==` | Equal to |
+| `!=` | Not equal to |
+| `<`, `>` | Less than, greater than |
+| `<=`, `>=` | Less than or equal to, greater than or equal to |
+
+`==` compares numbers and characters correctly. **Do not use `==` to compare Strings.** Use `s1.equals(s2)` instead. The reason is explained in the concept on references.",,flag,0.018
+26,prog.classes_objects#theory-02,A class in Java is like a template for creating objects.,"### Defining a Class
+
+```java
+class Student {
+    String name;        // fields: each Student object has its own
+    int mark;
+
+    Student(String name, int mark) {    // constructor
+        this.name = name;
+        this.mark = mark;
+    }
+
+    boolean hasPassed() {               // instance method
+        return mark >= 40;
+    }
+}
+```
+
+**Fields** (also called instance variables) are declared inside the class but outside any method, **without** `static`. Every object gets its own set. Fields that are not given a value receive defaults: 0, `false` or `null`.",,flag,0.117
+27,prog.classes_objects#theory-04,You call an instance method using an object like this: `object.method()`.,"### static Versus Instance
+
+This explains the `static` keyword you have written since concept 1.
+
+| | Instance member | Static member |
+|---|---|---|
+| Declared | Without `static` | With `static` |
+| Belongs to | Each individual object | The class as a whole |
+| Field copies | One per object | Exactly one, shared by all objects |
+| Called as | `object.method()` | `ClassName.method()`, or just `method()` inside the class |
+| Can use instance fields directly | Yes | No, because there is no current object |
+
+`main` is `static` because the JVM calls it before any object exists. That is also why `main` cannot call an instance method such as `hasPassed()` on its own: it must first create an object and call the method on it. A static method that tries to use an instance field or method directly fails to compile with ""non-static ... cannot be referenced from a static context"".",,flag,0.653
+28,prog.code_tracing#theory-06,Temporary print statements create an automatic trace as the program runs.,"### Print Debugging and Debuggers
+
+When a program is too long to trace entirely by hand, observe it while it runs.
+
+- **Print debugging:** add temporary `System.out.println` statements that show variable values at key points, such as `System.out.println(""i="" + i + "" sum="" + sum);` at the end of each loop iteration. The output is an automatic trace. Remove these statements when you are done.
+- **A debugger** (built into VS Code and IntelliJ) lets you set a **breakpoint** on a line so the program pauses there. You can then **step over** a line (run it and pause at the next), **step into** a method call (pause at the first line of the called method), and inspect every variable and the call stack at each pause.
+
+Both are tools for checking a trace, not replacements for being able to trace by hand.",,pass,0.996
+29,prog.variables_types#theory-04,`float` uses 32 bits.,"### Primitive Types
+
+Java has eight **primitive types**. These six are used throughout this course:
+
+| Type | Holds | Size | Example literal |
+|---|---|---|---|
+| `int` | Whole numbers from about -2.1 billion to 2.1 billion | 32 bits | `42`, `-7` |
+| `long` | Very large whole numbers | 64 bits | `9000000000L` |
+| `double` | Decimal numbers | 64 bits | `3.14`, `-0.5` |
+| `float` | Decimal numbers with less precision | 32 bits | `3.14f` |
+| `char` | A single character | 16 bits | `'A'`, `'7'`, `'#'` |
+| `boolean` | `true` or `false` | | `true` |
+
+The remaining two, `byte` and `short`, are smaller whole-number types used mainly to save memory.
+
+Use `int` for counts and whole numbers, `double` for measurements and money calculations in simple programs, `boolean` for yes/no facts, and `char` for a single character. A `long` literal needs an `L` suffix, and a `float` literal needs an `f` suffix.",,pass,0.988
+30,prog.conditionals#theory-03,You use separate `if` statements when each check stands alone.,"### Separate ifs Versus else if
+
+Two separate `if` statements are independent: both may run. An `else if` runs only when all conditions above it were false.
+
+```java
+if (n > 0) { System.out.println(""positive""); }
+if (n > 10) { System.out.println(""large""); }      // can also run
+
+if (n > 10) { System.out.println(""large""); }
+else if (n > 0) { System.out.println(""positive""); }   // runs only if n <= 10
+```
+
+Use a chain when the outcomes are mutually exclusive, and separate `if` statements when each check stands alone.
+
+### Nested Conditionals and Braces
+
+A conditional can contain another conditional. Without braces, an `if` or `else` controls only the **single next statement**, and an `else` always belongs to the **nearest unmatched `if`**. Indentation does not change this, which makes code without braces easy to misread. Always use braces, even for one-line blocks.",,pass,0.986
+31,prog.operators_expressions#theory-05,The reason for the rule regarding `String` comparison is explained in a separate concept about references.,"### Relational Operators
+
+Relational operators compare two values and produce a `boolean`.
+
+| Operator | Meaning |
+|---|---|
+| `==` | Equal to |
+| `!=` | Not equal to |
+| `<`, `>` | Less than, greater than |
+| `<=`, `>=` | Less than or equal to, greater than or equal to |
+
+`==` compares numbers and characters correctly. **Do not use `==` to compare Strings.** Use `s1.equals(s2)` instead. The reason is explained in the concept on references.",,flag,0.551
+32,prog.nested_loops#theory-04,A grid or table pattern uses the outer loop for rows and the inner loop for columns.,"### Common Nested Loop Patterns
+
+| Pattern | Outer loop | Inner loop |
+|---|---|---|
+| Grid or table | Rows | Columns in each row |
+| Triangle shape | Rows | Columns up to the row number |
+| Pairs | First item | Second item, starting after the first |
+| Search with a check | Candidate values | Tests on each candidate |
+
+The last pattern is common for problems like finding primes: the outer loop chooses a candidate number, and the inner loop tests possible divisors.
+
+### break in Nested Loops
+
+`break` ends only the **innermost** loop that contains it. The outer loop continues with its next iteration. To stop both loops, a common approach is a `boolean` flag checked by the outer loop condition. Java also offers labelled breaks (`break outer;`), but a flag is usually clearer.",,pass,0.955
+33,prog.call_flow#theory-04,"In the provided example method, `total` can be used throughout the whole method.","### Scope
+
+The **scope** of a variable is the region of code where its name can be used. In Java, a local variable's scope runs from its declaration to the end of the **block** (the pair of braces) in which it is declared.
+
+```java
+public static void demo(int x) {       // x: whole method
+    int total = 0;                     // total: from here to end of method
+    for (int i = 0; i < x; i++) {      // i: only inside the for loop
+        int square = i * i;            // square: only inside the loop body
+        total += square;
+    }
+    // i and square cannot be used here
+    if (total > 10) {
+        String msg = ""big"";            // msg: only inside this if block
+        System.out.println(msg);
+    }
+    // msg cannot be used here
+}
+```
+
+Using a variable outside its scope is a compile-time error (""cannot find symbol""). Declaring a second local variable with the same name while the first is still in scope is also a compile-time error.
+
+A useful rule: **declare variables in the smallest scope that works.** A variable that only the loop needs belongs inside the loop.",,flag,0.015
+34,prog.java_intro#theory-01,The programming language is translated into the form that the machine can actually execute.,"## Theory
+
+### What a Program Is
+
+A computer can only perform very simple operations: store a value, add two numbers, compare two values, jump to another instruction. A **program** is a sequence of such instructions that together solve a problem. A **programming language** lets us write those instructions in a form people can read, which is then translated into a form the machine can execute.
+
+Java is a **high-level language**: it uses words and symbols close to English and mathematics rather than raw machine instructions.",,pass,0.992
+35,prog.classes_objects#theory-04,"If `main` wants to call an instance method like `hasPassed()`, it must first create an object and call the method on it.","### static Versus Instance
+
+This explains the `static` keyword you have written since concept 1.
+
+| | Instance member | Static member |
+|---|---|---|
+| Declared | Without `static` | With `static` |
+| Belongs to | Each individual object | The class as a whole |
+| Field copies | One per object | Exactly one, shared by all objects |
+| Called as | `object.method()` | `ClassName.method()`, or just `method()` inside the class |
+| Can use instance fields directly | Yes | No, because there is no current object |
+
+`main` is `static` because the JVM calls it before any object exists. That is also why `main` cannot call an instance method such as `hasPassed()` on its own: it must first create an object and call the method on it. A static method that tries to use an instance field or method directly fails to compile with ""non-static ... cannot be referenced from a static context"".",,pass,0.997
+36,prog.conditionals#theory-03,"When you write two separate `if` statements, they are independent.","### Separate ifs Versus else if
+
+Two separate `if` statements are independent: both may run. An `else if` runs only when all conditions above it were false.
+
+```java
+if (n > 0) { System.out.println(""positive""); }
+if (n > 10) { System.out.println(""large""); }      // can also run
+
+if (n > 10) { System.out.println(""large""); }
+else if (n > 0) { System.out.println(""positive""); }   // runs only if n <= 10
+```
+
+Use a chain when the outcomes are mutually exclusive, and separate `if` statements when each check stands alone.
+
+### Nested Conditionals and Braces
+
+A conditional can contain another conditional. Without braces, an `if` or `else` controls only the **single next statement**, and an `else` always belongs to the **nearest unmatched `if`**. Indentation does not change this, which makes code without braces easy to misread. Always use braces, even for one-line blocks.",,pass,0.996
+37,prog.call_flow#theory-03,Different methods can use the exact same name for their variables without any conflict.,"### Each Call Has Its Own Local Variables
+
+A **local variable** is declared inside a method. Parameters are local variables too. Every time a method is called, Java creates a **fresh set** of its local variables for that call. When the call returns, those variables are destroyed.
+
+Two consequences follow:
+
+- A local variable does **not** remember its value between calls. If `count` is a local variable set to 0 at the start of a method, it is 0 at the start of every call.
+- Two different methods can each have a variable named `n`. They are unrelated variables that happen to share a name. Changing one never affects the other.",,pass,0.813
+38,prog.array_iteration#theory-05,"Inside that method, you can loop through or traverse the array to do some work with the data.","### Arrays as Method Parameters
+
+A method can take an array parameter, such as `static int sum(int[] a)`, and traverse it. The call passes the array by name: `sum(values)`. Because the method uses `a.length`, it works for arrays of any size. Methods that compute a result from an array and return it are the most reusable form of these algorithms.",,pass,0.876
+39,prog.classes_objects#theory-04,Static members belong to the class instead of an object.,"### static Versus Instance
+
+This explains the `static` keyword you have written since concept 1.
+
+| | Instance member | Static member |
+|---|---|---|
+| Declared | Without `static` | With `static` |
+| Belongs to | Each individual object | The class as a whole |
+| Field copies | One per object | Exactly one, shared by all objects |
+| Called as | `object.method()` | `ClassName.method()`, or just `method()` inside the class |
+| Can use instance fields directly | Yes | No, because there is no current object |
+
+`main` is `static` because the JVM calls it before any object exists. That is also why `main` cannot call an instance method such as `hasPassed()` on its own: it must first create an object and call the method on it. A static method that tries to use an instance field or method directly fails to compile with ""non-static ... cannot be referenced from a static context"".",,flag,0.095
+40,prog.code_tracing#theory-06,You should remove temporary print statements when you are finished.,"### Print Debugging and Debuggers
+
+When a program is too long to trace entirely by hand, observe it while it runs.
+
+- **Print debugging:** add temporary `System.out.println` statements that show variable values at key points, such as `System.out.println(""i="" + i + "" sum="" + sum);` at the end of each loop iteration. The output is an automatic trace. Remove these statements when you are done.
+- **A debugger** (built into VS Code and IntelliJ) lets you set a **breakpoint** on a line so the program pauses there. You can then **step over** a line (run it and pause at the next), **step into** a method call (pause at the first line of the called method), and inspect every variable and the call stack at each pause.
+
+Both are tools for checking a trace, not replacements for being able to trace by hand.",,pass,0.998
+41,prog.operators_expressions#theory-05,You can compare sizes using greater than `>`.,"### Relational Operators
+
+Relational operators compare two values and produce a `boolean`.
+
+| Operator | Meaning |
+|---|---|
+| `==` | Equal to |
+| `!=` | Not equal to |
+| `<`, `>` | Less than, greater than |
+| `<=`, `>=` | Less than or equal to, greater than or equal to |
+
+`==` compares numbers and characters correctly. **Do not use `==` to compare Strings.** Use `s1.equals(s2)` instead. The reason is explained in the concept on references.",,flag,0.040
+42,prog.nested_loops#theory-03,Running a single loop over `n` items results in an amount of work proportional to `n`.,"### Why Nested Loops Get Slow
+
+A single loop over `n` items does about `n` units of work. A loop nested inside another, both over `n`, does about `n × n = n²`. The difference grows quickly:
+
+| n | Single loop, n | Nested loops, n² |
+|---|---|---|
+| 10 | 10 | 100 |
+| 100 | 100 | 10,000 |
+| 1,000 | 1,000 | 1,000,000 |
+| 10,000 | 10,000 | 100,000,000 |
+
+Doubling `n` doubles the work of a single loop but **quadruples** the work of a nested loop. Measuring how work grows with input size is the subject of Big-O analysis in the Data Structures and Algorithms module.",,pass,0.976
+43,prog.variables_types#theory-05,"`'A'` and `""A""` are entirely different types.","### String
+
+`String` holds a sequence of characters, such as a name or a sentence. String literals use **double quotes**: `""Colombo""`. `String` is not a primitive type; it is a class, which is why it starts with a capital letter. You will see what that means in the concept on classes and objects.
+
+Two useful operations for now:
+
+- `s.length()` returns the number of characters in `s`.
+- `s.charAt(i)` returns the character at position `i`, counting from `0`.
+
+A `char` uses **single quotes** and holds exactly one character; a `String` uses **double quotes** and can hold any number, including zero. `'A'` and `""A""` are different types.
+
+To read a single character with `Scanner`, read a word and take its first character: `char c = sc.next().charAt(0);`
+
+### Constants
+
+A variable declared with the keyword `final` cannot be reassigned after it is given a value. It is a **constant**.
+
+```java
+final double PI = 3.14159;
+final int MAX_STUDENTS = 40;
+```
+
+Trying to assign a new value to a `final` variable is a compile-time error. Constants make programs easier to read and change, because a meaningful name replaces a bare number.",,pass,0.967
+44,prog.conditionals#theory-02,Java evaluates `else if` conditions strictly from top to bottom.,"### else if Chains
+
+When there are more than two outcomes, chain conditions with `else if`:
+
+```java
+if (mark >= 75) {
+    grade = 'A';
+} else if (mark >= 65) {
+    grade = 'B';
+} else if (mark >= 55) {
+    grade = 'C';
+} else {
+    grade = 'F';
+}
+```
+
+Java tests the conditions **from top to bottom** and runs the block of the **first** condition that is `true`. It then skips the rest of the chain. The final `else` catches every case that no condition matched.
+
+Because the first true condition wins, **order matters**. If `mark >= 55` were tested first, a mark of 90 would receive a C, since 90 is also at least 55. With thresholds like these, test the strictest condition first.",,flag,0.331
+45,prog.variables_types#theory-04,An example of a `char` is `'A'`.,"### Primitive Types
+
+Java has eight **primitive types**. These six are used throughout this course:
+
+| Type | Holds | Size | Example literal |
+|---|---|---|---|
+| `int` | Whole numbers from about -2.1 billion to 2.1 billion | 32 bits | `42`, `-7` |
+| `long` | Very large whole numbers | 64 bits | `9000000000L` |
+| `double` | Decimal numbers | 64 bits | `3.14`, `-0.5` |
+| `float` | Decimal numbers with less precision | 32 bits | `3.14f` |
+| `char` | A single character | 16 bits | `'A'`, `'7'`, `'#'` |
+| `boolean` | `true` or `false` | | `true` |
+
+The remaining two, `byte` and `short`, are smaller whole-number types used mainly to save memory.
+
+Use `int` for counts and whole numbers, `double` for measurements and money calculations in simple programs, `boolean` for yes/no facts, and `char` for a single character. A `long` literal needs an `L` suffix, and a `float` literal needs an `f` suffix.",,pass,0.998
+46,prog.nested_loops#theory-02,Figuring out how many times the inner code runs in nested loops depends on how the loops are set up.,"### Counting Total Iterations
+
+When the inner loop runs a fixed number of times, the total is a **product**:
+
+> total inner iterations = (outer iterations) × (inner iterations per outer iteration)
+
+The example above prints 3 × 4 = 12 stars.
+
+When the inner bound **depends on the outer variable**, add up the inner counts instead. In
+
+```java
+for (int i = 1; i <= n; i++) {
+    for (int j = 1; j <= i; j++) {
+        // body
+    }
+}
+```
+
+the inner loop runs 1 time, then 2, then 3, up to `n`. The total is 1 + 2 + ... + n = n(n + 1) / 2. For `n = 10` that is 55.
+
+For all **pairs** of distinct values where order does not matter, the inner loop starts one past the outer variable:
+
+```java
+for (int i = 1; i <= n; i++) {
+    for (int j = i + 1; j <= n; j++) {
+        // each unordered pair (i, j) exactly once
+    }
+}
+```
+
+This runs n(n - 1) / 2 times. For `n = 5` that is 10 pairs.",,flag,0.199
+47,prog.classes_objects#theory-04,Every object gets its own copy of an instance field.,"### static Versus Instance
+
+This explains the `static` keyword you have written since concept 1.
+
+| | Instance member | Static member |
+|---|---|---|
+| Declared | Without `static` | With `static` |
+| Belongs to | Each individual object | The class as a whole |
+| Field copies | One per object | Exactly one, shared by all objects |
+| Called as | `object.method()` | `ClassName.method()`, or just `method()` inside the class |
+| Can use instance fields directly | Yes | No, because there is no current object |
+
+`main` is `static` because the JVM calls it before any object exists. That is also why `main` cannot call an instance method such as `hasPassed()` on its own: it must first create an object and call the method on it. A static method that tries to use an instance field or method directly fails to compile with ""non-static ... cannot be referenced from a static context"".",,flag,0.183
+48,prog.conditionals#theory-03,You use a chain of `else if` statements when the outcomes are mutually exclusive.,"### Separate ifs Versus else if
+
+Two separate `if` statements are independent: both may run. An `else if` runs only when all conditions above it were false.
+
+```java
+if (n > 0) { System.out.println(""positive""); }
+if (n > 10) { System.out.println(""large""); }      // can also run
+
+if (n > 10) { System.out.println(""large""); }
+else if (n > 0) { System.out.println(""positive""); }   // runs only if n <= 10
+```
+
+Use a chain when the outcomes are mutually exclusive, and separate `if` statements when each check stands alone.
+
+### Nested Conditionals and Braces
+
+A conditional can contain another conditional. Without braces, an `if` or `else` controls only the **single next statement**, and an `else` always belongs to the **nearest unmatched `if`**. Indentation does not change this, which makes code without braces easy to misread. Always use braces, even for one-line blocks.",,flag,0.755
+49,prog.variables_types#theory-02,Variables are like storage boxes in Java where data can be kept.,"### Declaring, Initialising and Assigning
+
+```java
+int count;        // declaration: creates a variable named count of type int
+count = 5;        // assignment: stores 5 in count
+int total = 10;   // declaration with initialisation in one statement
+total = total + count;   // reassignment: total now holds 15
+```
+
+The `=` symbol is the **assignment operator**. It means ""evaluate the right-hand side, then store the result in the variable on the left"". It does not mean mathematical equality, which is why `total = total + count` makes sense: the old value of `total` is used to compute the new one.
+
+A local variable must be given a value before it is used. Reading a variable that has been declared but never assigned is a **compile-time error**.",,flag,0.458
+50,prog.variables_types#theory-04,An example of a `double` is `3.14`.,"### Primitive Types
+
+Java has eight **primitive types**. These six are used throughout this course:
+
+| Type | Holds | Size | Example literal |
+|---|---|---|---|
+| `int` | Whole numbers from about -2.1 billion to 2.1 billion | 32 bits | `42`, `-7` |
+| `long` | Very large whole numbers | 64 bits | `9000000000L` |
+| `double` | Decimal numbers | 64 bits | `3.14`, `-0.5` |
+| `float` | Decimal numbers with less precision | 32 bits | `3.14f` |
+| `char` | A single character | 16 bits | `'A'`, `'7'`, `'#'` |
+| `boolean` | `true` or `false` | | `true` |
+
+The remaining two, `byte` and `short`, are smaller whole-number types used mainly to save memory.
+
+Use `int` for counts and whole numbers, `double` for measurements and money calculations in simple programs, `boolean` for yes/no facts, and `char` for a single character. A `long` literal needs an `L` suffix, and a `float` literal needs an `f` suffix.",,pass,0.996
+51,prog.operators_expressions#theory-07,Division requires special attention when the denominator is zero.,"### Useful Math Methods
+
+| Method | Returns |
+|---|---|
+| `Math.abs(x)` | Absolute value |
+| `Math.max(a, b)`, `Math.min(a, b)` | Larger or smaller of two values |
+| `Math.pow(a, b)` | `a` raised to the power `b`, as a `double` |
+| `Math.sqrt(x)` | Square root, as a `double` |
+| `Math.round(x)` | `x` rounded to the nearest whole number (a `long` for a `double` argument) |
+
+### Division by Zero
+
+Integer division by zero, such as `5 / 0`, throws an `ArithmeticException` at runtime and stops the program. Floating-point division by zero does not throw: `5.0 / 0` evaluates to `Infinity`.",,flag,0.349
+52,prog.loops#theory-05,"If your code needs to run at least one time before it checks whether it should keep going, you use a `do-while` loop.","### Choosing a Loop
+
+| Situation | Loop |
+|---|---|
+| Number of iterations known in advance | `for` |
+| Repeat until something happens, possibly zero times | `while` |
+| Must run at least once, then check | `do-while` |",,pass,0.881
+53,prog.operators_expressions#theory-04,"If `x` starts at `5`, the statement `int y = x++;` assigns the original value of `5` to `y` and then increases `x` to `6`.","### Compound Assignment, Increment and Decrement
+
+| Form | Equivalent to |
+|---|---|
+| `x += 5` | `x = x + 5` |
+| `x -= 5` | `x = x - 5` |
+| `x *= 5` | `x = x * 5` |
+| `x /= 5` | `x = x / 5` |
+| `x %= 5` | `x = x % 5` |
+| `x++` or `++x` | `x = x + 1` |
+| `x--` or `--x` | `x = x - 1` |
+
+As a standalone statement, `x++` and `++x` do the same thing. They differ only inside a larger expression: `x++` (postfix) uses the old value and then increments, while `++x` (prefix) increments first and then uses the new value. If `x` is `5`, then `int y = x++;` sets `y` to `5` and `x` to `6`, while `int z = ++x;` would increment first. To keep code readable, use `++` as a standalone statement.",,flag,0.215
+54,prog.nested_loops#theory-01,"By convention, programmers use `i` for the outer loop variable and `j` for the inner loop variable.","## Theory
+
+### A Loop Inside a Loop
+
+A **nested loop** is a loop whose body contains another loop. The outer loop controls rows, rounds or first choices; the inner loop does the work for each of them.
+
+```java
+for (int i = 1; i <= 3; i++) {          // outer loop
+    for (int j = 1; j <= 4; j++) {      // inner loop
+        System.out.print(""*"");
+    }
+    System.out.println();
+}
+```
+
+The key rule: **for every single iteration of the outer loop, the inner loop runs from its start to its end.** Here, when `i` is 1, `j` goes 1, 2, 3, 4. Then `i` becomes 2, and `j` starts again from 1. The output is 3 rows of 4 stars.
+
+By convention the outer variable is `i` and the inner one is `j`. They must be different variables: reusing `i` in the inner loop would overwrite the outer counter.",,pass,0.924
+55,prog.nested_loops#theory-03,"When `n` grows to 10,000, the single loop does 10,000 units of work.","### Why Nested Loops Get Slow
+
+A single loop over `n` items does about `n` units of work. A loop nested inside another, both over `n`, does about `n × n = n²`. The difference grows quickly:
+
+| n | Single loop, n | Nested loops, n² |
+|---|---|---|
+| 10 | 10 | 100 |
+| 100 | 100 | 10,000 |
+| 1,000 | 1,000 | 1,000,000 |
+| 10,000 | 10,000 | 100,000,000 |
+
+Doubling `n` doubles the work of a single loop but **quadruples** the work of a nested loop. Measuring how work grows with input size is the subject of Big-O analysis in the Data Structures and Algorithms module.",,flag,0.584
+56,prog.array_iteration#theory-05,Using `a.length` is one of the best parts about passing arrays into methods.,"### Arrays as Method Parameters
+
+A method can take an array parameter, such as `static int sum(int[] a)`, and traverse it. The call passes the array by name: `sum(values)`. Because the method uses `a.length`, it works for arrays of any size. Methods that compute a result from an array and return it are the most reusable form of these algorithms.",,flag,0.001
+57,prog.call_flow#theory-01,Method calls work the exact same way as pausing reading to look up a word in a dictionary.,"## Theory
+
+### What Happens During a Call
+
+When a method is called, the **caller pauses** at the exact point of the call. The **called method** (the callee) runs from its first statement. When the callee finishes, by reaching `return` or the end of its body, execution **resumes in the caller at the point where it paused**, using the returned value if there is one.
+
+The caller does not restart, and the rest of the caller's statements have not run yet: they run after the callee returns.",,flag,0.029
+58,prog.operators_expressions#theory-03,"When an expression runs, Java checks the operators from highest precedence to lowest.","### Precedence and Associativity
+
+Java evaluates operators in a fixed order of **precedence**:
+
+1. Parentheses `( )`
+2. Unary operators such as `-x`, `!`, `++`, `--` and casts
+3. `*`, `/`, `%`
+4. `+`, `-`
+5. Relational `<`, `>`, `<=`, `>=`
+6. Equality `==`, `!=`
+7. Logical AND `&&`
+8. Logical OR `||`
+9. Assignment `=`, `+=` and similar
+
+Operators on the same level are evaluated **left to right**, except assignment, which works right to left. So `2 + 3 * 4` is `14`, `(2 + 3) * 4` is `20`, and `20 / 4 * 2` is `10`, because `20 / 4` is evaluated first.
+
+When in doubt, use parentheses. They cost nothing and make intent clear.",,flag,0.734
+59,prog.code_tracing#theory-03,A `return` statement removes that frame and resumes the caller using the returned value.,"### Tracing Rules for Each Construct
+
+| Construct | What to record |
+|---|---|
+| Assignment | Evaluate the right side fully using current values, then update the left side |
+| Integer arithmetic | Apply integer division and `%` exactly; `7 / 2` is 3 |
+| `if` / `else if` | Evaluate each condition in order; follow only the first true branch |
+| `&&`, `\|\|` | Stop evaluating when the left operand decides the result |
+| Loops | Check the condition before each iteration (`while`, `for`) or after (`do-while`); record the update |
+| Nested loops | Restart the inner loop fully for every outer iteration |
+| Method call | Add a frame with the parameters' copied values; the caller pauses |
+| `return` | Remove the frame; resume the caller at the call, using the returned value |
+| Arrays | Draw the array as a row of cells and update individual cells |
+| Objects | Draw each object as a box; draw reference variables as arrows to boxes |
+| Reference assignment | Move or copy the arrow; no new box is created unless `new` runs |",,pass,0.995
+60,prog.loops#theory-05,The `while` loop checks a condition first.,"### Choosing a Loop
+
+| Situation | Loop |
+|---|---|
+| Number of iterations known in advance | `for` |
+| Repeat until something happens, possibly zero times | `while` |
+| Must run at least once, then check | `do-while` |",,flag,0.157

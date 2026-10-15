@@ -109,3 +109,22 @@ Everything the tutor generates is checked against the course passage it was writ
 - **The audit's flagged claims have not been checked by a person.** Many look like false alarms on true statements, but that is my reading, not a result. `audit` wrote `results/gate-human-labels-*.csv` (60 claims, shuffled so the gate decision is not visible to the labeller, with a blank `human_label` column). Labelling it is what turns these numbers into a reportable precision and recall.
 - **One module, one language, one model family.** The threshold is for this course's style of text and this tutor prompt. Changing the prompt, the model or the passage text changes what was measured; the cache key includes all three for that reason.
 - **HHEM was not compared** (it needs custom model code). The model comparison here is two NLI cross-encoders.
+
+### First human-checked result (2026-10-15)
+
+One person (the project owner) labelled 60 claims taken from 30 real tutor explanations, blind to the gate's decision (a page showed only the claim and its passage; the gate's verdicts were kept in a separate key). Half the sample was claims the gate flagged at 0.77 and half it passed. Labels: supported, contradicted, not supported, unsure; 3 unsure were left out. The files are in `labels/`; this command reproduces the numbers: `uv run --project backend/services/tutor-service python "research/c3-RAG tutor/experiments/label_tool.py" score "research/c3-RAG tutor/labels/gate-human-labels-2026-10-15.csv" --key "research/c3-RAG tutor/labels/gate-human-labels-2026-10-15.key.json"`.
+
+| | Truly unsupported | Supported |
+|---|---|---|
+| Gate flagged (27 used) | 4 | 23 |
+| Gate passed (30) | 1 | 29 |
+
+* Real tutor text is mostly faithful: 5 of 57 claims (9%) were unsupported.
+* Of the claims the gate flagged, **15%** were truly unsupported (95% range 6% to 32%). The other 85% were false alarms.
+* Of the claims it passed, **97%** were truly supported (95% range 83% to 99%).
+* Scaled to all 419 claims in the audit, the gate wrongly flagged about **12%** of the supported ones. That matches the calibration (88% of supported claims accepted), so the calibration of the false-alarm rate holds on real text.
+* The low share of flags that were right is explained by the base rate, not by a broken checker. When 91% of claims are good, even a 12% false-flag rate means most flags are false alarms. The calibration set was about 40% unsupported, which hides this.
+* **Recall cannot be measured from this sample.** It holds only 5 unsupported claims, so the rough scaled estimate (42%) rests on one missed claim and must not be quoted. Measuring recall needs more unsupported claims, which is what the induced-hallucination conditions in the methodology (degraded retrieval) are for.
+* The unsupported claims were of two kinds: invented colour (a dictionary analogy, "one of the best parts of passing arrays", "variables are like storage boxes") and plausible-sounding additions. The one that got through scored 0.96.
+
+Limits: one annotator and no repeat labelling yet, so no agreement figure; 30 claims per group, so wide ranges; the claims came from explanations written before retrieval support was added (single passage), and were scored with all windows rather than the four-best shortcut used now; the sample is half flagged by design, so threshold sweeps within it overstate false alarms and are not a basis for changing the threshold.

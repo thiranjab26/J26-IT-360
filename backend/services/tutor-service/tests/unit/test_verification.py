@@ -545,17 +545,30 @@ def test_trimming_refuses_when_too_much_would_go_or_too_little_would_stay() -> N
     assert trim_unsupported(short, ["One short claim here."]) is None, "too little would remain"
 
 
-def test_two_blocked_attempts_are_trimmed_and_the_remainder_is_checked_again() -> None:
-    result = writer(Replies(LONG, LONG), ScriptedNLI({"always": 0.0})).write(
+def test_a_failed_text_is_trimmed_before_any_rewrite_is_paid_for() -> None:
+    model = Replies(LONG, LONG)
+
+    result = writer(model, ScriptedNLI({"always": 0.0})).write(
         EXPLAIN, concept="Loops", passage="p"
     )
 
     assert result.generated is not None and result.generated.verified is True
     assert BAD_SENTENCE not in result.generated.text
     assert "iteration" in result.generated.text
-    assert [a.attempt for a in result.audits] == [1, 2, 3]
-    assert [a.result.passed for a in result.audits] == [False, False, True]
-    assert BAD_SENTENCE not in result.audits[2].text, "the third audit is the trimmed text"
+    assert [a.attempt for a in result.audits] == [1, 2]
+    assert [a.result.passed for a in result.audits] == [False, True]
+    assert BAD_SENTENCE not in result.audits[1].text, "the second audit is the trimmed text"
+    assert len(model.prompts) == 1, "no rewrite was requested"
+
+
+def test_when_trimming_is_not_possible_the_text_is_rewritten_with_feedback() -> None:
+    model = Replies(BAD, GOOD)
+
+    result = writer(model, ScriptedNLI({"always": 0.0})).write(
+        EXPLAIN, concept="Loops", passage="p"
+    )
+
+    assert result.generated.text == GOOD and len(model.prompts) == 2
 
 
 def test_a_trimmed_text_that_still_fails_is_not_shown() -> None:

@@ -81,13 +81,15 @@ def cmd_prebuild(args: argparse.Namespace) -> int:
         nli.load()
     course = get_course(args.module)
     ground = get_grounder()
+    kinds = {"explain": (EXPLAIN,), "reteach": (RETEACH,), "both": (EXPLAIN, RETEACH)}[args.kind]
 
     built = skipped = failed = 0
+    in_a_row = 0  # model failures straight after one another
     blocked: list[str] = []
     started = time.perf_counter()
     for n, (ref, _, _) in enumerate(passages[: args.limit or None], 1):
         grounding = ground(course, ref)
-        for kind in (EXPLAIN, RETEACH):
+        for kind in kinds:
             label = f"{ref} ({kind}, {len(grounding.support)} retrieved)"
             outcome = ensure_verified(
                 writer=writer,
@@ -101,6 +103,7 @@ def cmd_prebuild(args: argparse.Namespace) -> int:
                 skipped += 1
                 print(f"[{n}] {label}: already built")
                 continue
+            in_a_row = in_a_row + 1 if outcome.status == "failed" else 0
             if outcome.status == "built":
                 built += 1
                 print(f"[{n}] {label}: verified after {outcome.attempts} attempt(s)")
@@ -110,6 +113,14 @@ def cmd_prebuild(args: argparse.Namespace) -> int:
             else:
                 failed += 1
                 print(f"[{n}] {label}: the model call failed, left uncached")
+            if in_a_row >= args.stop_after:
+                print(
+                    f"\nStopping: {in_a_row} model calls in a row failed. That usually means "
+                    "this key's daily quota is used up.\nSwitch to another key and run the "
+                    "same command again; everything already built is skipped."
+                )
+                print(f"built {built}, already there {skipped} before stopping")
+                return 2
             time.sleep(args.pause)  # be kind to a rate-limited model
 
     print(
@@ -126,8 +137,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--module", default="prog")
     parser.add_argument("--concept", help="only this concept, e.g. prog.loops")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("status").set_defaults(func=cmd_status)
+    status = sub.add_parser("status")
+    status.set_defaults(func=cmd_status)
     build = sub.add_parser("prebuild")
+    # The concept can be given before or after the command. SUPPRESS keeps the subcommand
+    # from overwriting a value given before it with its own default.
+    for command in (status, build):
+        command.add_argument(
+            "--concept", default=argparse.SUPPRESS, help="only this concept, e.g. prog.loops"
+        )
     build.add_argument("--limit", type=int, default=0, help="only the first N passages")
     build.add_argument("--pause", type=float, default=4.0, help="seconds between passages")
     build.add_argument(
@@ -135,6 +153,18 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=4,
         help="generations per passage before giving up (each is told what failed the last)",
+    )
+    build.add_argument(
+        "--kind",
+        choices=["explain", "reteach", "both"],
+        default="both",
+        help="explain is what every student reads; reteach is shown only after two misses",
+    )
+    build.add_argument(
+        "--stop-after",
+        type=int,
+        default=3,
+        help="stop after this many model failures in a row (a key out of quota)",
     )
     build.add_argument("--force", action="store_true", help="rebuild even if already cached")
     build.set_defaults(func=cmd_prebuild)
