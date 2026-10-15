@@ -108,6 +108,7 @@ def test_each_rule_earns_its_own_badge() -> None:
         "week_warrior": BadgeFacts(streak=7),
         "xp_500": BadgeFacts(total_xp=500),
         "xp_2000": BadgeFacts(total_xp=2000),
+        "first_build": BadgeFacts(practicals_passed=1),
     }
     assert set(cases) == set(BADGE_BY_ID), "every badge must have a test"
     for badge_id, facts in cases.items():
@@ -181,6 +182,7 @@ def test_every_bonus_kind_is_labelled_and_positive() -> None:
         "mastery": BONUSES.mastery,
         "quest": BONUSES.quest,
         "streak": BONUSES.streak,
+        "practical": BONUSES.practical,
     }
     assert set(values) == set(BONUS_LABELS)
     assert all(v > 0 for v in values.values())

@@ -46,6 +46,8 @@ A concept with two quick checks and two gating checkpoints, all clean, earns 260
 | Concept mastered | 100 | The mastery estimate for a concept reaches 70% for the first time | concept, ever |
 | Quest complete | 150 | Every concept in a topic is mastered | topic, ever |
 | Streak bonus | 25 | A session finishes on a day when the learning streak is 3 days or more | day |
+| Practical passed (level 4) | 150 | A level 4 practical passes every test | practical, ever |
+| Practical passed (level 5) | 250 | A level 5 practical passes every test | practical, ever |
 
 A first, clean session on one concept therefore earns 260 + 50 + 50 + 100 = 460 XP.
 
@@ -80,6 +82,7 @@ Total XP, including bonuses, sets the level.
 | Week Warrior | epic | Learn on 7 days in a row. |
 | Half a Grand | common | Earn 500 XP. |
 | Two Thousand Club | rare | Earn 2,000 XP. |
+| First Build | common | Pass your first practical. |
 
 Rarity only changes how the unlock is celebrated on screen. It has no effect on XP.
 
@@ -98,6 +101,15 @@ Every topic in a module is a quest: master every concept in it (70% mastery each
 a quest pays the quest bonus once and earns Topic Champion if it is the first. The quest list
 for Programming Fundamentals in Java is: Getting Started, Basics, Control Flow, Methods,
 Arrays, Objects, Program Tracing.
+
+## Practicals
+
+A practical is a program-writing question from the course (levels 4 and 5). The student writes
+Java that reads from standard input and prints to standard output. **Run** tries it on input of
+their choosing. **Submit** runs it on every test, visible and hidden, and the practical is passed
+only if all of them match. The first pass of each practical pays the bonus above. Hidden tests are
+made by running the course's own reference solution, so their expected answers are the authors'.
+Practical attempts do not feed the mastery evidence that other components read.
 
 ## Not in this version
 

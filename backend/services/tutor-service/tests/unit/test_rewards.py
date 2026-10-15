@@ -332,7 +332,7 @@ def test_the_profile_shows_level_badges_and_sessions(course, student) -> None:
     assert profile.completed_sessions == 1
     earned = {b.id for b in profile.badges if b.earned}
     assert earned == {"concept_master", "first_steps", "flawless", "sharp_start"}
-    assert len(profile.badges) == 10, "locked badges are listed too, so there is something to chase"
+    assert len(profile.badges) == 11, "locked badges are listed too, so there is something to chase"
     assert all(b.earned_at is not None for b in profile.badges if b.earned)
 
 

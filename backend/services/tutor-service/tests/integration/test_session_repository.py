@@ -237,3 +237,43 @@ def test_streak_days_leaderboard_and_names_come_back_from_the_database(db, cours
     profile = service.profile(user)
     assert profile.streak.current == 1 and profile.level.total_xp == mine.xp
     assert {b.id for b in profile.badges if b.earned} >= {"first_steps", "concept_master"}
+
+
+def test_practical_tests_attempts_and_standings_round_trip(db) -> None:
+    from app.practicals.repository import SqlPracticalRepository
+    from app.practicals.tests_builder import TestCase
+
+    repo = SqlPracticalRepository(db)
+    user = str(uuid.uuid4())
+    question = f"prog.loops#exercise-q{uuid.uuid4().hex[:6]}"  # a name no real practical uses
+
+    assert repo.tests(question) == [] and question not in repo.tested()
+    repo.replace_tests(
+        question,
+        [TestCase("2\n", "4", True, "sample"), TestCase("5\n", "10", False, "generated")],
+    )
+    assert [(t.stdin, t.expected, t.visible) for t in repo.tests(question)] == [
+        ("2\n", "4", True),
+        ("5\n", "10", False),
+    ]
+    assert question in repo.tested()
+
+    repo.replace_tests(question, [TestCase("1\n", "2", True, "sample")])  # replaced, not added to
+    assert len(repo.tests(question)) == 1
+
+    repo.record_attempt(user, question, "first try", True, False, 1, 3)
+    repo.record_attempt(user, question, "second try", True, True, 3, 3)
+    standing = repo.standings(user)[question]
+    assert (standing.passed, standing.best_passed, standing.total) == (True, 3, 3)
+    assert repo.last_source(user, question) == "second try"
+    assert repo.last_source(str(uuid.uuid4()), question) is None
+
+
+def test_the_practical_bonus_is_accepted_by_the_ledger_and_paid_once(db, course) -> None:
+    user = str(uuid.uuid4())
+    service = service_for(db, course)
+    session_id = service.start(user, LOOPS).session_id
+
+    assert service.repo.add_xp_event(user, session_id, "practical", "prog.loops#exercise-q09", 150)
+    assert not service.repo.add_xp_event(user, None, "practical", "prog.loops#exercise-q09", 150)
+    assert service.repo.total_xp(user) == 150

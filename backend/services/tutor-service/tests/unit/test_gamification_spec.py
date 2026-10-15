@@ -53,6 +53,8 @@ def test_the_bonuses_in_the_spec_are_the_bonuses_in_the_code(spec: str) -> None:
         "Concept mastered": BONUSES.mastery,
         "Quest complete": BONUSES.quest,
         "Streak bonus": BONUSES.streak,
+        "Practical passed (level 4)": BONUSES.practical,
+        "Practical passed (level 5)": BONUSES.practical_hard,
     }
 
 
