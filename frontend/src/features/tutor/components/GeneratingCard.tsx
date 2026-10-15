@@ -1,5 +1,6 @@
 import { Card, cx } from '@/shared/components/ui';
 import { CheckIcon, SparkleIcon } from './icons';
+import { Mascot } from './Mascot';
 
 const STAGES = [
   { from: 0, label: 'Finding the most relevant passages in the course index' },
@@ -20,10 +21,19 @@ export function GeneratingCard({ elapsed }: { elapsed: number }) {
     <div role="status" aria-live="polite">
     <Card className="animate-fade-in px-[26px] py-[24px]">
       <div className="flex items-center justify-between gap-[12px]">
-        <p className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">
-          Preparing your next part
-        </p>
+        <div className="flex items-center gap-[10px]">
+          <Mascot mood="think" size={44} />
+          <p className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">
+            Loading your next level
+          </p>
+        </div>
         <span className="font-mono text-[11px] text-ink-muted">{elapsed}s</span>
+      </div>
+      <div className="mt-[12px] h-[8px] overflow-hidden rounded-full bg-surface-sunken">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-brand to-violet shadow-[0_0_10px_oklch(0.68_0.19_275/0.7)] transition-[width] duration-1000"
+          style={{ width: `${Math.min(94, 8 + (current + 1) * 24 + Math.min(elapsed, 30) * 0.4)}%` }}
+        />
       </div>
 
       <ol className="mt-[16px] flex flex-col gap-[11px]">

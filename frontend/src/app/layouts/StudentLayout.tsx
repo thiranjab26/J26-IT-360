@@ -1,6 +1,6 @@
 import { NavLink, Link, Outlet, useNavigate } from 'react-router-dom';
 
-import { PlayerHud, useModules } from '@/features/tutor';
+import { PlayerHud, SoundToggle, useModules } from '@/features/tutor';
 import { useAuth } from '@/shared/auth/AuthProvider';
 import { cx } from '@/shared/components/ui';
 
@@ -26,16 +26,16 @@ export function StudentLayout() {
   return (
     <div className="min-h-screen">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-[54px] max-w-[1180px] items-center justify-between gap-[16px] px-[20px]">
+        <div className="mx-auto flex h-[58px] max-w-[1180px] items-center justify-between gap-[16px] px-[20px]">
           <div className="flex items-center gap-[22px]">
             <Link to="/dashboard" className="flex items-center gap-[9px]">
               <span
                 aria-hidden="true"
-                className="flex size-[22px] items-center justify-center rounded-[6px] bg-brand font-mono text-[11px] font-semibold text-white"
+                className="flex size-[26px] items-center justify-center rounded-[8px] bg-gradient-to-br from-brand to-violet font-mono text-[12px] font-bold text-white shadow-[0_0_14px_oklch(0.68_0.19_275/0.6)]"
               >
                 V
               </span>
-              <span className="text-[13.5px] font-semibold tracking-tight">VeriTutor</span>
+              <span className="text-[14px] font-bold tracking-tight">VeriTutor</span>
             </Link>
 
             <nav aria-label="Sections" className="hidden items-center gap-[4px] sm:flex">
@@ -49,6 +49,7 @@ export function StudentLayout() {
 
           <div className="flex items-center gap-[12px]">
             <PlayerHud />
+            <SoundToggle />
             <button
               type="button"
               onClick={onSignOut}
@@ -78,7 +79,7 @@ function Tab({ to, children }: { to: string; children: string }) {
         cx(
           TAB,
           isActive
-            ? 'font-medium text-ink after:absolute after:inset-x-[10px] after:bottom-0 after:h-[2px] after:bg-brand'
+            ? 'font-semibold text-ink after:absolute after:inset-x-[10px] after:bottom-0 after:h-[3px] after:rounded-t-full after:bg-gradient-to-r after:from-brand after:to-violet after:shadow-[0_0_10px_oklch(0.68_0.19_275/0.8)]'
             : 'text-ink-muted hover:text-ink',
         )
       }

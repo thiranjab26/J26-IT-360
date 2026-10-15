@@ -37,6 +37,23 @@ export const FlameIcon = (p: IconProps) => (
   </Solid>
 );
 
+export const HeartIcon = (p: IconProps) => (
+  <Solid {...p}>
+    <path d="M12 21s-7.5-4.6-9.6-9.2C1 8.6 2.8 5 6.2 5c2.1 0 3.7 1.2 4.6 2.8h2.4C14.1 6.2 15.7 5 17.8 5c3.4 0 5.2 3.6 3.8 6.8C19.5 16.4 12 21 12 21Z" />
+  </Solid>
+);
+
+export const VolumeIcon = ({ muted, ...p }: IconProps & { muted?: boolean }) => (
+  <Stroke {...p}>
+    <path d="M4 9.5v5h3.6L12 18.5v-13L7.6 9.5H4Z" fill="currentColor" />
+    {muted ? (
+      <path d="m16 9.5 5 5m0-5-5 5" />
+    ) : (
+      <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+    )}
+  </Stroke>
+);
+
 export const BoltIcon = (p: IconProps) => (
   <Solid {...p}>
     <path d="M13.2 2 4.5 13.6h5.8L9.4 22l9.1-12.1h-6L13.2 2Z" />

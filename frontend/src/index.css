@@ -81,6 +81,74 @@
   --animate-shine: shine 2.6s ease-in-out infinite;
   --animate-bob: bob 2.4s ease-in-out infinite;
   --animate-spin-slow: spin 14s linear infinite;
+  --animate-hop: hop 0.7s ease-in-out;
+  --animate-blink: blink 4.5s ease-in-out infinite;
+  --animate-twinkle: twinkle 5s ease-in-out infinite;
+  --animate-glow: glow 2.4s ease-in-out infinite;
+  --animate-rise: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-dots: dots 1.2s steps(4, end) infinite;
+
+  @keyframes hop {
+    0%,
+    100% {
+      transform: translateY(0) scale(1, 1);
+    }
+    25% {
+      transform: translateY(0) scale(1.08, 0.9);
+    }
+    50% {
+      transform: translateY(-14px) scale(0.96, 1.06);
+    }
+    75% {
+      transform: translateY(0) scale(1.06, 0.92);
+    }
+  }
+  @keyframes blink {
+    0%,
+    92%,
+    100% {
+      transform: scaleY(1);
+    }
+    96% {
+      transform: scaleY(0.1);
+    }
+  }
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.95;
+    }
+  }
+  @keyframes glow {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 3px oklch(0.8 0.15 85 / 0.5));
+    }
+    50% {
+      filter: drop-shadow(0 0 10px oklch(0.8 0.15 85 / 0.95));
+    }
+  }
+  @keyframes rise {
+    0% {
+      transform: translateY(18px) scale(0.92);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes dots {
+    0% {
+      clip-path: inset(0 100% 0 0);
+    }
+    100% {
+      clip-path: inset(0 0 0 0);
+    }
+  }
 
   @keyframes pop {
     0% {
@@ -207,6 +275,26 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* A neon edge for the one card that matters on a screen. */
+.neon-edge {
+  position: relative;
+}
+.neon-edge::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, oklch(0.7 0.2 275), oklch(0.7 0.22 335), oklch(0.8 0.15 85));
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.8;
 }
 
 @layer base {

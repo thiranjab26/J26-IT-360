@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
-import { Badge, Banner, Button, Card, cx } from '@/shared/components/ui';
+import { Banner, Card, cx } from '@/shared/components/ui';
 import {
   usePractical,
   useRunPractical,
@@ -15,10 +15,13 @@ import {
 import type { Rewards } from '../api/sessionApi';
 import { CodeEditor } from '../components/CodeEditor';
 import { fireConfetti } from '../components/fx';
-import { CheckIcon } from '../components/icons';
+import { GameButton } from '../components/GameButton';
+import { BoltIcon, CheckIcon, LockIcon, PlayIcon, StarIcon } from '../components/icons';
 import { Markdown } from '../components/Markdown';
+import { Companion, Mascot } from '../components/Mascot';
 import { RewardCelebration } from '../components/RewardCelebration';
 import { RewardStrip } from '../components/RewardStrip';
+import { playCue } from '../components/sound';
 
 /**
  * Write a Java program, try it on input of your choice, then submit it against every test.
@@ -85,7 +88,15 @@ function Workspace({ practical }: { practical: Practical }) {
 
   const doRun = useCallback(() => {
     setSubmitted(null);
-    run.mutate({ source, stdin }, { onSuccess: setRan });
+    run.mutate(
+      { source, stdin },
+      {
+        onSuccess: (result) => {
+          setRan(result);
+          playCue(result.compiled && result.status === 'ok' ? 'run' : 'wrong');
+        },
+      },
+    );
   }, [run, source, stdin]);
 
   const doSubmit = () => {
@@ -93,10 +104,18 @@ function Workspace({ practical }: { practical: Practical }) {
     submit.mutate(source, {
       onSuccess: (result) => {
         setSubmitted(result);
-        if (result.passed) fireConfetti('small', { x: 0.5, y: 0.3 });
+        if (result.passed) {
+          fireConfetti('big', { x: 0.5, y: 0.3 });
+          playCue('clear');
+        } else {
+          playCue('wrong');
+        }
         const r = result.rewards;
         if (r && (r.level_up || r.badges.length > 0)) {
-          window.setTimeout(() => setCelebrate(r), 800);
+          window.setTimeout(() => {
+            playCue('levelup');
+            setCelebrate(r);
+          }, 1200);
         }
       },
     });
@@ -109,18 +128,44 @@ function Workspace({ practical }: { practical: Practical }) {
     <div className="flex flex-col gap-[16px]">
       <header>
         <Link to="/practicals" className="font-mono text-[11px] text-ink-faint hover:text-brand">
-          ← Practicals
+          ← All missions
         </Link>
-        <div className="mt-[8px] flex flex-wrap items-center gap-[10px]">
-          <h1 className="text-[22px] font-semibold tracking-tight text-ink">{practical.title}</h1>
-          <Badge tone={practical.level >= 5 ? 'caution' : 'brand'}>level {practical.level}</Badge>
+        <div className="mt-[8px] flex flex-wrap items-center gap-[12px]">
+          <h1 className="bg-gradient-to-r from-ink to-brand bg-clip-text text-[24px] font-extrabold tracking-tight text-transparent">
+            {practical.title}
+          </h1>
+          <Difficulty level={practical.level} />
           {practical.passed && (
-            <Badge tone="verified">
-              <CheckIcon className="size-[11px]" /> passed
-            </Badge>
+            <span className="inline-flex items-center gap-[5px] rounded-full bg-verified-wash px-[10px] py-[3px] font-mono text-[11px] font-bold text-verified-ink">
+              <CheckIcon className="size-[11px]" /> CLEARED
+            </span>
           )}
         </div>
       </header>
+
+      <Companion
+        mood={
+          submitted
+            ? submitted.passed
+              ? 'cheer'
+              : 'oops'
+            : ran && !ran.compiled
+              ? 'oops'
+              : 'idle'
+        }
+        text={
+          submitted
+            ? submitted.passed
+              ? 'Mission clear! That is how you write it.'
+              : submitted.compiled
+                ? 'Some tests failed. Compare the expected output with yours.'
+                : 'The compiler is unhappy. Read its message, line by line.'
+            : ran && !ran.compiled
+              ? 'It did not compile. The message below points at the line.'
+              : 'Write your program, run it on the sample, then submit when it looks right.'
+        }
+        size={56}
+      />
 
       {failure && (
         <Banner
@@ -130,8 +175,8 @@ function Workspace({ practical }: { practical: Practical }) {
       )}
 
       <div className="grid items-start gap-[18px] lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-        <Card className="px-[20px] py-[18px]">
-          <p className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">Task</p>
+        <Card className="neon-edge px-[20px] py-[18px]">
+          <p className="font-mono text-[10.5px] tracking-wide text-brand uppercase">Mission briefing</p>
           <Markdown className="mt-[10px]">{practical.statement}</Markdown>
           <p className="mt-[14px] text-[12px] text-ink-muted">
             {practical.tests_total > 0
@@ -152,20 +197,23 @@ function Workspace({ practical }: { practical: Practical }) {
             onChange={(event) => setStdin(event.target.value)}
             rows={3}
             spellCheck={false}
-            className="rounded-[10px] border border-line bg-surface px-[12px] py-[9px] font-mono text-[12.5px] text-ink focus:outline-none"
+            className="rounded-[12px] border-2 border-line bg-[oklch(0.14_0.03_285)] px-[12px] py-[9px] font-mono text-[12.5px] text-[oklch(0.92_0.04_150)] focus:outline-none"
           />
 
           <div className="flex flex-wrap items-center gap-[10px]">
-            <Button variant="secondary" onClick={doRun} busy={run.isPending} disabled={busy}>
+            <GameButton variant="secondary" onClick={doRun} busy={run.isPending} disabled={busy}>
+              <PlayIcon className="size-[13px]" />
               Run
-            </Button>
-            <Button
+            </GameButton>
+            <GameButton
+              variant="go"
               onClick={doSubmit}
               busy={submit.isPending}
               disabled={busy || practical.tests_total === 0}
             >
-              Submit for marking
-            </Button>
+              <BoltIcon className="size-[13px]" />
+              Submit mission
+            </GameButton>
             <button
               type="button"
               className="ml-auto text-[12px] text-ink-muted hover:text-brand"
@@ -195,10 +243,10 @@ function Pre({ children, tone }: { children: string; tone?: 'bad' }) {
   return (
     <pre
       className={cx(
-        'max-h-[260px] overflow-auto rounded-[8px] border px-[12px] py-[9px] font-mono text-[12.5px] leading-[1.55] whitespace-pre-wrap',
+        'max-h-[260px] overflow-auto rounded-[10px] border px-[12px] py-[9px] font-mono text-[12.5px] leading-[1.55] whitespace-pre-wrap',
         tone === 'bad'
           ? 'border-caution-line bg-caution-wash text-caution-ink'
-          : 'border-line bg-surface-muted text-ink',
+          : 'border-line bg-[oklch(0.14_0.03_285)] text-[oklch(0.88_0.14_150)]',
       )}
     >
       {children}
@@ -271,51 +319,75 @@ function SubmitPanel({ result }: { result: SubmitResult }) {
     );
   }
   return (
-    <Card
-      className={cx(
-        'animate-slide-up px-[16px] py-[14px]',
-        result.passed ? 'border-verified-line' : 'border-caution-line',
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-[10px]">
-        <p
-          className={cx(
-            'text-[15px] font-semibold',
-            result.passed ? 'text-verified-ink' : 'text-caution-ink',
-          )}
-        >
-          {result.passed
-            ? `All ${result.tests_total} tests passed`
-            : `${result.tests_passed} of ${result.tests_total} tests passed`}
-        </p>
-        <div className="flex gap-[4px]" aria-hidden="true">
-          {result.results.map((r) => (
-            <span
-              key={r.number}
-              className={cx('size-[10px] rounded-[3px]', r.passed ? 'bg-verified' : 'bg-caution')}
-            />
-          ))}
+    <Card className={cx('animate-rise px-[18px] py-[16px]', result.passed && 'neon-edge')}>
+      <div className="flex items-center gap-[14px]">
+        <Mascot mood={result.passed ? 'cheer' : 'oops'} size={58} />
+        <div className="min-w-0 flex-1">
+          <p
+            className={cx(
+              'text-[21px] font-extrabold tracking-tight',
+              result.passed
+                ? 'animate-glow bg-gradient-to-r from-gold to-flame bg-clip-text text-transparent'
+                : 'text-caution-ink',
+            )}
+          >
+            {result.passed ? 'MISSION CLEAR!' : 'Not yet. Keep debugging!'}
+          </p>
+          <p className="text-[12.5px] text-ink-muted">
+            {result.passed
+              ? `All ${result.tests_total} systems online.`
+              : `${result.tests_passed} of ${result.tests_total} systems online.`}
+          </p>
         </div>
       </div>
 
-      {result.rewards && (
-        <RewardStrip
-          points={0}
-          bonuses={result.rewards.bonuses}
-          className="mt-[10px]"
-        />
+      <div className="mt-[14px] flex gap-[4px]" aria-hidden="true">
+        {result.results.map((r, i) => (
+          <span
+            key={r.number}
+            style={{ animationDelay: `${i * 90}ms` }}
+            className={cx(
+              'h-[12px] flex-1 animate-rise rounded-full',
+              r.passed
+                ? 'bg-verified shadow-[0_0_10px_oklch(0.68_0.17_155/0.7)]'
+                : 'bg-caution/35',
+            )}
+          />
+        ))}
+      </div>
+
+      {result.rewards && result.rewards.bonuses.length > 0 && (
+        <RewardStrip points={0} bonuses={result.rewards.bonuses} className="mt-[12px]" />
       )}
 
-      <ul className="mt-[10px] flex flex-col gap-[6px]">
-        {result.results.map((r) => (
-          <TestRow key={r.number} test={r} />
+      <ul className="mt-[12px] flex flex-col gap-[6px]">
+        {result.results.map((r, i) => (
+          <TestRow key={r.number} test={r} delay={i * 90} />
         ))}
       </ul>
     </Card>
   );
 }
 
-function TestRow({ test }: { test: TestResult }) {
+/** Difficulty as filled stars, out of five. */
+function Difficulty({ level }: { level: number }) {
+  const filled = Math.min(5, Math.max(1, level));
+  return (
+    <span role="img" aria-label={`Difficulty ${filled} of 5`} className="inline-flex gap-[2px]">
+      {Array.from({ length: 5 }, (_, i) => (
+        <StarIcon
+          key={i}
+          className={cx(
+            'size-[16px]',
+            i < filled ? 'text-gold drop-shadow-[0_0_5px_oklch(0.8_0.15_85/0.8)]' : 'text-line-strong',
+          )}
+        />
+      ))}
+    </span>
+  );
+}
+
+function TestRow({ test, delay = 0 }: { test: TestResult; delay?: number }) {
   const why =
     test.status === 'timeout'
       ? 'took too long'
@@ -326,7 +398,10 @@ function TestRow({ test }: { test: TestResult }) {
           : null;
 
   return (
-    <li className="rounded-[8px] border border-line-soft bg-surface-muted px-[11px] py-[8px]">
+    <li
+      style={{ animationDelay: `${delay}ms` }}
+      className="animate-slide-up rounded-[10px] border border-line-soft bg-surface-muted px-[11px] py-[8px]"
+    >
       <div className="flex items-center gap-[8px] text-[12.5px]">
         <span
           className={cx(
@@ -337,8 +412,9 @@ function TestRow({ test }: { test: TestResult }) {
           {test.passed ? <CheckIcon className="size-[10px]" /> : <span>!</span>}
         </span>
         <span className="font-medium text-ink">
-          {test.visible ? `Sample test ${test.number}` : `Hidden test ${test.number}`}
+          {test.visible ? `Sample test ${test.number}` : `Hidden vault ${test.number}`}
         </span>
+        {!test.visible && !test.passed && <LockIcon className="size-[12px] text-ink-faint" />}
         <span className="text-ink-muted">
           {test.passed ? 'passed' : why ? `failed (${why})` : 'failed'}
         </span>

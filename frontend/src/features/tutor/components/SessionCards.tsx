@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
-import { Badge, Button, Card, cx } from '@/shared/components/ui';
+import { Badge, Card, cx } from '@/shared/components/ui';
 import type {
   Rewards,
   Session,
@@ -13,9 +13,11 @@ import type {
 } from '../api/sessionApi';
 import { BadgeMedal } from './BadgeMedal';
 import { useCountUp } from './fx';
+import { GameButton, Hearts } from './GameButton';
 import { CheckIcon, SparkleIcon } from './icons';
 import { Markdown } from './Markdown';
 import { RewardStrip } from './RewardStrip';
+import { playCue } from './sound';
 
 /* ------------------------------------------------------------------- shells */
 
@@ -118,9 +120,9 @@ export function HookCard({ session, onNext, busy }: StepProps) {
       </h2>
       {session.text && <Markdown className="mt-[14px]">{session.text}</Markdown>}
       <div className="mt-[22px]">
-        <Button onClick={onNext} busy={busy}>
+        <GameButton onClick={onNext} busy={busy}>
           Start learning
-        </Button>
+        </GameButton>
       </div>
     </Panel>
   );
@@ -142,9 +144,9 @@ export function TeachCard({ session, onNext, busy }: StepProps) {
       {session.sources && <Sources sources={session.sources} />}
       {session.source_text && <OriginalPassage text={session.source_text} />}
       <div className="mt-[22px]">
-        <Button onClick={onNext} busy={busy}>
+        <GameButton onClick={onNext} busy={busy}>
           Continue
-        </Button>
+        </GameButton>
       </div>
     </Panel>
   );
@@ -168,9 +170,9 @@ export function ReteachCard({ session, onNext, busy }: StepProps) {
         {session.sources && <Sources sources={session.sources} />}
         {session.source_text && <OriginalPassage text={session.source_text} />}
         <div className="mt-[22px]">
-          <Button onClick={onNext} busy={busy}>
+          <GameButton onClick={onNext} busy={busy}>
             Try the question again
-          </Button>
+          </GameButton>
         </div>
       </Panel>
     </div>
@@ -227,16 +229,17 @@ function QuestionBody({
   const answer = isChoice ? choice : typed;
 
   return (
-    <Panel>
+    <Panel className={cx(question.gating && 'neon-edge')}>
       <div className="flex flex-wrap items-center justify-between gap-[8px]">
-        <Eyebrow>{question.gating ? 'Checkpoint' : 'Quick check'}</Eyebrow>
+        <Eyebrow>{question.gating ? 'Boss checkpoint' : 'Quick check'}</Eyebrow>
         <div className="flex items-center gap-[7px]">
           {question.gating ? (
             <>
               <Badge tone="brand">Must pass to finish</Badge>
-              <Badge>
-                try {question.attempt} of {question.max_attempts}
-              </Badge>
+              <Hearts
+                total={question.max_attempts}
+                left={Math.max(0, question.max_attempts - question.attempt + 1)}
+              />
             </>
           ) : (
             <Badge>never blocks you</Badge>
@@ -269,11 +272,11 @@ function QuestionBody({
             <label
               key={option.letter}
               className={cx(
-                'flex cursor-pointer items-start gap-[12px] rounded-[10px] border px-[14px] py-[11px]',
-                'transition-all duration-150 active:scale-[0.985]',
+                'flex cursor-pointer items-start gap-[12px] rounded-[14px] border-2 px-[14px] py-[12px]',
+                'transition-all duration-100 active:translate-y-[3px]',
                 choice === option.letter
-                  ? 'border-brand bg-brand-wash shadow-[0_4px_14px_oklch(0.52_0.14_265/0.18)]'
-                  : 'border-line bg-surface hover:-translate-y-[1px] hover:border-brand-soft hover:shadow-[0_4px_12px_oklch(0.25_0.01_265/0.07)]',
+                  ? 'translate-y-[1px] border-brand bg-brand-wash shadow-[0_3px_0_0_var(--color-brand),0_0_22px_oklch(0.68_0.19_275/0.35)]'
+                  : 'border-line bg-surface shadow-[0_4px_0_0_var(--color-line)] hover:-translate-y-[1px] hover:border-brand-soft hover:shadow-[0_5px_0_0_var(--color-brand-soft)]',
               )}
             >
               <input
@@ -286,8 +289,8 @@ function QuestionBody({
               />
               <span
                 className={cx(
-                  'flex size-[24px] shrink-0 items-center justify-center rounded-full border',
-                  'font-mono text-[11.5px] font-semibold transition-colors',
+                  'flex size-[28px] shrink-0 items-center justify-center rounded-[8px] border-2',
+                  'font-mono text-[12px] font-bold transition-colors',
                   choice === option.letter
                     ? 'border-brand bg-brand text-white'
                     : 'border-line-strong text-ink-muted',
@@ -295,7 +298,7 @@ function QuestionBody({
               >
                 {choice === option.letter ? <CheckIcon className="size-[13px] animate-pop" /> : option.letter}
               </span>
-              <span className="pt-[2px] text-[13.5px] text-ink">{option.text}</span>
+              <span className="pt-[3px] text-[14px] text-ink">{option.text}</span>
             </label>
           ))}
         </fieldset>
@@ -316,9 +319,9 @@ function QuestionBody({
       )}
 
       <div className="mt-[18px]">
-        <Button onClick={() => onAnswer(answer)} busy={busy} disabled={!answer.trim()}>
+        <GameButton variant="go" onClick={() => onAnswer(answer)} busy={busy} disabled={!answer.trim()}>
           Check answer
-        </Button>
+        </GameButton>
       </div>
     </Panel>
   );
@@ -336,6 +339,14 @@ export function FeedbackBanner({
   const correct = feedback.outcome === 'correct';
   const unreadable = feedback.outcome === 'unreadable';
   const xp = useCountUp(feedback.xp_earned, 600);
+
+  // One sound per answer shown: this banner is mounted fresh for each new result.
+  useEffect(() => {
+    playCue(correct ? 'correct' : unreadable ? 'tap' : 'wrong');
+    if (!correct || feedback.xp_earned <= 0) return;
+    const later = window.setTimeout(() => playCue('xp'), 380);
+    return () => window.clearTimeout(later);
+  }, [correct, unreadable, feedback.xp_earned]);
 
   return (
     <div
@@ -406,9 +417,9 @@ export function FeedbackCard({ session, onNext, busy }: StepProps) {
     <div className="flex flex-col gap-[14px]">
       {feedback && <FeedbackBanner feedback={feedback} rewards={session.rewards} />}
       <div>
-        <Button onClick={onNext} busy={busy}>
+        <GameButton variant={retry ? 'go' : 'primary'} onClick={onNext} busy={busy}>
           {retry ? 'Try again' : 'Continue'}
-        </Button>
+        </GameButton>
       </div>
     </div>
   );
@@ -518,20 +529,20 @@ export function SummaryCard({
 
         <div className="mt-[24px] flex flex-wrap gap-[10px]">
           {summary.can_resume && (
-            <Button onClick={onResume} busy={busy}>
+            <GameButton onClick={onResume} busy={busy}>
               Resume session
-            </Button>
+            </GameButton>
           )}
-          <Button
-            variant={summary.can_resume ? 'secondary' : 'primary'}
+          <GameButton
+            variant={summary.can_resume ? 'secondary' : 'go'}
             onClick={onRestart}
             busy={busy}
           >
-            {summary.can_resume ? 'Start over' : 'Try this concept again'}
-          </Button>
-          <Button variant="ghost" onClick={onBack}>
+            {summary.can_resume ? 'Start over' : 'Play again'}
+          </GameButton>
+          <GameButton variant="ghost" onClick={onBack}>
             Back to quest map
-          </Button>
+          </GameButton>
         </div>
       </Panel>
     </div>
