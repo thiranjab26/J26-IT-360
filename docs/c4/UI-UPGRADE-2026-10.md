@@ -214,3 +214,23 @@ A rollback kit sits outside the repository, so it is never committed:
 `Intelligent Viva System/C4-rollback-ui-upgrade-2026-10-08/`. Its `README.md` lists every added,
 changed and removed file with the exact before and after, and `rollback.py` undoes all of it or
 part of it. Edits made after the upgrade are kept.
+
+## 16. Live viva changes (12 Oct 2026)
+
+A redesign (navy palette, video-call tile, new portrait, boxed record bar) was tried and reverted
+the same day at the owner's request: the earlier colours, mascot and round microphone button are
+back. What stayed:
+
+- A slim live waveform under the microphone button while recording (`components/voice.tsx`,
+  drawn on a canvas every animation frame, outside React state).
+- One voice per session (`useSpeech.ts`): once the Groq voice has played, the browser voice is
+  never mixed in; a failed clip is retried once, then the question stays on screen with a
+  "Listen again" prompt. The browser voice is used throughout only when the server has no cloud voice.
+- Speech lab: optional CrisperWhisper words file (exact fillers and repairs), and the repair,
+  lexical-filler and word-search measures.
+- Copies of the files from before these changes: `Intelligent Viva System/C4-backups/ui-2026-10-12/`.
+- Friendly touches for students: an optional microphone check on the "Ready" screen (wave and a
+  tick, then the mic is released); a "Slower" button that replays the question at 0.8 speed in
+  the same voice; question dots instead of the bar and "Question 2 of 5"; a neutral "Thank you.
+  Here is the next question." between questions; and a short celebration on the report straight
+  after a viva (for finishing, never for being right; not shown when a report is opened from history).

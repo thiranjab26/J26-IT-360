@@ -8,7 +8,8 @@ Source of truth for the current behaviour: the standalone demo at
 `Desktop/Research Project/Astra Prototype/Astra version 2/adaptlearn-c4`
 (`backend/services/viva-service/app/logic.py`, `providers.py`, `disfluency.py`, `research.py`, `seed.py`).
 
-Versions to record on every session: policy `c04-policy-1.3-skip-stop`, gap rules `c04-gap-1.4-literature-profile`
+Versions to record on every session: policy `c04-policy-1.4-clarify` (1.3 `c04-policy-1.3-skip-stop`
+until 9 Oct 2026), gap rules `c04-gap-1.4-literature-profile`
 (1.3 `c04-gap-1.3-verbal-signal` until 9 Oct 2026).
 
 ## 1. Research purpose
@@ -70,7 +71,7 @@ The server then enforces these rules, whatever the model returned:
 1. `rubric_hits` must contain exactly one entry per rubric point, using the bank's IDs (the JSON schema constrains IDs with an enum). Otherwise retry once, then fail.
 2. `covered` is true only for `full`; follow-up targeting and the report's strengths use it.
 3. A misconception counts only with a quote of at least two words that appears in the current answer; others are dropped and the reason says so. A `misconception_bearing` state with every misconception dropped becomes `partial` (or `incorrect` at 0 coverage).
-4. Credit carries forward: each point keeps the best level it reached in earlier answers that held no misconception, unless the current answer contains a misconception.
+4. Credit carries forward: each point keeps the best level it reached in any earlier answer, unless the current answer contains a misconception. (Until the second 9 Oct change, answers that held a misconception gave nothing forward; a speech-to-text error could then erase a whole answer.)
 5. `coverage = 100 * (full + 0.5 * partial) / total`, rounded to 1 decimal. Demo and older results without a level count `covered` as 1.
 6. If coverage is 100 with no misconception and the state is `partial` or `superficial`, upgrade it to `complete`.
 7. If the answer is a clear non-answer (see below), force `non_answer`.
@@ -84,7 +85,11 @@ A bare "No." is **not** a non-answer, because it can answer a yes/no probe.
 Instruction to the model (keep the meaning; `ASSESS_RULES` in `llm.py`): the transcript is speech
 recognition of a second-language English speaker, so judge what the student meant and ignore
 grammar, fillers and words the recognizer clearly misheard (a word that sounds like the expected
-term, such as "decibel" for "decimal", counts as that term); assess only the provided rubric; grade
+term, such as "decibel" for "decimal", counts as that term; numbers that sound alike, such as
+fourteen and forty, may be misheard even as digits, so when the working shows the intended value the
+model uses it and records no misconception); a misconception is a wrong belief stated as fact, while
+an imprecise answer or the right idea in another notation (0 and 1 for True and False) is partial;
+assess only the provided rubric; grade
 every rubric point the transcript demonstrates even if it answers a different part of the original
 question than the current prompt asked; combine uncontradicted earlier evidence; grade each point
 `full`, `partial` or `none` as above and never give `full` for everyday wording alone; list a
@@ -127,6 +132,7 @@ A demo-mode phrase matcher (`demo_assess`: keyword matching with nearby-negation
 - If the chosen prompt repeats an earlier question for this concept, use one fixed alternate ("Use a different concrete example to explain {concept}. Work through your reasoning step by step."); if that also repeats, use `REPEATED_PROMPT_NEXT_CONCEPT`.
 - `ASK_SIMPLER_OR_PREREQUISITE` and `SIMPLIFY` turns are marked `scaffolded` (they may teach).
 - Student skip: `SKIPPED_NEXT_CONCEPT`, recorded as a skipped turn with no AI call.
+- Request to explain the question (policy 1.4): a short answer such as "I don't understand the question", "can you repeat that", "what do you mean" or "pardon" (at most 14 words) gives `CLARIFY`, checked before the policy above. It is not marked (no AI marking call; the turn copies the earlier credit with state `non_answer`, provider `rule:clarification`, and `clarification: true`), the gap rules and the report ignore it, and the same question comes back in plainer words **at the same depth**, so it uses up no follow-up. Fallback text: "Let me ask that another way." plus the targeted point's reviewed probe, or the concept's `non_answer` follow-up. A second request in a row is marked as `non_answer` instead (then `REPHRASE` or `SIMPLIFY`), so it cannot loop.
 - Student says to stop ("stop the session", "I don't want to answer", "I want to quit", "no more questions"): the session finishes early without assessing that utterance (`STUDENT_ENDED_SESSION`).
 
 ## 5. Follow-up wording (AI, constrained)
@@ -144,6 +150,10 @@ Purposes per action:
 | `ASK_SIMPLER_OR_PREREQUISITE` | One simpler, more basic question on the same concept |
 | `REPHRASE` | Short kind reassurance ("That is okay."), then the original question in plainer words |
 | `SIMPLIFY` | Short reassurance, then one very easy entry question |
+| `CLARIFY` | The question the student asked about, again in shorter, plainer words, with a tiny everyday example if it helps; never quote the student, never give the answer |
+
+The wording call for `CLARIFY` also receives `question_just_asked`. Answers that say nothing about the
+concept ("I don't know", a request to repeat the question) are never quoted.
 
 Wording rules: plain English for a second-year undergraduate, at most 25 words, exactly one question
 ending with "?", quote a few of the student's own words when the answer had content, adapt the reviewed

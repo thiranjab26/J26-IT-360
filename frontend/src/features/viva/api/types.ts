@@ -260,6 +260,13 @@ export type FluencyMeasures = {
   phonation_time_ratio?: number;
   mid_clause_pause_share?: number | null;
   response_latency_s?: number | null;
+  repairs_per_min?: number;
+  lexical_fillers_per_min?: number;
+  repetitions?: number;
+  false_starts?: number;
+  self_corrections?: number;
+  lexical_fillers?: number;
+  word_searches?: number;
   silent_pauses?: number;
   filled_pauses?: number;
   syllables?: number;

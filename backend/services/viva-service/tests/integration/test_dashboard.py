@@ -1,5 +1,7 @@
 """Admin overview dashboard and the speech lab (recording analysis)."""
 
+import json
+
 import numpy as np
 
 from app.integrations import recording
@@ -82,3 +84,28 @@ def test_lab_explains_a_missing_speech_extra(client, monkeypatch):
     )
     assert response.status_code == 503
     assert "--extra speech" in response.text
+
+
+def test_lab_uses_a_crisperwhisper_words_file(client, monkeypatch):
+    monkeypatch.setattr(recording, "decode", lambda content, max_seconds=0: np.zeros(16000 * 20))
+    monkeypatch.setattr(recording, "speech_intervals", lambda audio: [(1.0, 4.0), (5.0, 9.0)])
+    monkeypatch.setattr(recording, "syllables", lambda audio: [])
+    words = [("the", 1.0), ("the", 1.4), ("[UM]", 2.0), ("loop", 5.2), ("[laughter]", 6.0)]
+    payload = {"words": [{"start": t, "end": t + 0.3, "word": w} for w, t in words]}
+    files = {
+        "audio": ("P01_student.m4a", b"fake", "audio/mp4"),
+        "words": ("P01_student.words.json", json.dumps(payload), "application/json"),
+    }
+    data = client.post(
+        "/api/v1/viva/lab/analyse", headers=auth(client, "admin"), files=files
+    ).json()
+    assert data["transcript_source"] == "crisperwhisper"
+    assert data["session"]["filled_pauses"] == 1 and data["session"]["repetitions"] == 1
+    assert [w["word"] for w in data["words"]] == ["the", "the", "[UM]", "loop"]
+    bad = {**files, "words": ("x.json", "not json", "application/json")}
+    assert (
+        client.post(
+            "/api/v1/viva/lab/analyse", headers=auth(client, "admin"), files=bad
+        ).status_code
+        == 422
+    )

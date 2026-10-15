@@ -281,3 +281,46 @@ Copies of every file before and after this change are in
 4. Restart the backend and run the tests.
 
 Or ask Claude to undo this change.
+
+## 13. Second round, after the second test viva (9 Oct, about 11:30)
+
+The owner took Programming basics again with the new marking: 48% overall and Mixed, but
+Operators still came out as "Likely knowledge gap" at 25%, one follow-up made no sense, and the
+voice misread the maths. The causes and fixes:
+
+| # | What happened | Fix |
+|---|---|---|
+| 1 | "I don't understand the question" was marked as an answer; the next follow-up moved on to another point and opened with: You said "I don't understand the question." | New `CLARIFY` step (policy `c04-policy-1.4-clarify`): a short request to explain or repeat the question is not marked, does not count as an answer, uses up no follow-up, and brings back the same question in plainer words. A second request in a row goes the normal "did not answer" way, so it cannot loop. |
+| 2 | Follow-ups quoted answers with no content ("You said 'I don't understand…'") | The wording rules never quote "I don't know" or a request to repeat the question. |
+| 3 | Speech-to-text heard "fourteen" as "40"; the marker recorded a misconception and asked how the student got 40 | Marking rule: numbers that sound alike may be misheard even as digits; when the working (3 x 4, then add 2) shows the intended value, use it and record no misconception. |
+| 4 | Because that first answer held a (false) misconception, all its correct parts were thrown away for later answers | Credit now carries forward from every earlier answer; only a misconception in the current answer blocks it. |
+| 5 | The rubric said "14, **not 20**", so "14" got only half credit and the system asked "work it out step by step" after the student had answered | Points no longer require the contrast: "2 + 3 * 4 evaluates to 14." Same for Big-O ("grows as the input size n grows"). The variables example point now says at least one example with its type is enough. |
+| 6 | "Boolean holds 0 and 1" was flagged as a misconception | Marking rule: a misconception is a wrong belief stated as fact; an imprecise answer or the right idea in another notation (0 and 1 for True and False) is partial. |
+| 7 | The voice read "+ * > <" badly | Before speaking, code and maths become words: "2 plus 3 times 4", "x is greater than 0 and x is less than 10", "O of n squared", "scores at index 2", "a dot copy". Server voice (`speakable` in `speech.py`) and browser fallback voice (`speakable` in `useSpeech.ts`) use the same rules. |
+
+**Results.** The same second viva, re-marked with the live model after these fixes:
+
+| | Variables | Operators | Session |
+|---|---|---|---|
+| Live result (before) | 70%, Mixed | 25%, Likely knowledge gap | 48%, Mixed |
+| Re-marked (after) | 70%, Mixed | **50%, Mixed** | **60%, Mixed** |
+
+The request to explain the question was no longer marked, "0 and 1" for booleans was partial
+rather than a misconception, and the first operators answer kept its correct parts.
+
+**The AI marker varies between runs.** The same answers re-marked twice gave the variables concept
+50% once and 70% the next time (it judged the example point differently). Temperature is already 0;
+clearer rubric points and rules reduce the variation but cannot remove it. For research results,
+report this as a limitation, and never treat one AI mark as exact.
+
+**Files:** `app/integrations/llm.py` (clarification detection, `CLARIFY` purpose, quote rule,
+number and misconception rules, carry-over), `app/domain/logic.py` (policy 1.4, `CLARIFY` step,
+report and gap rules ignore clarifications), `app/api/v1/routes/sessions.py` (the step in the
+answer flow), `app/integrations/speech.py` and `frontend/src/features/viva/hooks/useSpeech.ts`
+(`speakable`), `app/domain/c3_bank.py` (3 rubric points), tests (4 new; 104 pass),
+`docs/c4/spec-domain.md`. Live database: the 3 changed questions refreshed in place (backup
+`C4-db-backups/viva-backup-2026-10-09-1134.json` and later).
+
+**Undo:** everything before this round is in git commit `8544d36`. To restore a file from it:
+`git restore --source 8544d36 -- <file>`. Then run `uv run python scripts/load_c3_bank.py --update`
+to put the questions back as that version defines them, and restart the backend.

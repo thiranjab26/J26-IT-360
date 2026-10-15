@@ -118,3 +118,23 @@ def test_live_fluency_uses_the_research_tools_vad_settings(monkeypatch):
     speech.research_intervals([])
     recording.speech_intervals([])
     assert seen[0] == seen[1] and seen[0].min_silence_duration_ms == 250
+
+
+def test_voice_says_code_and_maths_as_words():
+    from app.integrations.speech import speakable
+
+    assert speakable(
+        "What is 2 + 3 * 4, and why? Then explain what the expression x > 0 and x < 10 checks."
+    ) == (
+        "What is 2 plus 3 times 4, and why? Then explain what the expression x is greater than 0 "
+        "and x is less than 10 checks."
+    )
+    assert speakable("O(n log n) beats O(n^2)") == "O of n log n beats O of n squared"
+    assert (
+        speakable("scores[2] = 90 and b = a.copy()")
+        == "scores at index 2 equals 90 and b equals a dot copy"
+    )
+    assert speakable("for i in range(len(scores))") == "for i in range of len of scores"
+    assert speakable("factorial(n - 1), 7.5 and first-in, first-out") == (
+        "factorial of n minus 1, 7.5 and first-in, first-out"
+    )

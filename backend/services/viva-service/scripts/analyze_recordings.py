@@ -3,8 +3,8 @@
 Put each session's Zoom files in one folder, named by participant code:
 
     P01_student.m4a     the student's voice (required)
-    P01_examiner.m4a    your voice (optional; splits the session per question and gives
-                        response times)
+    P01_examiner.m4a    your voice (required; splits the session per question so listening
+                        time and thinking time are not counted as the student's pauses)
     P01_student.words.json   word timings from the CrisperWhisper notebook (optional;
                         otherwise the student file is transcribed here)
 
@@ -29,6 +29,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.integrations import recording  # noqa: E402
 
 AUDIO = (".m4a", ".mp3", ".wav", ".mp4", ".webm", ".ogg", ".flac")
+# Other transcribers drop most fillers and repairs, and a 0 would read as fluent speech, so
+# without a CrisperWhisper file these stay blank and the statistics skip them.
+VERBATIM_ONLY = (
+    "filled_pauses_per_min", "filled_pauses_per_100_words", "filled_pauses", "repairs_per_min",
+    "lexical_fillers_per_min", "repetitions", "false_starts", "self_corrections",
+    "lexical_fillers", "word_searches", "warmup_filled_pauses_per_min",
+)  # fmt: skip
 
 
 def clock(seconds):
@@ -73,6 +80,11 @@ def analyse(code, folder, args):
     summary = {"code": code, "transcript_source": source, **result["session"]}
     rows = [{"code": code, **r} for r in result["answers"]]
     window_rows = [{"code": code, **w} for w in result["windows"]]
+    verbatim = source == "crisperwhisper"
+    if not verbatim:
+        print(f"{code}: no CrisperWhisper words file, fillers and repairs left blank", flush=True)
+        for row in (summary, *rows, *window_rows):
+            row.update({k: "" for k in VERBATIM_ONLY if k in row})
     count_row = {"code": code}
     if result["check"]:
         check = result["check"]
@@ -81,10 +93,12 @@ def analyse(code, folder, args):
                 "listen_in": student.name,
                 "listen_from": clock(check["begin"]),
                 "listen_to": clock(check["finish"]),
-                "tool_fillers": check["fillers"],
-                "tool_pauses": check["pauses"],
+                "tool_fillers": check["fillers"] if verbatim else "",
+                "tool_repairs": check["repairs"] if verbatim else "",
+                "tool_pauses_1s": check["pauses"],
                 "your_fillers": "",
-                "your_pauses": "",
+                "your_repairs": "",
+                "your_pauses_1s": "",
             }
         )
     detail = {
@@ -98,6 +112,18 @@ def analyse(code, folder, args):
         "question_turns": [[round(s, 3), round(e, 3)] for s, e in result["turns"]],
     }
     return summary, rows, window_rows, count_row, detail
+
+
+def keep_your_counts(path, rows):
+    """Carry the counts you typed into count_check.csv over to the new file."""
+    if not path.exists():
+        return rows
+    with path.open(newline="", encoding="utf-8") as f:
+        typed = {r["code"]: r for r in csv.DictReader(f)}
+    for row in rows:
+        old = typed.get(row["code"], {})
+        row.update({k: old[k] for k in row if k.startswith("your_") and old.get(k)})
+    return rows
 
 
 def write_csv(path, rows):
@@ -141,6 +167,11 @@ def main():
     out.mkdir(exist_ok=True)
     sessions, answers, windows, checks = [], [], [], []
     for code in codes:
+        if not find(folder, f"{code}_examiner"):
+            # Without the examiner's track the whole viva is one answer, so the student's
+            # listening and thinking time would count as pauses.
+            print(f"{code}: SKIPPED, no {code}_examiner audio file", flush=True)
+            continue
         summary, rows, window_rows, count_row, detail = analyse(code, folder, args)
         sessions.append(summary)
         answers += rows
@@ -150,7 +181,7 @@ def main():
     write_csv(out / "sessions.csv", sessions)
     write_csv(out / "answers.csv", answers)
     write_csv(out / "windows.csv", windows)
-    write_csv(out / "count_check.csv", checks)
+    write_csv(out / "count_check.csv", keep_your_counts(out / "count_check.csv", checks))
     print(f"Done: {len(codes)} participants. Results in {out}")
 
 

@@ -49,6 +49,7 @@ export default function App() {
     [view, setView] = useState<View>("workspace"),
     [session, setSession] = useState<Session | null>(null),
     [report, setReport] = useState<Report | null>(null),
+    [celebrate, setCelebrate] = useState(false),
     [error, setError] = useState(""),
     [staffModal, setStaffModal] = useState(false),
     [mobileNav, setMobileNav] = useState(false),
@@ -108,7 +109,9 @@ export default function App() {
     setError("");
     setMobileNav(false);
   }
-  function showReport(r: Report) {
+  // fresh: the student has just finished this viva, so the report opens with a celebration.
+  function showReport(r: Report, fresh = false) {
+    setCelebrate(fresh);
     setReport(r);
     setSession(null);
   }
@@ -229,6 +232,7 @@ export default function App() {
               ) : report ? (
                 <ReportView
                   report={report}
+                  celebrate={celebrate}
                   token={auth.token}
                   onBack={() => {
                     setReport(null);
@@ -238,7 +242,7 @@ export default function App() {
                 />
               ) : view === "workspace" ? (
                 role === "participant" ? (
-                  <Workspace auth={auth} topics={topics} session={session} setSession={setSession} onReport={showReport} onError={setError} />
+                  <Workspace auth={auth} topics={topics} session={session} setSession={setSession} onReport={(r) => showReport(r, true)} onError={setError} />
                 ) : (
                   <StaffHome auth={auth} navigate={navigate} onReport={showReport} onError={setError} />
                 )

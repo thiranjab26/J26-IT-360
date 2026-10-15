@@ -1,4 +1,5 @@
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Download, PartyPopper, Printer } from "lucide-react";
+import type { CSSProperties } from "react";
 import type { Report } from "../api/types";
 import { api, date, downloadJson, gapLabels, label } from "../api/client";
 import { ResourceLink } from "../components/components";
@@ -30,11 +31,13 @@ const TONE: Record<string, { tone: string; color: string; meaning: string }> = {
 
 export default function ReportView({
   report,
+  celebrate = false,
   token,
   onBack,
   onError,
 }: {
   report: Report;
+  celebrate?: boolean;
   token: string;
   onBack: () => void;
   onError: (s: string) => void;
@@ -66,6 +69,21 @@ export default function ReportView({
           </button>
         </div>
       </div>
+
+      {celebrate && (
+        <section className="st-card st-celebrate no-print" role="status">
+          <span className="st-confetti" aria-hidden="true">
+            {Array.from({ length: 18 }, (_, i) => (
+              <i key={i} style={{ "--i": i } as CSSProperties} />
+            ))}
+          </span>
+          <PartyPopper size={26} />
+          <div>
+            <strong>Viva complete. Well done for finishing!</strong>
+            <p className="st-muted st-small">Explaining out loud takes practice. Here is your report.</p>
+          </div>
+        </section>
+      )}
 
       <section className={`st-card st-outcome ${outcome.tone}`}>
         <div>

@@ -50,7 +50,8 @@ Until the open questions below are settled:
 - English only (no Sinhala or Tamil measures); "jargon" dropped; voice only, no video.
 - Groups come from the students' own answers (self-report), checked by an observer.
 - SLIIT Preliminary Ethics Review Form, plus written consent that names Groq transcription.
-- Data structures questions (stacks, queues); the project title stays the same (the work
+- Programming Fundamentals questions (variables, conditionals, loops, functions; changed from
+  data structures on 10 Oct 2026 so that knowledge gaps are rarer); the project title stays the same (the work
   deepens proposal objective 3).
 - Study vivas are run **manually** by the owner on Zoom from a fixed script (5 questions, scripted
   follow-ups A and B chosen by the deterministic rule), with an observer in the call. Zoom local

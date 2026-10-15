@@ -6,6 +6,7 @@ algorithmic observations, not validated psychological measures.
 
 import io
 import logging
+import re
 import threading
 import time
 from functools import lru_cache
@@ -227,10 +228,46 @@ def deepgram_ready():
     return bool(cfg.allow_cloud_llm and cfg.deepgram_api_key)
 
 
+# Code and maths said as words, so the voice reads "2 + 3 * 4" as "2 plus 3 times 4".
+# Keep in step with SPOKEN in frontend/src/features/viva/hooks/useSpeech.ts.
+SPOKEN = [
+    (r"\bO\(\s*([^()]*?)\s*\)", r"O of \1"),
+    (r"([A-Za-z0-9])\^2\b", r"\1 squared"),
+    (r"([A-Za-z0-9])\^3\b", r"\1 cubed"),
+    (r"([A-Za-z0-9])\^([A-Za-z0-9]+)", r"\1 to the power \2"),
+    (r"\s*>=\s*", " is greater than or equal to "),
+    (r"\s*<=\s*", " is less than or equal to "),
+    (r"\s*==\s*", " equals "),
+    (r"\s*!=\s*", " is not equal to "),
+    (r"\s*>\s*", " is greater than "),
+    (r"\s*<\s*", " is less than "),
+    (r"\s*\*\s*", " times "),
+    (r"\s*\+\s*", " plus "),
+    (r"(?<=[\d)])\s*/\s*(?=[\d(])", " divided by "),
+    (r"(?<=\w)\s+-\s+(?=\w)", " minus "),
+    (r"\s*=\s*", " equals "),
+    (r"([A-Za-z_]\w*)\[([^\]]+)\]", r"\1 at index \2"),
+    (r"([A-Za-z_]\w*)\(\)", r"\1"),
+]
+CALL = re.compile(r"([A-Za-z_]\w*)\(([^()]+)\)")  # sum(3) -> "sum of 3", innermost first
+
+
+def speakable(text):
+    """The text as the voice should say it: symbols in code and maths become words."""
+    for pattern, spoken in SPOKEN:
+        text = re.sub(pattern, spoken, text)
+    for _ in range(3):
+        text = CALL.sub(r"\1 of \2", text)
+    text = re.sub(r"(?<=[A-Za-z_])\.(?=[A-Za-z_])", " dot ", text)  # a.copy, not 7.5
+    return " ".join(text.split())
+
+
 @lru_cache(maxsize=128)
 def synthesize(text):
     """Question audio as (bytes, media type, provider). Cached so replays cost nothing."""
     import httpx
+
+    text = speakable(text)
 
     cfg = settings()
     if deepgram_ready() and cfg.deepgram_tts_daily_chars:

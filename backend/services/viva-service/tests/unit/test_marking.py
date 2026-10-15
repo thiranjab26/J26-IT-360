@@ -2,6 +2,7 @@
 
 from app.config import settings
 from app.integrations import llm as providers
+from app.integrations.llm import ASSESS_RULES
 
 QUESTION = {
     "concept": "Variables",
@@ -121,3 +122,50 @@ def test_points_keep_the_best_level_from_earlier_answers(monkeypatch):
     result = providers.assess(QUESTION, "q", "count = 5 is an integer type", prior)
     assert [h["level"] for h in result["rubric_hits"]] == ["full", "partial", "full"]
     assert result["coverage"] == round(100 * 2.5 / 3, 1)
+
+
+def test_a_misconception_in_an_earlier_answer_keeps_what_it_got_right(monkeypatch):
+    prior = [
+        {
+            "question": "q",
+            "transcript": "t",
+            "assessment": {
+                "misconceptions": [
+                    "Thinks 2 + 3 * 4 equals 40"
+                ],  # e.g. speech-to-text heard 14 as 40
+                "rubric_hits": [{"id": "name", "point": "x", "covered": False, "level": "partial"}],
+            },
+        }
+    ]
+    fake(
+        monkeypatch,
+        {
+            "state": "partial",
+            "coverage": 0,
+            "rubric_hits": hits("none", "full", "none"),
+            "missing_points": [],
+            "misconceptions": [],
+            "reason": "r",
+            "provider": "x",
+        },
+    )
+    result = providers.assess(QUESTION, "q", "it is fourteen", prior)
+    assert [h["level"] for h in result["rubric_hits"]] == ["partial", "full", "none"]
+    assert "fourteen and forty" in ASSESS_RULES
+
+
+def test_requests_to_explain_the_question_are_recognised():
+    for said in (
+        "I don't understand the question.",
+        "Sorry, can you repeat that?",
+        "What do you mean?",
+        "Could you explain the question please",
+        "I didn't get it",
+    ):
+        assert providers.clarification_request(said), said
+    for said in (
+        "I don't know",
+        "A variable stores a value",
+        "I don't understand why but a stack is last in first out and push adds to the top",
+    ):
+        assert not providers.clarification_request(said), said

@@ -69,10 +69,11 @@ def test_session_total_and_literature_flags():
     assert not fluency.communication_flagged({"speech_rate_syll_s": 1.5})
 
 
-def test_counting_check_counts_only_noticeable_pauses():
-    speech = [(0, 1), (1.3, 2), (2.8, 4)]  # gaps 0.3 s (not noticed) and 0.8 s (noticed)
-    heard = fluency.noticed(speech, [Word(1.5, 1.7, "uh")], 0, 4)
-    assert heard == {"fillers": 1, "pauses": 1}
+def test_counting_check_counts_only_pauses_of_a_second():
+    speech = [(0, 1), (1.3, 2), (2.8, 3.5), (4.7, 5)]  # gaps 0.3 s, 0.8 s, 1.2 s (counted)
+    words = [Word(1.5, 1.7, "uh"), Word(2.8, 3.0, "the"), Word(3.1, 3.3, "the")]
+    heard = fluency.noticed(speech, words, 0, 5)
+    assert heard == {"fillers": 1, "repairs": 1, "pauses": 1}
 
 
 def test_windows_cover_the_answer():
@@ -112,3 +113,30 @@ def test_answer_profile_measures_one_answer_like_the_research_tool():
     assert fluency.flags(p) == ["articulation_rate_syll_s"]  # one measure: not the pattern
     assert fluency.answer_profile(speech, []) is None
     assert fluency.answer_profile(speech, [Word(1.0, 1.4, "um"), Word(2.0, 2.3, "uh")]) is None
+
+
+def test_repairs_fillers_and_word_searches():
+    text = (
+        "Ehm the the [UM] b-b-boolean func- function , sorry I mean a for loop a for loop , "
+        "you know , how do I say , mhm aa it"
+    )
+    words = [Word(i * 0.4, i * 0.4 + 0.3, t) for i, t in enumerate(text.split())]
+    c = fluency.counts([(0.0, 12.0)], [], words, 0.0, 12.0)
+    assert c["fillers"] == 4  # Ehm, [UM], mhm, aa
+    assert c["repetitions"] == 2  # "the the", "a for loop a for loop"
+    assert c["false_starts"] == 2  # b-b-boolean, func-
+    assert c["self_corrections"] == 2  # sorry, I mean
+    assert c["lexical_fillers"] == 1 and c["word_searches"] == 1
+    measured = fluency.rates(c)
+    assert measured["repairs_per_min"] == pytest.approx(6 / (c["span_s"] / 60), abs=0.01)
+    assert (
+        fluency.repairs([Word(0, 1, "well-known"), Word(1, 2, "co-operate")])["false_starts"] == 0
+    )
+
+
+def test_crisperwhisper_event_tags_are_not_words():
+    from app.integrations import recording
+
+    items = [(0, 1, "[UH]"), (1, 2, "[laughter]"), (2, 3, "loop")]
+    words = recording.words_from_json([{"start": s, "end": e, "word": t} for s, e, t in items])
+    assert [w.text for w in words] == ["[UH]", "loop"]

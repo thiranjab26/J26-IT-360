@@ -90,7 +90,7 @@ CONCEPTS = {
         points=[
             (
                 "growth",
-                "Big-O describes how the number of operations grows with the input size n, not the exact time.",
+                "Big-O describes how the number of operations grows as the input size n grows.",
                 [
                     "grows",
                     "growth",
@@ -710,12 +710,12 @@ CONCEPTS = {
         name="Variables and data types",
         description="Storing values in named variables; integers, floats, booleans and strings",
         notes='A variable is a name that refers to a stored value, and assigning a new value replaces the old one. The type of a value decides what it can hold and which operations make sense: an integer holds whole numbers, a float holds numbers with a fractional part, a boolean is True or False, and a string holds text. For example, 7 is an integer, 7.5 is a float and "7" is a string.',
-        question="What is a variable? Then explain how an integer, a float, a boolean and a string differ, and give one example value.",
-        answer='A variable is a named storage location for a value; assigning a new value replaces the old one. An integer holds whole numbers, a float holds numbers with a decimal (fractional) part, a boolean is True or False, and a string holds text in quotes. For example, 7 is an integer, 7.5 is a float and "7" is a string.',
+        question="What is a variable used for in a program? What kinds of values can an integer, a float, a boolean, and a string store? Give at least one example.",
+        answer='A variable stores or refers to a value using a name. An integer stores a whole number, such as 7; a float stores a number with a decimal part, such as 7.5; a boolean is True or False; and a string stores text, such as "Hello" or "7".',
         points=[
             (
                 "variable",
-                "A variable is a named storage location for a value, and assigning a new value replaces the old one.",
+                "A variable stores or refers to a value using a name.",
                 [
                     "name",
                     "named",
@@ -727,7 +727,7 @@ CONCEPTS = {
                     "refers to",
                 ],
                 "What does a variable hold, and how does the program refer to it?",
-                "A variable is a name that refers to a stored value, and assigning a new value replaces the old one",
+                "A variable is a name that refers to a stored value",
             ),
             (
                 "integer_float",
@@ -752,7 +752,7 @@ CONCEPTS = {
             ),
             (
                 "example",
-                'Gives a correct example value with its type, such as 7 (integer), 7.5 (float) or "7" (string).',
+                'Gives at least one correct example value with its type, such as 1 or 7 (integer), 1.1 or 7.5 (float), True (boolean) or "7" (string).',
                 [
                     "7.5",
                     '"7"',
@@ -803,7 +803,7 @@ CONCEPTS = {
             ),
             (
                 "result",
-                "2 + 3 * 4 evaluates to 14, not 20.",
+                "2 + 3 * 4 evaluates to 14.",
                 ["14", "fourteen"],
                 "Work it out step by step: what is 3 * 4, and what do you get after adding 2?",
                 "so 2 + 3 * 4 is 14, not 20",
@@ -842,8 +842,8 @@ CONCEPTS = {
         name="Conditionals",
         description="Branching with if, else-if and else based on boolean conditions",
         notes="An if statement runs its block only when its condition is true. In an if, else-if, else chain the conditions are checked from top to bottom, only the first true branch runs, and the else branch runs when no condition is true. For a mark of 72 with the chain if mark >= 75: A, else if mark >= 65: B, else: C, the result is B.",
-        question="How does an if, else-if, else chain decide which branch to run? What grade does a mark of 72 get with: if mark >= 75 then A, else if mark >= 65 then B, else C?",
-        answer="The conditions are checked from top to bottom and only the first true branch runs; else runs when no condition is true. For 72, mark >= 75 is false and mark >= 65 is true, so the result is B and the else branch is skipped.",
+        question="A program checks these rules in order: if the mark is 75 or more, give grade A; otherwise, if the mark is 65 or more, give grade B; otherwise, give grade C. A student gets 72. Which grade will the program give? Explain how it chooses.",
+        answer="The grade is B. The program checks the conditions from top to bottom: the first is false because 72 is below 75, and the second is true because 72 is at least 65. Only the first matching branch runs; the final else runs only when neither earlier condition is true.",
         points=[
             (
                 "condition",
@@ -891,8 +891,8 @@ CONCEPTS = {
         name="Loops",
         description="Repeating work with for and while loops; loop conditions and termination",
         notes="A for loop repeats once for each item in a sequence or each value in a range, so the number of repetitions is known in advance. A while loop repeats as long as its condition stays true and checks the condition before each repetition. Every loop needs progress towards its stopping condition: a while loop whose condition never becomes false is an infinite loop.",
-        question="When would you use a for loop and when a while loop? What makes a while loop stop, and what happens if it never does?",
-        answer="A for loop repeats once for each item or each value in a range, when the number of repetitions is known in advance. A while loop repeats as long as its condition is true, checked before each repetition, when you do not know in advance how many times. It stops when the condition becomes false; if the body never makes progress towards that, it is an infinite loop.",
+        question="When would you use a for loop, and when would you use a while loop?",
+        answer="A for loop is used to repeat something a known number of times or to go through a collection of items. A while loop repeats while a condition is true, so it suits repetition that depends on something happening, such as asking for a password until it is correct.",
         points=[
             (
                 "for_loop",
@@ -921,13 +921,6 @@ CONCEPTS = {
                 ],
                 "When does a while loop check its condition, and what makes it stop?",
                 "A while loop repeats as long as its condition stays true and checks the condition before each repetition",
-            ),
-            (
-                "infinite",
-                "Without progress towards the stopping condition, the loop never ends.",
-                ["infinite loop", "never stops", "never ends", "forever", "never becomes false"],
-                "What goes wrong if nothing in a while loop's body changes its condition?",
-                "a while loop whose condition never becomes false is an infinite loop",
             ),
         ],
         errors=[
@@ -990,8 +983,8 @@ CONCEPTS = {
         name="Functions and parameters",
         description="Defining and calling functions; passing arguments to parameters",
         notes="A function definition gives a name to a block of code and lists its parameters, and the code runs only when the function is called. When you call a function, each argument value is passed to the matching parameter, so in def area(w, h) called as area(3, 4), w is 3 and h is 4. Functions let you reuse code and give a task a clear name.",
-        question="What is the difference between defining and calling a function? In def area(w, h), what are w and h when you call area(3, 4)?",
-        answer="Defining a function gives a named block of code with parameters; the code runs only when the function is called. Calling it passes each argument to the matching parameter, so area(3, 4) sets w to 3 and h to 4. Functions let you reuse code and give a task a clear name.",
+        question="What is the difference between defining a function and calling it?",
+        answer="Defining a function gives it a name, parameters and a body of code; the body does not run just because it has been defined. Calling the function runs its body, with the arguments passed to its parameters.",
         points=[
             (
                 "define_call",
@@ -1009,25 +1002,18 @@ CONCEPTS = {
             ),
             (
                 "arguments",
-                "Each argument goes to the matching parameter: w is 3 and h is 4.",
-                ["argument", "parameter", "w is 3", "h is 4", "passed", "matching", "in order"],
-                "When you call area(3, 4), which parameter receives 3, and how is that decided?",
-                "each argument value is passed to the matching parameter, so in def area(w, h) called as area(3, 4), w is 3 and h is 4",
-            ),
-            (
-                "reuse",
-                "Functions let you reuse code and name a task clearly.",
+                "Calling the function passes each argument to its matching parameter.",
                 [
-                    "reuse",
-                    "reusable",
-                    "clear name",
-                    "organise",
-                    "organize",
-                    "avoid repeating",
-                    "repeat the code",
+                    "argument",
+                    "parameter",
+                    "passed",
+                    "pass",
+                    "matching",
+                    "in order",
+                    "values we give",
                 ],
-                "Why write a function instead of copying the same lines in three places?",
-                "Functions let you reuse code and give a task a clear name",
+                "When you call a function with some values, where do those values go?",
+                "When you call a function, each argument value is passed to the matching parameter",
             ),
         ],
         errors=[
@@ -1042,44 +1028,37 @@ CONCEPTS = {
         name="Return values and scope",
         description="Returning results from functions; local versus outer variable scope",
         notes="A return statement ends the function and sends a value back to the caller, which can store or use it; printing a value only shows it and does not return it. A variable created inside a function is local: it exists only while that call runs and cannot be used outside the function. A local variable with the same name as an outer variable hides the outer one inside the function but does not change it.",
-        question="What is the difference between returning a value and printing it? If a function creates a variable called total, can code outside the function use total?",
-        answer="return ends the function and sends a value back to the caller, which can store or use it; print only displays it. A variable created inside a function is local: it exists only during that call and cannot be used outside. A local variable with the same name as an outer one hides it inside the function but does not change it.",
+        question="What is the difference between using return and using print inside a Python function?",
+        answer="return sends a value back to the code that called the function, which can store it or use it in another calculation. print displays a value on the screen; printing a value does not return it to the calling code.",
         points=[
             (
                 "return",
-                "return sends a value back to the caller; printing only shows it.",
+                "return sends a value back to the calling code, which can store it or use it.",
                 [
                     "return",
                     "back to the caller",
                     "sends back",
+                    "gives back",
                     "can store",
                     "use the result",
-                    "only shows",
-                    "only displays",
                 ],
                 "After a function prints a number, can the caller store that number in a variable? What would let it?",
                 "A return statement ends the function and sends a value back to the caller, which can store or use it",
             ),
             (
-                "local",
-                "A variable created inside a function is local and cannot be used outside.",
+                "print",
+                "print only displays a value on the screen; it does not return it.",
                 [
-                    "local",
-                    "inside the function",
-                    "only exists",
-                    "cannot be used outside",
-                    "not accessible",
-                    "scope",
+                    "print",
+                    "displays",
+                    "shows",
+                    "on the screen",
+                    "only shows",
+                    "only displays",
+                    "not returned",
                 ],
-                "Where can a variable created inside a function be used, and when does it stop existing?",
-                "A variable created inside a function is local: it exists only while that call runs and cannot be used outside the function",
-            ),
-            (
-                "shadowing",
-                "A local variable with an outer variable's name hides it but does not change it.",
-                ["same name", "hides", "shadow", "does not change", "outer variable", "global"],
-                "If the function sets its own total = 0 while an outer total is 50, what is the outer total afterwards?",
-                "A local variable with the same name as an outer variable hides the outer one inside the function but does not change it",
+                "If a function prints an answer on the screen, does the calling code get that answer back?",
+                "printing a value only shows it and does not return it",
             ),
         ],
         errors=[

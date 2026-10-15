@@ -1,30 +1,52 @@
 # MCQ knowledge check (10 questions, 10 minutes)
 
-Same concepts and difficulty as the viva (`viva-script.md`). Pass mark: **6 of 10 (60%)**.
-Only students at or above the pass mark take the viva; if one scores lower and cannot be
-replaced, keep them and note it. Put it in the Google Form as a Quiz with this answer key, and
-turn off "release score immediately" so students do not see answers before their viva.
+Programming Fundamentals (IT1010): the same five topics and difficulty as the viva
+(`viva-script.md`), two questions per topic, but never the viva's own questions or examples, so
+the quiz does not give away viva answers. Every question is multiple choice with one correct
+answer. Pass mark: **7 of 10 (70%)**; the study needs students who know the content so that any
+difficulty in the viva points to English, not knowledge. Only students at or above the pass mark
+take the viva; if one scores lower and cannot be replaced, keep them and note it. Put it in the
+Google Form as a Quiz (multiple choice, one answer each) with this answer key, and turn off
+"release score immediately" so students do not see answers before their viva.
 
-1. You push 3, then 7, then 5 onto an empty stack, then pop once. Which value is removed?
-   a) 3  b) 7  **c) 5**  d) Nothing is removed
-2. Which stack operation reads the top element without removing it?
-   a) push  b) pop  **c) peek**  d) enqueue
-3. A, B and C are enqueued in that order. What does the first dequeue return?
-   **a) A**  b) B  c) C  d) It depends on the values
-4. Which structure fits a printer that prints jobs in the order they arrive?
-   a) Stack  **b) Queue**  c) Binary search tree  d) Hash table
-5. Which structure is most suitable for an undo feature?
-   **a) Stack**  b) Queue  c) Array sorted by time  d) Linked list in arrival order
-6. Checking whether brackets such as `( [ ] )` are balanced is usually done with a:
-   a) Queue  **b) Stack**  c) Hash table  d) Binary search tree
-7. When method A calls method B, what is pushed onto the call stack?
-   a) A copy of method A's code
-   **b) A frame for B, with its local variables and where to return**
-   c) The final result of B
-   d) Nothing until B finishes
-8. A recursive method with no base case will most likely cause:
-   a) A compile error  **b) A stack overflow**  c) An infinite queue  d) A correct result
-9. Inserting an element at the start of an array of n elements takes:
-   a) O(1)  b) O(log n)  **c) O(n)**  d) O(n²)
-10. Inserting a new node at the head of a singly linked list takes:
-    **a) O(1)**  b) O(log n)  c) O(n)  d) O(n²)
+**Variables and data types**
+
+1. A program sets `x = 10`, then `x = 3`. What is the value of `x` now?
+   a) 10  **b) 3**  c) 13  d) 103
+2. Which data type is best for storing a price such as `49.99`?
+   a) Integer  **b) Float**  c) Boolean  d) String
+3. Which of these values is a boolean?
+   a) `"False"`  b) `0.5`  **c) `False`**  d) `"yes"`
+
+**Conditionals**
+
+4. `temp` is 30. The program checks `if temp > 35` print "Hot", `else if temp > 25` print "Warm",
+   `else` print "Cold". What is printed?
+   a) Hot  **b) Warm**  c) Cold  d) Warm and Cold
+5. `age` is 17. The program checks `if age >= 18` print "Adult", `else` print "Minor". What is
+   printed?
+   a) Adult  **b) Minor**  c) Adult and Minor  d) Nothing
+
+**Loops**
+
+6. `sum` starts at 0. A `for` loop runs with `i` = 1, 2, 3, 4, 5 and adds `i` to `sum` each time.
+   What is `sum` at the end?
+   a) 5  b) 10  **c) 15**  d) 6
+7. `count` starts at 0. A `while count < 3` loop adds 1 to `count` each time. How many times does
+   the loop body run?
+   a) 2  **b) 3**  c) 4  d) It never stops
+
+**Functions and parameters**
+
+8. What is a parameter in a function?
+   a) The name of the function  **b) A variable that receives a value when the function is called**
+   c) The value printed by the function  d) A loop inside the function
+9. A function is defined as `def greet(name): return "Hi " + name`. What does `greet("Sam")`
+   return?
+   a) `"Hi name"`  **b) `"Hi Sam"`**  c) `"Sam"`  d) Nothing
+
+**Return values**
+
+10. A function is defined as `def double(n): return n * 2`. What is stored in `result` after
+    `result = double(4) + 1`?
+    a) 8  **b) 9**  c) 5  d) 10

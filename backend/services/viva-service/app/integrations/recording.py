@@ -6,6 +6,8 @@ inputs: the examiner's own track, which splits the student's track per question 
 response times, and word timings (CrisperWhisper JSON, Groq or local Whisper).
 """
 
+import re
+
 from app.domain import fluency
 from app.domain.fluency import Word
 
@@ -48,7 +50,11 @@ def syllables(audio):
 
 def words_from_json(data):
     items = data["words"] if isinstance(data, dict) else data
-    return [Word(float(w["start"]), float(w["end"]), str(w["word"])) for w in items]
+    words = [Word(float(w["start"]), float(w["end"]), str(w["word"])) for w in items]
+    # CrisperWhisper tags non-speech events ("[laughter]"); only its [UM] and [UH] are speech.
+    return [
+        w for w in words if fluency.is_filler(w.text) or not re.fullmatch(r"\W*\[.*\]\W*", w.text)
+    ]
 
 
 def transcribe(content, suffix, audio, how, model_name="small.en"):

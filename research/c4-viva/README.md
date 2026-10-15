@@ -9,10 +9,13 @@ literature are in `docs/c4/research-scope-change.md`; the day plan is `docs/c4/P
 
 - 5 + 5 students (communication difficulty vs comfortable, by their own self-report), all with
   at least 60% on a 10-question MCQ, so weak answers are not knowledge gaps.
-- A scripted 10-minute viva on Zoom: the researcher asks five DSA questions with fixed
-  follow-ups; an observer rates each answer. Zoom saves each voice in its own file.
+- A scripted 10-minute viva on Zoom: the researcher asks five Programming Fundamentals
+  (IT1010) questions with fixed follow-ups; an observer rates each answer. Zoom saves each
+  voice in its own file.
 - Measures from the student's voice: silent pauses (250 ms or more), speech and articulation
-  rate, mean length of run, share of mid-clause pauses, filled pauses, response latency.
+  rate, mean length of run, share of mid-clause pauses, filled pauses, response latency,
+  repairs (repetitions, false starts, self-corrections), lexical fillers (you know, kind of)
+  and word searches (how do I say). Repairs and fillers need the CrisperWhisper transcript.
 - Primary measures (hypothesis H1): speech rate, mean length of run, mean silent pause, silent
   pauses per minute. Everything else is exploratory, including the share of mid-clause pauses,
   which depends on the transcript (transcribers put commas exactly where people pause).
@@ -44,10 +47,11 @@ uv sync --extra speech --extra research
 
 # 2. Measures for every participant (writes RECORDINGS/results/*.csv)
 uv run --extra speech --extra research python scripts/analyze_recordings.py "C:/Users/MSII/Documents/viva-study/recordings"
-#    without CrisperWhisper files: add --transcriber groq (fast, cloud) or keep local (private)
+#    without CrisperWhisper files: add --transcriber groq (fast, cloud) or keep local (private);
+#    fillers and repairs are then left blank, because those transcribers drop them
 #    with a warm-up question: add --warmup
 
-# 3. Counting check: fill your_fillers and your_pauses in results/count_check.csv
+# 3. Counting check: fill your_fillers, your_repairs and your_pauses_1s in results/count_check.csv
 
 # 4. Statistics, charts and report.md
 uv run --extra research python ../../../research/c4-viva/analysis/run_stats.py \

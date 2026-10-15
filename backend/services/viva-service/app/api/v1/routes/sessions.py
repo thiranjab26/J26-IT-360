@@ -28,6 +28,7 @@ from app.domain.logic import (
     GAP_VERSION,
     POLICY_VERSION,
     build_report,
+    clarification_assessment,
     hesitation,
     issue_question,
     next_question,
@@ -39,6 +40,7 @@ from app.integrations.llm import (
     ProviderUnavailable,
     assess,
     check_phrasing,
+    clarification_request,
     improvement_plan,
     phrase_follow_up,
 )
@@ -230,7 +232,11 @@ def phrase(data, index, prior, next_q, assessment, transcript, action, draft=Non
             stored, next_q["question"] = next_q["question"], text
             return {"source": assessment["provider"] + ":combined", "stored_prompt": stored}
     try:
-        text, source = phrase_follow_up(bank, action, target, assessment, transcript, prior, seen)
+        # CLARIFY rewords the question the student just asked about, so it needs that question.
+        asked = {"asked": data["turns"][-1]["question"]} if action == "CLARIFY" else {}
+        text, source = phrase_follow_up(
+            bank, action, target, assessment, transcript, prior, seen, **asked
+        )
     except (ProviderUnavailable, ValueError, HTTPException) as exc:
         return {
             "source": "stored_fallback",
@@ -458,15 +464,25 @@ def submit_answer(
         )
         db.commit()
         return response
-    assessment = assess(
-        data["snapshots"][index],
-        current["question"],
-        body.transcript,
-        prior,
-        follow_up_plans(data, current, prior) if llm_wording() else None,
-    )
-    draft = assessment.pop("_draft", None)
-    action = policy(assessment["state"], current["depth"], data["max_depth"], prior)
+    clarify = clarification_request(body.transcript) and current["_elicitation_action"] != "CLARIFY"
+    if clarify:
+        # "I don't understand the question": not marked, and the same question comes back in
+        # plainer words without using up a follow-up. A second request in a row is marked.
+        assessment, draft, action = (
+            clarification_assessment(data["snapshots"][index], prior),
+            None,
+            "CLARIFY",
+        )
+    else:
+        assessment = assess(
+            data["snapshots"][index],
+            current["question"],
+            body.transcript,
+            prior,
+            follow_up_plans(data, current, prior) if llm_wording() else None,
+        )
+        draft = assessment.pop("_draft", None)
+        action = policy(assessment["state"], current["depth"], data["max_depth"], prior)
     turn = {
         "id": uid(),
         "question_id": current["id"],
@@ -489,6 +505,7 @@ def submit_answer(
         "target_rubric_id": current.get("_target_rubric_id"),
         "policy_version": data["policy_version"],
         "provider": assessment["provider"],
+        **({"clarification": True} if clarify else {}),
     }
     data["turns"].append(turn)
     next_q, action = next_question(data, current, assessment, action)

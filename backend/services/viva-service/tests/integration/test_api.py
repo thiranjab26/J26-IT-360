@@ -214,3 +214,27 @@ def test_spoken_answer_keeps_fluency_measures_and_rejects_unknown_fields(client)
     with SessionLocal() as db:
         turn = db.get(VivaSession, session["id"]).data["turns"][0]
     assert turn["hesitation"]["fluency"] == profile
+
+
+def test_asking_to_explain_the_question_repeats_it_plainly_without_marking(client):
+    headers = auth(client)
+    session = start(client, headers)
+    first = session["current_question"]
+    reply = answer(client, headers, session, "I don't understand the question.")
+    assert reply.status_code == 200, reply.text
+    assert reply.json()["action"] == "CLARIFY"
+    again = reply.json()["session"]["current_question"]
+    assert again["concept"] == first["concept"] and again["depth"] == first["depth"]
+    assert again["question"] != first["question"]
+    # A second request in a row is marked as a non-answer instead of looping.
+    second = answer(
+        client, headers, reply.json()["session"], "Sorry, can you repeat that?", request_id="r2"
+    )
+    assert second.json()["action"] in ("REPHRASE", "SIMPLIFY")
+    with SessionLocal() as db:
+        turns = db.get(VivaSession, session["id"]).data["turns"]
+    assert (
+        turns[0]["clarification"] is True
+        and turns[0]["assessment"]["provider"] == "rule:clarification"
+    )
+    assert "clarification" not in turns[1]

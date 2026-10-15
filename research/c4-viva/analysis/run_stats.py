@@ -22,7 +22,7 @@ from scipy.stats import mannwhitneyu, spearmanr
 # (column, label, direction in the difficulty group: "lower" or "higher")
 # The first four are the primary measures named in hypothesis H1, decided before the data
 # is seen. Only they share the Holm correction: with 5 + 5 students, correcting over all
-# eleven measures could never reach p < 0.05. The rest are exploratory.
+# fourteen measures could never reach p < 0.05. The rest are exploratory.
 PRIMARY = {
     "speech_rate_syll_s",
     "mean_length_of_run_syll",
@@ -35,10 +35,13 @@ MEASURES = [
     ("mean_length_of_run_syll", "Mean length of run (syllables)", "lower"),
     ("mean_silent_pause_ms", "Mean silent pause (ms)", "higher"),
     ("silent_pauses_per_min", "Silent pauses per minute", "higher"),
-    ("long_pauses_per_min", "Pauses of 2 s or more per minute", "higher"),
+    ("long_pauses_per_min", "Pauses of 1 s or more per minute", "higher"),
     ("mid_clause_pause_share", "Share of pauses inside clauses", "higher"),
     ("filled_pauses_per_min", "Filled pauses per minute", "higher"),
     ("filled_pauses_per_100_words", "Filled pauses per 100 words", "higher"),
+    ("repairs_per_min", "Repairs per minute (repeats, false starts, corrections)", "higher"),
+    ("lexical_fillers_per_min", "Lexical fillers per minute (you know, kind of)", "higher"),
+    ("word_searches", "Word searches (how do I say)", "higher"),
     ("response_latency_s", "Response latency (s)", "higher"),
     ("phonation_time_ratio", "Phonation time ratio", "lower"),
 ]
@@ -141,7 +144,11 @@ def fmt(x, digits=3):
 def main(results_dir, participants_path):
     results_dir = Path(results_dir)
     sessions = {r["code"]: r for r in read(results_dir / "sessions.csv")}
-    people = [p for p in read(participants_path) if p.get("group", "").strip() in GROUPS]
+    # Typed by hand, so case and spaces are ignored. P00 is the practice viva, never a result.
+    people = [{k: (v or "").strip() for k, v in p.items()} for p in read(participants_path)]
+    for p in people:
+        p["code"], p["group"] = p["code"].upper(), p.get("group", "").lower()
+    people = [p for p in people if p["group"] in GROUPS and p["code"] != "P00"]
     rows = [{**sessions[p["code"]], **p} for p in people if p["code"] in sessions]
     missing = [p["code"] for p in people if p["code"] not in sessions]
     labels = [r["group"].strip() == "difficulty" for r in rows]
@@ -264,28 +271,28 @@ def main(results_dir, participants_path):
     checks = (
         read(results_dir / "count_check.csv") if (results_dir / "count_check.csv").exists() else []
     )
-    done = [
-        (
-            number(c["tool_fillers"]),
-            number(c["your_fillers"]),
-            number(c["tool_pauses"]),
-            number(c["your_pauses"]),
-        )
-        for c in checks
-        if number(c.get("your_fillers")) is not None and number(c.get("your_pauses")) is not None
-    ]
+    checks = [c for c in checks if c["code"] in {r["code"] for r in rows}]
     report += ["## 5. Counting check (tool vs your ears)", ""]
-    if done:
-        for name, a, b in (("Fillers", 0, 1), ("Pauses", 2, 3)):
-            tool, human = [d[a] for d in done], [d[b] for d in done]
-            within = sum(abs(t - h) <= 1 for t, h in zip(tool, human, strict=True))
-            line = f"{name}: within one of your count for {within} of {len(done)} students; mean difference {np.mean(np.abs(np.subtract(tool, human))):.1f}"
-            if len(done) >= 3 and len(set(tool)) > 1 and len(set(human)) > 1:
-                line += f"; Spearman rho {spearmanr(tool, human)[0]:.2f}"
-            report.append(line + ".")
-    else:
+    checked = False
+    for name, key in (
+        ("Fillers", "fillers"),
+        ("Repairs", "repairs"),
+        ("Pauses of 1 s or more", "pauses_1s"),
+    ):
+        pairs = [(number(c.get(f"tool_{key}")), number(c.get(f"your_{key}"))) for c in checks]
+        pairs = [(t, h) for t, h in pairs if t is not None and h is not None]
+        if not pairs:
+            continue
+        checked = True
+        tool, human = [t for t, _ in pairs], [h for _, h in pairs]
+        within = sum(abs(t - h) <= 1 for t, h in pairs)
+        line = f"{name}: within one of your count for {within} of {len(pairs)} students; mean difference {np.mean(np.abs(np.subtract(tool, human))):.1f}"
+        if len(pairs) >= 3 and len(set(tool)) > 1 and len(set(human)) > 1:
+            line += f"; Spearman rho {spearmanr(tool, human)[0]:.2f}"
+        report.append(line + ".")
+    if not checked:
         report.append(
-            "Not filled in yet: add your counts to the your_fillers and your_pauses columns of count_check.csv."
+            "Not filled in yet: add your counts to the your_fillers, your_repairs and your_pauses_1s columns of count_check.csv."
         )
     report += [
         "",

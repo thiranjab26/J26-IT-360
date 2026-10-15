@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Send,
   SkipForward,
+  Snail,
   Volume2,
   Square,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import type { AudioMetrics, Auth, Context, Report, Session, Topic } from "../api
 import { Busy, ErrorNotice, Integrations, integrationLabel } from "../components/components";
 import { providerName, useSpeech, type Heard } from "../hooks/useSpeech";
 import { Mascot } from "../components/Mascot";
+import { MicCheck, VoiceWave } from "../components/voice";
 import "../styles/student.css";
 
 export default function Workspace({
@@ -333,14 +335,18 @@ function LiveSession({
       ? "Turning your recording into text…"
       : speech.recording
         ? `Listening · ${speech.seconds}s. Tap the button when you finish`
-        : speech.speaking
+        : nodding
+          ? q?.depth
+            ? "Thank you. Here is a follow-up question."
+            : "Thank you. Here is the next question."
+          : speech.speaking
           ? "Reading the question…"
           : speech.starting
             ? "Opening microphone…"
             : mode === "speech" && !answer
               ? "Tap the microphone and answer when ready"
               : "";
-  const progress = (session.progress.completed_concepts / Math.max(1, session.progress.total_concepts)) * 100;
+  const { completed_concepts: done, total_concepts: total } = session.progress;
   return (
     <div className="st">
       <div className="st-topbar">
@@ -373,14 +379,16 @@ function LiveSession({
       <div className="st-row st-between">
         <div className="st-row">
           <span className="st-chip st-chip-accent">
-            Concept {q?.ordinal || session.progress.completed_concepts} of {session.progress.total_concepts}
+            Question {q?.ordinal || done} of {total}
           </span>
           {q && <span className="st-chip">{q.depth ? `Follow-up ${q.depth} of ${session.max_depth}` : "Main question"}</span>}
         </div>
         {q && <span className="st-chip">{q.concept}</span>}
       </div>
-      <div className="st-progress" aria-hidden="true">
-        <span style={{ width: `${progress}%` }} />
+      <div className="st-dots" aria-hidden="true">
+        {Array.from({ length: total }, (_, i) => (
+          <span key={i} className={i < done ? "is-done" : i === done ? "is-current" : ""} />
+        ))}
       </div>
 
       {q && !ready ? (
@@ -391,7 +399,14 @@ function LiveSession({
             Your viva guide will ask each question out loud. Find a quiet place, then allow microphone access when asked.
             You can skip a question, or say "stop the session" at any time.
           </p>
-          <button className="st-btn st-btn-primary" onClick={() => setReady(true)}>
+          {mode === "speech" && <MicCheck />}
+          <button
+            className="st-btn st-btn-primary"
+            onClick={() => {
+              speech.prime();
+              setReady(true);
+            }}
+          >
             Start the viva
           </button>
         </section>
@@ -408,6 +423,14 @@ function LiveSession({
               onClick={() => (speech.speaking ? speech.stopSpeaking() : speech.speak(q.question))}
             >
               {speech.speaking ? <><Square size={15} /> Stop</> : <><Volume2 size={16} /> Listen again</>}
+            </button>
+            <button
+              className="st-btn st-btn-ghost"
+              disabled={speech.recording}
+              title="Hear the question again, more slowly"
+              onClick={() => speech.speak(q.question, 0.8)}
+            >
+              <Snail size={16} /> Slower
             </button>
             <label className="st-small st-muted st-row" style={{ gap: 6 }}>
               <input
@@ -437,6 +460,7 @@ function LiveSession({
               >
                 {speech.recording ? <Square size={28} /> : <Mic size={30} />}
               </button>
+              {speech.recording && <VoiceWave className="st-mic-wave" source={() => speech.meters.current.mic} active />}
               {speech.hasRecording && !speech.transcribing && (
                 <button className="st-btn st-btn-ghost" disabled={speech.starting || speech.recording} onClick={speech.retry}>
                   <RotateCcw size={16} /> Retry transcription

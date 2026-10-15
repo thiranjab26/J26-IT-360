@@ -5,10 +5,10 @@ Status key: `[ ]` open, `[~]` in progress, `[x]` done. Update this file in the s
 
 ## P0: Before the first commit
 
-- [ ] Install `uv`, then in `backend/services/viva-service` run `uv sync --extra speech` and `uv lock`
-- [ ] Run the checks with uv: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
-- [ ] Confirm `git status` lists no `.env` file and only C4 paths, plus `frontend/src/app/router.tsx`, `frontend/package.json` and `pnpm-lock.yaml`
-- [ ] Commit in small steps with `feat(viva): ...` messages; do not push until reviewed
+- [x] Install `uv`, then in `backend/services/viva-service` run `uv sync --extra speech` and `uv lock`
+- [x] Run the checks with uv: `uv run ruff check . && uv run ruff format --check . && uv run pytest`
+- [x] Confirm `git status` lists no `.env` file and only C4 paths, plus `frontend/src/app/router.tsx`, `frontend/package.json` and `pnpm-lock.yaml`
+- [x] Commit in small steps with `feat(viva): ...` messages; do not push until reviewed
 
 ## P1: Before PP1 (complete by 20 Oct 2026; PP1 on 21 Oct)
 

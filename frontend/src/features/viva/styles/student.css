@@ -195,3 +195,25 @@
 .viva-app .st-heard p { margin: 4px 0 6px; line-height: 1.9; }
 .viva-app .st-filler { background: #fde7b0; color: inherit; border-radius: 4px; padding: 0 2px; }
 .viva-app .st-pause { display: inline-block; margin: 0 4px; padding: 0 7px; border-radius: 999px; background: #e3e9f2; color: #4a5b74; font-size: 12px; line-height: 1.6; vertical-align: 1px; }
+
+.viva-app .st-mic-wave { width: min(240px, 80%); height: 28px; color: var(--st-rose); }
+
+/* Friendly touches: question dots, the microphone check, and the finish celebration. */
+.viva-app .st-dots { display: flex; gap: 6px; }
+.viva-app .st-dots span { flex: 1; height: 6px; border-radius: 999px; background: var(--st-soft); transition: background 0.4s; }
+.viva-app .st-dots .is-done { background: var(--st-accent); }
+.viva-app .st-dots .is-current { background: linear-gradient(90deg, var(--st-accent), #a5b4fc); animation: st-dot-pulse 1.8s ease-in-out infinite; }
+@keyframes st-dot-pulse { 50% { opacity: 0.55; } }
+.viva-app .st-miccheck { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 64px; }
+.viva-app .st-miccheck .st-mic-wave { color: var(--st-accent); }
+.viva-app .st-ok { color: var(--st-green); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+.viva-app .st-celebrate { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; border-color: #c7d2fe; background: linear-gradient(135deg, #fff, #eef2ff); }
+.viva-app .st-celebrate > svg { color: var(--st-accent); flex: none; }
+.viva-app .st-celebrate strong { font-size: 18px; }
+.viva-app .st-confetti { position: absolute; inset: 0; pointer-events: none; }
+.viva-app .st-confetti i { position: absolute; top: -12px; left: calc(var(--i) * 5.4% + 2%); width: 7px; height: 11px; border-radius: 2px; background: hsl(calc(var(--i) * 47) 80% 60%); opacity: 0; animation: st-confetti 1.9s ease-in calc(var(--i) * 45ms) 1 forwards; }
+@keyframes st-confetti { 0% { opacity: 1; transform: translateY(0) rotate(0deg); } 100% { opacity: 0; transform: translateY(140px) rotate(calc(var(--i) * 80deg)); } }
+@media (prefers-reduced-motion: reduce) {
+  .viva-app .st-confetti { display: none; }
+  .viva-app .st-dots .is-current { animation: none; }
+}

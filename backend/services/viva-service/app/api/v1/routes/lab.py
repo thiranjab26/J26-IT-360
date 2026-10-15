@@ -5,6 +5,8 @@ returns the measures with the literature thresholds, so the research and the sys
 one implementation. Audio is processed in memory and not stored.
 """
 
+import json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
@@ -66,6 +68,7 @@ def blank_syllable_measures(row):
 async def analyse_recording(
     audio: UploadFile = File(...),
     examiner: UploadFile | None = File(default=None),
+    words: UploadFile | None = File(default=None),
     transcriber: str = Form(default="auto"),
     user: User = Depends(admin),
 ):
@@ -73,11 +76,25 @@ async def analyse_recording(
         raise HTTPException(422, "transcriber must be auto, groq or none.")
     content, suffix = await read_audio(audio)
     examiner_audio = await read_audio(examiner) if examiner is not None else None
+    verbatim = None
+    if words is not None:
+        # The CrisperWhisper notebook's P03_student.words.json: verbatim, so fillers and
+        # repairs are counted as the research tool counts them.
+        raw = await words.read(5_000_000 + 1)
+        await words.close()
+        try:
+            if len(raw) > 5_000_000:
+                raise ValueError("too large")
+            verbatim = recording.words_from_json(json.loads(raw))
+        except (ValueError, KeyError, TypeError) as exc:
+            raise HTTPException(
+                422, "The words file must be the .words.json from the CrisperWhisper notebook."
+            ) from exc
     cfg = settings()
     cloud = bool(cfg.allow_cloud_llm and cfg.speech_api_key)
-    if transcriber == "groq" and not cloud:
+    if transcriber == "groq" and not cloud and verbatim is None:
         raise HTTPException(503, "Groq transcription is not configured on this server.")
-    use_groq = cloud and transcriber in ("auto", "groq")
+    use_groq = verbatim is None and cloud and transcriber in ("auto", "groq")
     if use_groq:
         await run_in_threadpool(limits.reserve_speech, user.id)
 
@@ -100,7 +117,9 @@ async def analyse_recording(
             raise HTTPException(422, "The recording has no audio.")
         nuclei = recording.syllables(pcm)
         words, source = [], "none"
-        if use_groq:
+        if verbatim is not None:
+            words, source = verbatim, "crisperwhisper"
+        elif use_groq:
             try:
                 words = recording.transcribe(content, suffix, pcm, "groq")
                 source = "groq:" + cfg.speech_model
@@ -129,6 +148,11 @@ async def analyse_recording(
         notes.append(
             "No transcript: syllables were counted from the sound, which misses about 20%; "
             "fillers and pause positions are not available."
+        )
+    elif source != "crisperwhisper":
+        notes.append(
+            "Groq drops most fillers, repeats and false starts, so those counts are low. Add the "
+            "CrisperWhisper words file for exact counts."
         )
     speech = result["speech"]
     pauses = [

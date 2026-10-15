@@ -57,6 +57,6 @@ def test_update_bank_refreshes_questions_and_keeps_sessions(client):
         db.commit()
         assert update_bank(db)["questions"] == 1
         refreshed = db.get(Bank, "c3-it1010-basics-01").data
-        assert refreshed["question"].startswith("What is a variable?")
+        assert refreshed["question"].startswith("What is a variable used for")
         assert refreshed["version"] == 2
         assert db.scalar(select(func.count()).select_from(VivaSession)) == 1  # sessions stay

@@ -9,6 +9,8 @@ the last word is never counted as a pause.
 Definitions follow the L2 fluency literature cited in docs/c4/research-scope-change.md:
 silent pauses of 250 ms or more (De Jong and Bosker, 2013); speech rate and articulation
 rate in syllables per second; mean length of run in syllables between silent pauses.
+Repair fluency (Tavakoli and Skehan, 2005): repetitions, false starts and self-corrections,
+counted from the words, so they need a verbatim transcript (CrisperWhisper).
 """
 
 import re
@@ -16,11 +18,31 @@ from dataclasses import dataclass
 from statistics import mean
 
 SILENT_PAUSE_S = 0.25  # De Jong and Bosker (2013): 250 to 300 ms best predicts L2 proficiency
-NOTICEABLE_PAUSE_S = 0.5  # what a listener reliably notices; used by the counting check
-LONG_PAUSE_S = 2.0
+# Pauses of 1 s or more: the task-based fluency convention (Foster and Skehan, 1996), and long
+# enough to count by ear, so the counting check checks this measure directly.
+LONG_PAUSE_S = 1.0
 WINDOW_S = 15.0
 
-FILLER = re.compile(r"^\W*(u+h+|u+m+|uhm+|e+r+m*|h+m+|m{2,}|a+h+)\W*$", re.IGNORECASE)
+# Filled pauses (non-lexical fillers): uh, um, uhm, er, erm, eh, ehm, hmm, mm, mhm, ah, aa.
+# CrisperWhisper writes um and uh as [UM] and [UH].
+FILLER = re.compile(
+    r"^\W*(u+h+|u+m+|uhm+|e+r+m*|e+h+m*|h+m+|m+h+m+|m{2,}|a+h+|a{2,})\W*$", re.IGNORECASE
+)
+# A cut-off word ("func-") or a stutter on the first sound ("b-b-boolean", "w-what").
+FALSE_START = re.compile(r"^(?:\w+-|(\w{1,3})-(?:\1-)*\1\w*)$", re.IGNORECASE)
+# Phrases, matched on a segment's words with fillers and false starts removed. Words that
+# are usually real content in an explanation ("like 7.5", "so the loop stops", "well",
+# "okay", "actually") are left out.
+SELF_CORRECTION = re.compile(
+    r"\b(?:sorry|i mean|i meant|what i mean is|or rather|no wait|wait no"
+    r"|let me (?:try|start|say that|say it|put it) again|let me (?:rephrase|restart))\b"
+)
+LEXICAL_FILLER = re.compile(r"\b(?:you know|you see|kind of|sort of|basically|let me think)\b")
+# Searching for an English word: direct evidence of a language, not a knowledge, problem.
+WORD_SEARCH = re.compile(
+    r"\b(?:how (?:do|can) i say|how do you say|how to say|what is the word|what's the word"
+    r"|what do you call|what is it called|i don't know how to (?:say|explain|put))\b"
+)
 # Words that usually start a new clause; a pause before one counts as a clause-boundary pause.
 # Ambiguous words are left out: "first" ("first in, first out"), "that" ("that item"), "for".
 CLAUSE_STARTS = {
@@ -38,6 +60,38 @@ class Word:
 
 def is_filler(text):
     return bool(FILLER.match(text.strip()))
+
+
+def repetitions(tokens):
+    """Immediate repeats of one to three words: "the the" is 1, "a for loop a for loop" is 1."""
+    # ponytail: grammatical doubles ("that that", "had had") also count; rare in a viva.
+    count, i = 0, 0
+    while i < len(tokens):
+        n = next((n for n in (3, 2, 1) if tokens[i : i + n] == tokens[i + n : i + 2 * n]), 0)
+        count += bool(n)
+        i += n or 1
+    return count
+
+
+def repairs(words):
+    """Repair and stalling counts of a segment's words (fillers ignored)."""
+    content = [w.text.strip() for w in words if not is_filler(w.text)]
+    edges = [re.sub(r"^[^\w-]+|[^\w-]+$", "", t) for t in content]
+    false_starts = sum(1 for t in edges if FALSE_START.match(t))
+    tokens = [
+        re.sub(r"[^\w']", "", t.lower().replace("’", "'"))
+        for t in edges
+        if not FALSE_START.match(t)
+    ]
+    tokens = [t for t in tokens if t]
+    text = " ".join(tokens)
+    return {
+        "repetitions": repetitions(tokens),
+        "false_starts": false_starts,
+        "self_corrections": len(SELF_CORRECTION.findall(text)),
+        "lexical_fillers": len(LEXICAL_FILLER.findall(text)),
+        "word_searches": len(WORD_SEARCH.findall(text)),
+    }
 
 
 def count_syllables(word):
@@ -119,6 +173,7 @@ def counts(speech, syllables, words, start, end):
         "runs": len(pauses) + 1,
         "mid_clause": positions.count("mid"),
         "end_clause": positions.count("end"),
+        **repairs(span_words),
         "first_speech": first,
     }
 
@@ -159,8 +214,17 @@ def rates(c, latencies=()):
         "phonation_time_ratio": round(c["phonation_s"] / c["span_s"], 3),
         "mid_clause_pause_share": round(c["mid_clause"] / located, 3) if located else None,
         "response_latency_s": round(mean(latencies), 2) if latencies else None,
+        "repairs_per_min": round(
+            (c["repetitions"] + c["false_starts"] + c["self_corrections"]) / minutes, 2
+        ),
+        "lexical_fillers_per_min": round(c["lexical_fillers"] / minutes, 2),
         "silent_pauses": len(c["pauses"]),
         "filled_pauses": c["fillers"],
+        "repetitions": c["repetitions"],
+        "false_starts": c["false_starts"],
+        "self_corrections": c["self_corrections"],
+        "lexical_fillers": c["lexical_fillers"],
+        "word_searches": c["word_searches"],
         "syllables": c["syllables"],
         "syllables_acoustic": c["syllables_acoustic"],
         "words": c["words"],
@@ -183,12 +247,15 @@ def windows(speech, syllables, words, start, end, size=WINDOW_S):
 
 
 def noticed(speech, words, start, end):
-    """What a listener counts in the counting check: fillers and pauses of 0.5 s or more."""
+    """What a listener counts in the counting check: fillers, repairs and pauses of 1 s or more."""
     inside = clip(merge(speech), start, end)
     gaps = [b - a for (_, a), (b, _) in zip(inside, inside[1:], strict=False)]
+    heard = [w for w in words if start <= w.start < end]
+    r = repairs(heard)
     return {
-        "fillers": sum(1 for w in words if start <= w.start < end and is_filler(w.text)),
-        "pauses": sum(1 for g in gaps if g >= NOTICEABLE_PAUSE_S),
+        "fillers": sum(1 for w in heard if is_filler(w.text)),
+        "repairs": r["repetitions"] + r["false_starts"] + r["self_corrections"],
+        "pauses": sum(1 for g in gaps if g >= LONG_PAUSE_S),
     }
 
 

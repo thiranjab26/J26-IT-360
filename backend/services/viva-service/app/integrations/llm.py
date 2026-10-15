@@ -141,6 +141,20 @@ def positive_match(text, phrase):
     return False
 
 
+CLARIFY_REQUEST = re.compile(
+    r"\b(i )?(do not|don t|did not|didn t|can not|cannot|can t) (understand|get|follow|catch)\b"
+    r"|\b(can|could|would) you (please )?(repeat|rephrase|explain|say)\b"
+    r"|\bwhat do you mean\b|\bsay (that|it) again\b|\bpardon\b|\brepeat the question\b"
+    r"|\bwhat does (that|this|it|the question) mean\b"
+)
+
+
+def clarification_request(transcript):
+    """A short request to repeat or explain the question ("I don't understand the question")."""
+    text = " ".join(normalize(transcript).split())
+    return len(text.split()) <= 14 and bool(CLARIFY_REQUEST.search(text))
+
+
 def clear_non_answer(transcript):
     """Empty, filler-only, or explicit don't-know answers are non-answers regardless of model output."""
     text = re.sub(
@@ -160,7 +174,7 @@ def clear_non_answer(transcript):
 def demo_assess(question, transcript, previous_hits=None):
     text = normalize(transcript)
     tokens = text.split()
-    non_answer = clear_non_answer(transcript)
+    non_answer = clear_non_answer(transcript) or clarification_request(transcript)
     misconceptions = [
         m["description"]
         for m in question["misconceptions"]
@@ -398,7 +412,12 @@ ASSESS_RULES = (
     "Assess only the provided rubric. The transcript is automatic speech recognition of a "
     "second-language English speaker answering aloud: judge what the student meant, and ignore "
     "grammar, fillers and words the recognizer clearly misheard (a word that sounds like the "
-    "expected term, such as 'decibel' for 'decimal', counts as that term). The current follow-up "
+    "expected term, such as 'decibel' for 'decimal', counts as that term). Numbers that sound "
+    "alike are often misheard too, even when the transcript shows digits (fourteen and forty, "
+    "so '40' may be 14; fifteen and fifty): when the student's working shows the intended value, "
+    "use that value and do not record a misconception. A misconception is a wrong belief stated "
+    "as fact; an incomplete or imprecise answer, or the right idea in another notation (such as "
+    "0 and 1 for True and False), is partial, not a misconception. The current follow-up "
     "may target a subset: grade every rubric point the transcript demonstrates, even when it "
     "addresses a different part of the original question than current_prompt asked, and combine "
     "uncontradicted evidence from earlier answers. For each rubric point set level: full when "
@@ -428,12 +447,12 @@ def quoted(quote, transcript):
 @bounded_operation
 def assess(question, current_prompt, transcript, prior_turns, plans=None):
     cfg = settings()
-    # The best credit each point earned in earlier answers that held no misconception.
+    # The best credit each point earned in any earlier answer. A misconception in an earlier
+    # answer does not cancel what that answer got right; one in the current answer does.
     previous = {}
     for t in prior_turns:
-        if not t["assessment"]["misconceptions"]:
-            for h in t["assessment"]["rubric_hits"]:
-                previous[h["id"]] = max(previous.get(h["id"], 0.0), credit(h))
+        for h in t["assessment"]["rubric_hits"]:
+            previous[h["id"]] = max(previous.get(h["id"], 0.0), credit(h))
     previous_hits = sorted(k for k, v in previous.items() if v == 1.0)
     if cfg.assessment_provider == "demo":
         return demo_assess(question, transcript, previous_hits)
@@ -531,7 +550,7 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
             except ValueError as exc:
                 result, last = None, exc
         if result is None:
-            raise last
+            raise last or ValueError("The provider returned no assessment.")
         misconceptions = result["misconceptions"]
         if dropped:
             result["reason"] += (
@@ -554,6 +573,8 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
         ]
         if result["state"] == "misconception_bearing" and not misconceptions:
             result["state"] = "partial" if result["coverage"] else "incorrect"
+        if clarification_request(transcript):
+            result["state"] = "non_answer"  # a second request in a row: re-ask via REPHRASE
         if (
             result["coverage"] == 100
             and not misconceptions
@@ -647,6 +668,7 @@ PURPOSES = {
     "ASK_SIMPLER_OR_PREREQUISITE": "The answer was incorrect. Ask one simpler, more basic question about the same concept that the student can reason about from first principles. Do not give the answer.",
     "REPHRASE": 'The student did not answer or said they do not know. Start with a short, kind reassurance (for example "That is okay."), then ask the original question again in different, plainer words.',
     "SIMPLIFY": "The student has not answered twice. Start with a short, kind reassurance, then ask one very easy entry question about the concept that anyone who studied it could start on.",
+    "CLARIFY": "The student asked you to explain or repeat the question they were just asked (question_just_asked). Ask that same question again in shorter, plainer words, adding a tiny everyday example if it helps. Do not quote the student and do not give the answer.",
 }
 
 
@@ -676,7 +698,7 @@ def leaked_terms(question_text, bank, target, said):
 
 FOLLOW_UP_RULES = (
     'Write it in plain, simple English a second-year undergraduate understands: at most 25 words, exactly one question ending with "?". '
-    "If the latest answer has any content, start from one specific thing the student just said, quoting a few of their own words "
+    "If the latest answer says something about the concept (not just 'I don't know' or a request to repeat the question, which you never quote), start from one specific thing the student just said, quoting a few of their own words "
     '(for example: You said "...". Why / how / what happens if ...?), and ask them to explain, justify or test that claim. Ask about one thing only. '
     "When a reviewed probe is given, keep its meaning and adapt its wording to the student. "
     "Never reveal or hint at the answer, no praise or judgement, and never ask about details beyond the original question. "
@@ -745,7 +767,7 @@ def check_phrasing(text, bank, action, target, said, seen, latest=""):
     """Return why a drafted follow-up is unusable, or None."""
     if (
         latest
-        and action not in ("REPHRASE", "SIMPLIFY")
+        and action not in ("REPHRASE", "SIMPLIFY", "CLARIFY")
         and not clear_non_answer(latest)
         and not content_words(text) & content_words(latest)
     ):
@@ -767,8 +789,10 @@ def check_phrasing(text, bank, action, target, said, seen, latest=""):
 
 
 @bounded_operation
-def phrase_follow_up(bank, action, target, assessment, transcript, history, seen):
-    """Return (question, provenance) or raise ValueError/ProviderUnavailable for the caller's stored fallback."""
+def phrase_follow_up(bank, action, target, assessment, transcript, history, seen, asked=None):
+    """Return (question, provenance) or raise ValueError/ProviderUnavailable for the caller's stored fallback.
+
+    asked: the question the latest answer replied to."""
     cfg = settings()
     if action not in PURPOSES:
         raise ValueError("No phrasing purpose for this action.")
@@ -789,6 +813,7 @@ def phrase_follow_up(bank, action, target, assessment, transcript, history, seen
         "target": detail,
         "reviewed_probe": target.get("probe") if target else None,
         "conversation": [{"question": t["question"], "answer": t["transcript"]} for t in history],
+        "question_just_asked": asked,
         "latest_answer": transcript,
         "questions_already_asked": sorted(seen),
     }

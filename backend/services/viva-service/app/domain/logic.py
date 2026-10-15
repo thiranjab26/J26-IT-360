@@ -6,7 +6,7 @@ from statistics import mean
 from app.db.tables import now, uid
 from app.domain import fluency
 
-POLICY_VERSION = "c04-policy-1.3-skip-stop"
+POLICY_VERSION = "c04-policy-1.4-clarify"
 GAP_VERSION = "c04-gap-1.4-literature-profile"
 # The research's fluency thresholds; switch to the pilot profile after the 16 Oct statistics.
 GAP_PROFILE = fluency.LITERATURE_PROFILE
@@ -92,8 +92,46 @@ def issue_question(data, index, depth=0, text=None, action=None):
     }
 
 
+def clarification_assessment(bank, prior_turns):
+    """A request to explain the question is not an answer: nothing new is marked and the credit
+    from earlier answers stays as it was (policy 1.4)."""
+    last = prior_turns[-1]["assessment"] if prior_turns else None
+    return {
+        "state": "non_answer",
+        "coverage": last["coverage"] if last else 0.0,
+        "rubric_hits": [dict(h) for h in last["rubric_hits"]]
+        if last
+        else [
+            {"id": p["id"], "point": p["point"], "covered": False, "level": "none"}
+            for p in bank["rubric_points"]
+        ],
+        "missing_points": list(last["missing_points"])
+        if last
+        else [p["point"] for p in bank["rubric_points"]],
+        "misconceptions": [],
+        "reason": "The student asked for the question to be explained, so nothing was marked "
+        "and the question was asked again in plainer words.",
+        "provider": "rule:clarification",
+    }
+
+
 def next_question(data, current, assessment, action):
     index = current["_concept_index"]
+    if action == "CLARIFY":
+        # The same question in plainer words, at the same depth: asking is not an answer.
+        bank = data["snapshots"][index]
+        target = next(
+            (p for p in bank["rubric_points"] if p["id"] == current.get("_target_rubric_id")),
+            None,
+        )
+        prompt = (
+            f"Let me ask that another way. {target['probe']}"
+            if target and target.get("probe")
+            else bank["follow_ups"]["non_answer"]
+        )
+        issued = issue_question(data, index, current["depth"], prompt, action)
+        issued["_target_rubric_id"] = current.get("_target_rubric_id")
+        return issued, action
     if action in (
         "NEXT_CONCEPT",
         "DEPTH_LIMIT_NEXT_CONCEPT",
@@ -231,7 +269,7 @@ def signal_details(turn):
 
 def differentiate(turns, condition="C"):
     """Gap outcome from viva evidence only; C01 mastery is reference evidence for raters, not an input."""
-    answered = [t for t in turns if not t.get("skipped")]
+    answered = [t for t in turns if not t.get("skipped") and not t.get("clarification")]
     evidence = answered[:1] if condition == "A" else answered
     if not evidence:
         return MIXED, (
@@ -366,6 +404,8 @@ def build_report(session_id, data):
             outcomes.append(outcome)
             reasons.append(f"{bank['concept']}: {reason}")
             if condition == "C":
+                # Requests to explain the question are not answers (policy 1.4).
+                turns = [t for t in turns if not t.get("clarification")] or turns
                 last = turns[-1]["assessment"] if turns else None
                 answered = [t for t in turns if not t.get("skipped")]
                 concepts.append(

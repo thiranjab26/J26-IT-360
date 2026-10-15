@@ -15,9 +15,12 @@ const CORE: Record<string, { name: string; unit: string; decimals: number; why: 
 };
 const MORE: [keyof LabResult["session"], string, string, number][] = [
   ["silent_pauses_per_min", "Silent pauses", "per min", 1],
-  ["long_pauses_per_min", "Pauses of 2 s or more", "per min", 1],
+  ["long_pauses_per_min", "Pauses of 1 s or more", "per min", 1],
   ["filled_pauses_per_min", "Filled pauses", "per min", 1],
   ["filled_pauses_per_100_words", "Filled pauses", "per 100 words", 1],
+  ["repairs_per_min", "Repairs (repeats, false starts, corrections)", "per min", 1],
+  ["lexical_fillers_per_min", "Lexical fillers (you know, kind of)", "per min", 1],
+  ["word_searches", "Word searches (how do I say)", "count", 0],
   ["mid_clause_pause_share", "Pauses inside sentences", "share", 2],
   ["response_latency_s", "Response latency", "s", 1],
   ["phonation_time_ratio", "Phonation time ratio", "share", 2],
@@ -29,6 +32,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60))
 export default function SpeechLab({ auth, onError }: { auth: Auth; onError: (s: string) => void }) {
   const [student, setStudent] = useState<File | null>(null),
     [examiner, setExaminer] = useState<File | null>(null),
+    [words, setWords] = useState<File | null>(null),
     [transcriber, setTranscriber] = useState("auto"),
     [busy, setBusy] = useState(false),
     [result, setResult] = useState<LabResult | null>(null);
@@ -39,6 +43,7 @@ export default function SpeechLab({ auth, onError }: { auth: Auth; onError: (s: 
     const form = new FormData();
     form.append("audio", student);
     if (examiner) form.append("examiner", examiner);
+    if (words) form.append("words", words);
     form.append("transcriber", transcriber);
     try {
       setResult(await api<LabResult>("/lab/analyse", auth.token, form, "POST", AbortSignal.timeout(300000)));
@@ -59,11 +64,12 @@ export default function SpeechLab({ auth, onError }: { auth: Auth; onError: (s: 
         <div className="lab-drops">
           <DropZone label="Student recording" hint="Required. The student's voice, for example P03_student.m4a" file={student} onFile={setStudent} />
           <DropZone label="Examiner recording" hint="Optional. Your voice from the same call; splits the viva per question" file={examiner} onFile={setExaminer} />
+          <DropZone label="Words file" hint="Optional. P03_student.words.json from the CrisperWhisper notebook: exact fillers and repairs" file={words} onFile={setWords} accept=".json,application/json" />
         </div>
         <div className="lab-controls">
           <label className="field-inline">
             Transcription
-            <select value={transcriber} onChange={(e) => setTranscriber(e.target.value)}>
+            <select value={transcriber} disabled={!!words} title={words ? "The words file is used instead" : undefined} onChange={(e) => setTranscriber(e.target.value)}>
               <option value="auto">Automatic (Groq when configured)</option>
               <option value="groq">Groq: adds fillers and pause positions</option>
               <option value="none">Sound only: private, no words</option>
@@ -81,7 +87,7 @@ export default function SpeechLab({ auth, onError }: { auth: Auth; onError: (s: 
   );
 }
 
-function DropZone({ label, hint, file, onFile }: { label: string; hint: string; file: File | null; onFile: (f: File | null) => void }) {
+function DropZone({ label, hint, file, onFile, accept = ACCEPT }: { label: string; hint: string; file: File | null; onFile: (f: File | null) => void; accept?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   function drop(e: DragEvent) {
@@ -105,7 +111,7 @@ function DropZone({ label, hint, file, onFile }: { label: string; hint: string; 
       tabIndex={0}
       aria-label={`${label}: ${file ? file.name : "choose a file"}`}
     >
-      <input ref={input} type="file" accept={ACCEPT} hidden onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+      <input ref={input} type="file" accept={accept} hidden onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
       {file ? <FileAudio size={26} /> : <UploadCloud size={26} />}
       <strong>{label}</strong>
       <span className="small muted">{file ? `${file.name} · ${(file.size / 1048576).toFixed(1)} MB` : hint}</span>
@@ -229,6 +235,7 @@ function LabResults({ result }: { result: LabResult }) {
                   <th>Mean pause</th>
                   <th>Pauses/min</th>
                   <th>Fillers/min</th>
+                  <th>Repairs/min</th>
                 </tr>
               </thead>
               <tbody>
@@ -242,6 +249,7 @@ function LabResults({ result }: { result: LabResult }) {
                     <td>{a.mean_silent_pause_ms == null ? "n/a" : `${a.mean_silent_pause_ms} ms`}</td>
                     <td>{a.silent_pauses_per_min?.toFixed(1) ?? "n/a"}</td>
                     <td>{a.filled_pauses_per_min?.toFixed(1) ?? "n/a"}</td>
+                    <td>{a.repairs_per_min?.toFixed(1) ?? "n/a"}</td>
                   </tr>
                 ))}
               </tbody>
