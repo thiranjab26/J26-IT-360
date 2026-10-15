@@ -133,6 +133,12 @@ export const CoinsIcon = (p: IconProps) => (
   </Stroke>
 );
 
+export const CodeIcon = (p: IconProps) => (
+  <Stroke {...p}>
+    <path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" />
+  </Stroke>
+);
+
 export const ShieldIcon = (p: IconProps) => (
   <Solid {...p}>
     <path d="M12 2 4 5v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V5l-8-3Zm-1.2 13.2-3-3 1.4-1.4 1.6 1.6 4-4 1.4 1.4-5.4 5.4Z" />
@@ -151,4 +157,5 @@ export const BADGE_ICONS: Record<string, (p: IconProps) => React.JSX.Element> = 
   week_warrior: CalendarIcon,
   xp_500: CoinsIcon,
   xp_2000: BoltIcon,
+  first_build: CodeIcon,
 };

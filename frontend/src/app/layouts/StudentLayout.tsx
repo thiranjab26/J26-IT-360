@@ -8,7 +8,7 @@ import { cx } from '@/shared/components/ui';
  * The signed-in shell, following the VeriTutor mockups: brand, section tabs,
  * the current module as a pill, and the learner's avatar.
  *
- * Practicals and Course material have no screens yet, so they render as
+ * Course material has no screen yet, so it renders as
  * disabled tabs rather than links to nowhere.
  */
 export function StudentLayout() {
@@ -42,7 +42,7 @@ export function StudentLayout() {
               {current && <Tab to={`/modules/${current.module_id}`}>Quest Map</Tab>}
               <Tab to="/dashboard">Modules</Tab>
               <Tab to="/profile">Profile</Tab>
-              <DisabledTab>Practicals</DisabledTab>
+              <Tab to="/practicals">Practicals</Tab>
               <DisabledTab>Course material</DisabledTab>
             </nav>
           </div>
