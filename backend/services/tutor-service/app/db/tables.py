@@ -350,7 +350,7 @@ verified_explanations = Table(
 # so the same bonus can never be paid twice however often a request is replayed.
 # The values and rules are in docs/c3/gamification-spec.md.
 # ---------------------------------------------------------------------------
-XP_EVENT_KINDS = ("concept_clear", "flawless", "mastery", "quest", "streak")
+XP_EVENT_KINDS = ("concept_clear", "flawless", "mastery", "quest", "streak", "practical")
 
 xp_events = Table(
     "xp_events",
@@ -393,3 +393,42 @@ user_badges = Table(
     schema=TUTOR_SCHEMA,
 )
 Index("ix_user_badges_session", user_badges.c.session_id)
+
+# ---------------------------------------------------------------------------
+# tutor.practical_tests and tutor.practical_attempts
+#
+# A practical is a program-writing question from the course. Its tests are an input and the
+# output the course's own reference solution gives for it. Visible tests are shown to the
+# student, hidden ones only report pass or fail. Every submission is recorded.
+# ---------------------------------------------------------------------------
+practical_tests = Table(
+    "practical_tests",
+    metadata,
+    Column("question_id", Text, primary_key=True),
+    Column("test_no", SmallInteger, primary_key=True),
+    Column("stdin", Text, nullable=False),
+    Column("expected", Text, nullable=False),
+    Column("visible", Boolean, nullable=False),
+    Column("source", Text, nullable=False),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    CheckConstraint(_in("source", ("sample", "generated")), name="ck_practical_tests_source"),
+    schema=TUTOR_SCHEMA,
+)
+
+practical_attempts = Table(
+    "practical_attempts",
+    metadata,
+    Column(
+        "attempt_id", UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    ),
+    Column("user_id", UUID(as_uuid=True), nullable=False),
+    Column("question_id", Text, nullable=False),
+    Column("source", Text, nullable=False),
+    Column("compiled", Boolean, nullable=False),
+    Column("passed", Boolean, nullable=False),
+    Column("tests_passed", SmallInteger, nullable=False),
+    Column("tests_total", SmallInteger, nullable=False),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    schema=TUTOR_SCHEMA,
+)
+Index("ix_practical_attempts_user", practical_attempts.c.user_id, practical_attempts.c.question_id)

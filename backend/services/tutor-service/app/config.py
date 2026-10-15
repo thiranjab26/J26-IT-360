@@ -54,6 +54,13 @@ class Settings(BaseSettings):
         default="sentence-transformers/all-MiniLM-L6-v2", alias="TUTOR_EMBEDDING_MODEL"
     )
 
+    # --- practicals ---------------------------------------------------------
+    # local: run students' Java with the JDK on this machine. This is a DEVELOPMENT runner, not
+    # a sandbox; the isolated Piston runner replaces it from phase P4. off: practicals open but
+    # nothing can be run.
+    practicals_runner: str = Field(default="local", alias="TUTOR_PRACTICALS_RUNNER")
+    practicals_run_timeout: float = Field(default=5.0, alias="TUTOR_PRACTICALS_RUN_TIMEOUT")
+
     # --- guided sessions ----------------------------------------------------
     # The local time zone for "a day" in streaks. A streak is consecutive local days.
     timezone: str = Field(default="Asia/Colombo", alias="TUTOR_TIMEZONE")

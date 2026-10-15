@@ -34,6 +34,7 @@ _STATUS = {
     "not_found": status.HTTP_404_NOT_FOUND,
     "conflict": status.HTTP_409_CONFLICT,
     "forbidden": status.HTTP_403_FORBIDDEN,
+    "unavailable": status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

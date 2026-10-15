@@ -152,6 +152,25 @@ Levels, bonus XP, badges, streaks and topic quests sit on top of the checkpoint 
 
 Answer and continue responses carry a `rewards` object (XP gained, bonuses, badges, level, level-up) so the screen can celebrate exactly what was earned; a finished session's summary lists them again. A "day" for streaks follows `TUTOR_TIMEZONE`.
 
+## Practicals
+
+The authored code questions (39 of them) are also offered as hands-on practicals: the student writes a Java program, runs it against the sample, and submits it to be marked against hidden tests.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/tutor/practicals?module_id=prog` | Every practical with whether it is ready and how the student stands |
+| GET | `/api/v1/tutor/practicals/{id}` | The statement, starter code, visible samples and the student's last submission |
+| POST | `/api/v1/tutor/practicals/{id}/run` | Compile and run the code on the student's own input. Nothing is recorded |
+| POST | `/api/v1/tutor/practicals/{id}/submit` | Run against every test, record the attempt, and pay the practical bonus once on a first pass |
+
+How it works:
+
+- Programs read stdin and print to stdout. The tests come from the question's reference solution: the sample inputs from the statement plus a few extra inputs proposed by the model (the model only proposes inputs, never expected answers). Expected output is whatever the reference solution prints, so a wrong test cannot be invented.
+- `app/practicals/runner.py` defines `CodeRunner`. `LocalJavaRunner` compiles and runs with the JDK on the machine, in a throwaway folder, with time, memory and output limits, and kills the whole process tree on a timeout. **It is a development runner, not a sandbox**: student code runs as the user who started the service. The isolated Piston runner (phase P4) replaces it behind the same interface.
+- Build the tests once, then check them: `uv run python -m app.practicals.cli build-tests` and `uv run python -m app.practicals.cli status`.
+- Settings: `TUTOR_PRACTICALS_RUNNER` (`local` or `off`) and `TUTOR_PRACTICALS_RUN_TIMEOUT` (seconds per run). Tables: `tutor.practical_tests` and `tutor.practical_attempts` (migration 0008).
+- Not built yet: free-text (explain) grading, generated practicals, and feeding practical attempts into `tutor.v_attempt_outcomes`.
+
 ## Faithfulness gate
 
 Generated text is checked against the course passage it came from before a student sees it (`app/verification/`). The method, the numbers behind the settings and their limits are in `research/c3-RAG tutor/README.md`; this is how to run it.

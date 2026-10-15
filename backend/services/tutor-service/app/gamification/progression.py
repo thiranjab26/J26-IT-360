@@ -81,6 +81,8 @@ class Bonuses:
     quest: int = 150  # every concept in a topic is mastered
     streak: int = 25  # first finished session of a day, with a streak of 3 days or more
     streak_from_days: int = 3
+    practical: int = 150  # a level 4 practical passes every test, the first time
+    practical_hard: int = 250  # the same for a level 5 practical
 
 
 BONUSES = Bonuses()
@@ -92,6 +94,7 @@ BONUS_LABELS = {
     "mastery": "Concept mastered",
     "quest": "Quest complete",
     "streak": "Streak bonus",
+    "practical": "Practical passed",
 }
 
 
@@ -127,6 +130,7 @@ BADGES: tuple[Badge, ...] = (
     Badge("week_warrior", "Week Warrior", "Learn on 7 days in a row.", "epic"),
     Badge("xp_500", "Half a Grand", "Earn 500 XP.", "common"),
     Badge("xp_2000", "Two Thousand Club", "Earn 2,000 XP.", "rare"),
+    Badge("first_build", "First Build", "Pass your first practical.", "common"),
 )
 BADGE_BY_ID = {badge.id: badge for badge in BADGES}
 
@@ -144,6 +148,7 @@ class BadgeFacts:
     quests_complete: int = 0
     streak: int = 0
     total_xp: int = 0
+    practicals_passed: int = 0
 
 
 def badges_due(facts: BadgeFacts, owned: Collection[str]) -> list[Badge]:
@@ -159,6 +164,7 @@ def badges_due(facts: BadgeFacts, owned: Collection[str]) -> list[Badge]:
         "week_warrior": facts.streak >= 7,
         "xp_500": facts.total_xp >= 500,
         "xp_2000": facts.total_xp >= 2000,
+        "first_build": facts.practicals_passed >= 1,
     }
     return [b for b in BADGES if earned[b.id] and b.id not in owned]
 
