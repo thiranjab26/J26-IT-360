@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { startFrameLoop, type AnimationFrameApi } from '../../../src/core/camera/index.js';
+import {
+  startFrameLoop,
+  type AnimationFrameApi,
+  type FrameArrival,
+} from '../../../src/core/camera/index.js';
 import { FakeVideo } from '../helpers/fake-media.js';
 
 class FakeRaf implements AnimationFrameApi {
@@ -20,10 +24,10 @@ class FakeRaf implements AnimationFrameApi {
     return this.#callbacks.size;
   }
 
-  tick(): void {
+  tick(now = 0): void {
     const cbs = [...this.#callbacks.values()];
     this.#callbacks.clear();
-    for (const cb of cbs) cb(0);
+    for (const cb of cbs) cb(now);
   }
 }
 
@@ -39,6 +43,28 @@ describe('frame loop on requestVideoFrameCallback', () => {
 
     expect(seen).toEqual([500, 533, 600]);
     expect(raf.pending).toBe(0);
+  });
+
+  it('reports when each frame became available, preferring the capture time (A7 bench)', () => {
+    const video = new FakeVideo();
+    const arrivals: FrameArrival[] = [];
+    startFrameLoop(video, (_t, a) => arrivals.push(a), new FakeRaf());
+
+    // Camera stream in Chromium: captureTime on the performance clock.
+    video.presentFrame(1.0, 1040, { captureTime: 1000, presentationTime: 1030 });
+    // No captureTime (other browsers): presentation time.
+    video.presentFrame(1.1, 1140, { presentationTime: 1130 });
+    // A capture time from another clock or far in the past is not trusted.
+    video.presentFrame(1.2, 5000, { captureTime: 100, presentationTime: 4990 });
+    // A capture time in the future is not trusted either.
+    video.presentFrame(1.3, 6000, { captureTime: 6100, presentationTime: 5990 });
+
+    expect(arrivals).toEqual([
+      { ms: 1000, origin: 'capture' },
+      { ms: 1130, origin: 'presentation' },
+      { ms: 4990, origin: 'presentation' },
+      { ms: 5990, origin: 'presentation' },
+    ]);
   });
 
   it('stop() cancels the pending callback and ignores late ones', () => {
@@ -70,6 +96,16 @@ describe('frame loop fallback on requestAnimationFrame (browsers without rVFC)',
       raf.tick();
     }
     expect(seen).toEqual([100, 133, 166]);
+  });
+
+  it('reports the animation-frame time as the arrival', () => {
+    const video = videoWithoutRvfc();
+    const raf = new FakeRaf();
+    const arrivals: FrameArrival[] = [];
+    startFrameLoop(video, (_t, a) => arrivals.push(a), raf);
+    video.currentTime = 0.1;
+    raf.tick(250);
+    expect(arrivals).toEqual([{ ms: 250, origin: 'animation-frame' }]);
   });
 
   it('waits until the video has a decoded frame', () => {

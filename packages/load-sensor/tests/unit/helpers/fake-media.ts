@@ -76,8 +76,16 @@ export class FakeVideo {
     return this.#callbacks.size;
   }
 
-  /** Presents one frame with the given media time (seconds). */
-  presentFrame(mediaTimeS: number): void {
+  /**
+   * Presents one frame with the given media time (seconds). `now` is the
+   * callback's performance-clock time; `timing` overrides metadata fields
+   * such as `captureTime` / `presentationTime`.
+   */
+  presentFrame(
+    mediaTimeS: number,
+    now = 0,
+    timing: Partial<Pick<VideoFrameCallbackMetadata, 'captureTime' | 'presentationTime'>> = {},
+  ): void {
     const callbacks = [...this.#callbacks.values()];
     this.#callbacks.clear();
     const metadata: VideoFrameCallbackMetadata = {
@@ -87,8 +95,9 @@ export class FakeVideo {
       presentedFrames: 0,
       width: this.videoWidth,
       height: this.videoHeight,
+      ...timing,
     };
-    for (const cb of callbacks) cb(0, metadata);
+    for (const cb of callbacks) cb(now, metadata);
   }
 }
 

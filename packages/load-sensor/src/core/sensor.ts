@@ -1,4 +1,5 @@
 import { Camera, type CameraEnvironment, type CameraStatus } from './camera/index.js';
+import { HeuristicLoadClassifier } from './classifier/heuristic.js';
 import type { LoadClassifier } from './classifier/types.js';
 import type { ChannelFactory } from './events/broadcast.js';
 import { Emitter } from './events/emitter.js';
@@ -10,7 +11,9 @@ import {
   TfjsFaceMeshProvider,
   UnsupportedBackendError,
   type LandmarkProvider,
+  type LandmarkSample,
 } from './landmarks/index.js';
+import { timedClassifier, type LatencyProbe } from './util/latency-probe.js';
 import { FeaturePipeline } from './window/feature-pipeline.js';
 
 /**
@@ -67,6 +70,8 @@ export interface LoadSensorOptions {
     readonly channelFactory?: ChannelFactory;
     readonly timers?: HubTimers;
     readonly now?: () => number;
+    /** Benchmark only (TODO A7): records latencies as ARCHITECTURE.md §11 defines them. */
+    readonly latencyProbe?: LatencyProbe;
   };
 }
 
@@ -166,6 +171,10 @@ class LoadSensorImpl implements LoadSensor {
   readonly #emitter = new Emitter<LoadSensorEvents>();
   readonly #cleanup: (() => void)[] = [];
 
+  readonly #probe: LatencyProbe | null;
+  /** Arrival of the frame being pushed into the pipeline (latency probe only). */
+  #pushing: LandmarkSample['arrival'] | null = null;
+
   #modelReady = false;
   /** Bumped by disable(); an enable() that was waiting on the model then stops. */
   #generation = 0;
@@ -195,9 +204,13 @@ class LoadSensorImpl implements LoadSensor {
       options.targetFps === undefined ? {} : { targetFps: options.targetFps },
     );
     this.#pipeline = new FeaturePipeline({ useExpressionFeatures: this.useExpressionFeatures });
+    this.#probe = env.latencyProbe ?? null;
+    const classifier =
+      options.classifier ??
+      new HeuristicLoadClassifier({ useExpressionFeatures: this.useExpressionFeatures });
     this.#hub = new LoadStateHub({
       useExpressionFeatures: this.useExpressionFeatures,
-      ...(options.classifier ? { classifier: options.classifier } : {}),
+      classifier: this.#probe ? timedClassifier(classifier, this.#probe) : classifier,
       ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
       ...(options.broadcast === undefined ? {} : { broadcast: options.broadcast }),
       ...(options.strainStorage === undefined ? {} : { strainStorage: options.strainStorage }),
@@ -212,6 +225,17 @@ class LoadSensorImpl implements LoadSensor {
             }
           : null,
     });
+
+    // Registered before anything else listens to the pipeline, so "per-frame
+    // signals ready" is timed before other listeners run (latency probe, §11).
+    const probe = this.#probe;
+    if (probe) {
+      this.#cleanup.push(
+        this.#pipeline.onFrame((f) => {
+          if (this.#pushing) probe.frameSignalsReady(this.#pushing, f.signals !== null);
+        }),
+      );
+    }
 
     this.#cleanup.push(
       this.#hub.on('state', (e) => {
@@ -229,7 +253,10 @@ class LoadSensorImpl implements LoadSensor {
       this.#tracker.onSample((sample) => {
         const s = this.#camera.settings;
         const aspect = s?.width && s.height ? s.width / s.height : 4 / 3;
+        this.#probe?.inferenceTook(sample.inferenceMs);
+        this.#pushing = sample.arrival;
         this.#pipeline.push(sample.tMs, sample.face?.landmarks ?? null, aspect);
+        this.#pushing = null;
         this.#hub.updatePipeline(this.#pipeline.state);
       }),
       this.#pipeline.onSecond((second) => {
@@ -239,6 +266,7 @@ class LoadSensorImpl implements LoadSensor {
           this.#pipeline.state,
           w.classifiable ? w.toModelInput() : null,
         );
+        this.#probe?.decisionMade(second.frames);
       }),
       this.#camera.onStatus(({ status }) => {
         this.#onCameraStatus(status);

@@ -166,14 +166,48 @@ Preparation material for every item below (question lists, request text, checkli
   - `script-src` needs `'wasm-unsafe-eval'` for the TF.js WASM fallback; that allows WebAssembly compilation only, not JavaScript `eval`. The bundle has no `eval` / `new Function` and the built HTML has no inline script or style. Dev adds only `style-src 'unsafe-inline'` (Vite injects CSS as `<style>` for hot reload).
   - No `blob:` in `worker-src`: the threaded TF.js WASM build spawns blob workers only under cross-origin isolation (COOP/COEP), which the app does not enable. Turning isolation on later means adding `blob:` on purpose.
   - Also sent: `Permissions-Policy: camera=(self), microphone=(), geolocation=()`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`. No `report-uri`, because a reporting endpoint would itself be a network dependency (invariant 3).
-  - Evidence in `tests/e2e/csp.spec.ts`. Checks: the header and the first `<head>` element on all 3 pages; a deliberate cross-origin `fetch` POST, `sendBeacon` and WebSocket are each blocked by both the header and the meta copy; an injected inline script and page `eval` are refused; the self-hosted `.wasm` compiles. The sensor, consumer and cog admin pages all run with zero violations, on WebGL and on WASM with WebGL stubbed out. Firefox has not been checked yet (no Playwright Firefox project); its support for `'wasm-unsafe-eval'` starts at Firefox 102.
+  - Evidence in `tests/e2e/csp.spec.ts`. Checks: the header and the first `<head>` element on all 4 pages (incl. `bench.html`, added later in A7); a deliberate cross-origin `fetch` POST, `sendBeacon` and WebSocket are each blocked by both the header and the meta copy; an injected inline script and page `eval` are refused; the self-hosted `.wasm` compiles. The sensor, consumer and cog admin pages all run with zero violations, on WebGL and on WASM with WebGL stubbed out. Firefox has not been checked yet (no Playwright Firefox project); its support for `'wasm-unsafe-eval'` starts at Firefox 102.
   - Playwright note: `page.evaluate` runs through DevTools, which Chrome exempts from the eval check, so the eval probe runs from a same-origin script file instead.
-- [ ] Service worker precaching app shell + models
-- [ ] Playwright + fake camera: **zero network requests** during 60 s of sensing; save HAR to `docs/evidence/`
-- [ ] Playwright: load online → go offline → reload → reaches `status: "active"`
-- [ ] `npm run bench`: frame latency p50/p95, event latency p95, classifier time, long tasks; writes JSON with device + browser info
-- [ ] Tensor-leak test: `tf.memory().numTensors` flat across a simulated long run
+- [x] Service worker precaching app shell + models
+  - `vite-plugin-pwa` 2.0.0 (dev dependency, build time only; named in the CLAUDE.md stack) generates a Workbox worker. It precaches 4 pages, every chunk, both face mesh models and 2 WASM binaries, about 5.5 MB. Each file gets a content-hash revision, so a changed model is downloaded again and old caches are cleaned up.
+  - Not precached: source maps, `MANIFEST.json` and the threaded WASM build, which is only used under cross-origin isolation. `maximumFileSizeToCacheInBytes` is raised to 4 MiB because the 2.3 MiB landmark weights would otherwise be skipped silently. `navigateFallback: null` because this is a multi-page app.
+  - Registered by `src/demo/service-worker.ts`, from the sensor page only. `src/core` stays free of caching policy: a host app owns its own service worker. The plugin's `inline` register option is not used because it needs an inline script, which the CSP blocks.
+  - The worker is off in `pnpm dev`. The Performance tab shows "Offline cache: Ready" once the precache is done.
+- [x] Playwright + fake camera: **zero network requests** during 60 s of sensing; save HAR to `docs/evidence/`
+  - `tests/e2e/privacy-network.spec.ts`. The 60 s window starts once the precache is done, sensing is on and frames are flowing. It asserts zero requests in the window, including the service worker's own, and zero requests to other origins in the whole session.
+  - `pnpm evidence` writes `docs/evidence/nfr2-sensing-60s.har` (bodies omitted; localhost only, no cookies) and `.summary.json`. A plain `pnpm test:e2e` writes them to `test-results/` instead, so committed evidence is never rewritten by accident.
+  - Run 2026-10-16 (Chromium 153, synthetic camera): 0 requests in 60.0 s, 874 frames received, 49 requests in the session, all same-origin.
+- [x] Playwright: load online → go offline → reload → reaches `status: "active"`
+  - `tests/e2e/offline.spec.ts`. The test:
+    - proves the network is really gone;
+    - checks the reload and every later request came from the service worker;
+    - turns sensing on offline (model loaded from the cache, frames processed, 0 errors);
+    - checks the consumer and cog admin pages also load.
+  - Status reached: the synthetic fake camera has no face, so it honestly reaches `no_face`. Only a face clip in `ADAPTLEARN_FAKE_VIDEO` (see `tests/e2e/fake-camera.ts`) makes the test require `active`.
+  - [ ] 🧑 Record a face clip (outside the repo, instructions in `tests/e2e/fake-camera.ts`) and run `pnpm test:e2e` with `ADAPTLEARN_FAKE_VIDEO` set, so the `active` branch has run at least once. Not yet done.
+- [x] `npm run bench`: frame latency p50/p95, event latency p95, classifier time, long tasks; writes JSON with device + browser info
+  - `bench.html` runs the shipped library (`createLoadSensor()`) with no demo UI, so the numbers are the sensor's own and any long task on the page belongs to it. `pnpm bench [--browser=chromium,msedge,firefox] [--camera=real] [--seconds=120] [--warmup=30] [--headless]` builds the app, drives that page and writes `docs/bench/<date>_<time>_<cpu>_<browser>_<camera>.json`. The page can also be opened by hand on any laptop and the JSON downloaded.
+  - Measurement points (§11), in `src/core/util/latency-probe.ts`, attached through `environment.latencyProbe`. With no probe the sensor behaves exactly the same; a unit test checks the events are identical.
+    - Frame latency: frame arrival → per-frame signals ready. Arrival is rVFC `captureTime` if the browser gives it, else `presentationTime`, else the rAF time; the report records which.
+    - Event latency: arrival of the newest frame of a finished second → hub done.
+    - Inference time and classifier time.
+  - The report also has:
+    - startup time (camera + model; first processed frame), kept separate from steady state;
+    - long tasks (Chromium only);
+    - a portable 50 ms event-loop lag monitor;
+    - tensors and heap (Chromium) once a second;
+    - `within_budget` against §11, where `null` means not measured;
+    - `warnings` whenever a run is unrepresentative: no face, classifier never ran, software GPU, page hidden, freeze over 1 s.
+  - Headed by default, because headless Chromium uses SwiftShader. Chrome and Edge get a generated test-pattern clip from the OS temp folder, so their input is identical. Edge's built-in fake camera ended its track by itself in 2–3 of 3 launches, even with a bare `getUserMedia()` and no app code; Chromium did this in 0 of 10, and the file-backed device in 0 of 4. A fake-camera run that hits `no_camera` is retried up to 3 times. Real-camera runs are never retried.
+  - Warm-up starts after the first processed frame and lasts 30 s by default. See the Firefox note below.
+- [x] Tensor-leak test: `tf.memory().numTensors` flat across a simulated long run
+  - `tests/e2e/long-run.spec.ts`. Runs the real sensor on `bench.html` for 120 s (`LONG_RUN_SECONDS=3600` gives the NFR6 soak) and requires every reading to be identical.
+  - Readings are taken between two inferences, through `LatencyProbe.onFrame`. Reading on a 1 s timer had caught in-flight temporaries (1157 vs 1166) and gave a false +1.
+  - Checked by mutation: without `pixels.dispose()` in the provider the test fails, with growth +128.5 in 30 s.
 - [ ] Run bench on the weak laptop in Chrome, Edge, Firefox; commit outputs
+  - Tool ready. Dev-laptop runs (i5-1240P, Iris Xe, synthetic camera, so no face) are in `docs/bench/`; their own `warnings` say why they are not the NFR1 result.
+  - 🧑 Still needed: on the weakest laptop, run `pnpm bench --camera=real --browser=chromium,msedge,firefox` with your face in view, then commit the JSON.
+- [ ] Investigate: Firefox froze the main thread once, for about 7 s, about 25 s after sensing started (2026-10-16, i5-1240P, synthetic camera). It showed up in both runs where it fell inside the measured period (warm-up 5 s and 10 s). It did not repeat later in the 90 s run, and with a 40 s warm-up it fell outside the measured period. It looks like late shader compilation, but that is not confirmed. Learners on Firefox would see the page freeze once per session. Not seen in Chrome or Edge.
 - [ ] 🧑 Run the **Camera quality check** (Performance tab) with a real face on the weak laptop; save the JSON to `packages/load-sensor/docs/bench/`. Results: TBD
   - Added ahead of the bench to decide two method questions with numbers instead of guesses: is a higher capture resolution than 640×480 worth its latency, and is landmark smoothing before features needed? It steps the live track through 640×480, 960×720 and 1280×720 (`applyConstraints`, 2.5 s settle + 10 s measure each) and reports delivered resolution, landmark fps, inference p50/p95, face ratio, landmark jitter (frame-to-frame, translation removed, IOD units) and robust per-frame noise of EAR, iris offset, yaw and pitch (`src/demo/quality-check.ts`). Summary numbers only; a local download, nothing sent. The metric is unit-tested against synthetic faces with known injected noise (jitter ≈ 2σ/IOD). Headless fake-camera runs have no face and are not evidence. Do not change `DEFAULT_VIDEO_CONSTRAINTS` or add smoothing until these numbers exist (feature_spec + parity re-run if either changes).
 

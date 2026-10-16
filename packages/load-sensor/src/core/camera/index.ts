@@ -10,6 +10,8 @@ export type {
   CameraFailure,
   CameraFrame,
   CameraStatus,
+  FrameArrival,
+  FrameArrivalOrigin,
   FrameClock,
   PauseReason,
 } from './types.js';

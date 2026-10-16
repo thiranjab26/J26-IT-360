@@ -50,6 +50,7 @@ import {
   type DemoSettings,
   type SensorStatus,
 } from './settings.js';
+import { OFFLINE_STATE_LABEL, registerServiceWorker } from './service-worker.js';
 import { SignalsPanel } from './signals-panel.js';
 import { Tabs, type TabTone } from './tabs.js';
 import { WellbeingPanel } from './wellbeing-panel.js';
@@ -292,7 +293,11 @@ function mount(root: HTMLElement): void {
     { testId: 'dropped', label: 'Skipped (busy / rate)' },
     { testId: 'tensors', label: 'TF.js tensors' },
     { testId: 'errors', label: 'Inference errors' },
+    { testId: 'offline', label: 'Offline cache' },
   ]);
+  registerServiceWorker((state) => {
+    stats.set('offline', OFFLINE_STATE_LABEL[state]);
+  });
 
   const perfGrid = el('div');
   perfGrid.className = 'perf-grid';
@@ -347,9 +352,15 @@ function mount(root: HTMLElement): void {
   perfTitle.className = 'section-title';
   const perfSub = el(
     'p',
-    'Live read-outs for debugging. Frame time here is time inside the face model; the latency benchmark (TODO A7) measures end to end.',
+    'Live read-outs for debugging. Frame time here is time inside the face model; the latency benchmark measures end to end. ',
   );
   perfSub.className = 'section-sub';
+  // Its own page, so the demo UI never adds to what is measured (A7).
+  const benchLink = el('a', 'Open latency benchmark');
+  benchLink.href = `${import.meta.env.BASE_URL}bench.html`;
+  benchLink.target = 'adaptlearn-c2-bench';
+  benchLink.dataset.testid = 'open-bench';
+  perfSub.append(benchLink);
   perfTitles.append(perfTitle, perfSub);
   perfHead.append(perfTitles);
   // The event stream (what C01/C03/C04 receive) lives here, beside the debug read-outs.

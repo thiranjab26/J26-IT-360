@@ -1,0 +1,718 @@
+{
+  "schema": 1,
+  "tool": "adaptlearn-c2-bench",
+  "definitions": "ARCHITECTURE.md §11. frame_latency: frame arrival (rVFC captureTime, else presentationTime, else rAF time; see run.frame_arrival_origins) to per-frame signals computed. event_latency: arrival of the newest frame of a finished second to the hub having classified it and emitted any event (includes up to one frame interval of waiting for the second to close). face_mesh_inference: one landmark estimate. classifier: one classify() call. Percentiles: linear interpolation (NumPy default). Warm-up starts after the first processed frame; startup_s is reported separately.",
+  "started_at": "2026-10-16T14:41:43.841Z",
+  "startup_s": {
+    "camera_and_model": 0.14,
+    "first_processed_frame": 7.15
+  },
+  "config": {
+    "warmup_s": 30,
+    "measured_s": 120.1,
+    "target_fps": 15
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:155.0) Gecko/20100101 Firefox/155.0",
+    "hardwareConcurrency": 16,
+    "deviceMemoryGb": null,
+    "gpu": "ANGLE (Intel, Intel(R) HD Graphics Direct3D11 vs_5_0 ps_5_0), or similar",
+    "backend": "webgl",
+    "frameClock": "video-frame-callback",
+    "camera": {
+      "width": 640,
+      "height": 480
+    }
+  },
+  "run": {
+    "frames_processed": 1679,
+    "landmark_fps": 14,
+    "face_ratio": 0,
+    "frame_arrival_origins": {
+      "presentation": 1679
+    },
+    "status_seconds": {
+      "no_face": 120
+    }
+  },
+  "metrics_ms": {
+    "frame_latency": {
+      "n": 1679,
+      "p50": 48.66,
+      "p95": 70.32,
+      "max": 178.3,
+      "mean": 51.51
+    },
+    "event_latency": {
+      "n": 120,
+      "p50": 115.8,
+      "p95": 170.43,
+      "max": 303.64,
+      "mean": 125.12
+    },
+    "face_mesh_inference": {
+      "n": 1679,
+      "p50": 48,
+      "p95": 70,
+      "max": 178,
+      "mean": 51.22
+    },
+    "classifier": {
+      "n": 0,
+      "p50": null,
+      "p95": null,
+      "max": null,
+      "mean": null
+    }
+  },
+  "long_tasks": {
+    "supported": false,
+    "count": null,
+    "totalMs": null,
+    "maxMs": null
+  },
+  "event_loop_lag_ms": {
+    "n": 2326,
+    "p95": 8,
+    "max": 56,
+    "stalls": 4
+  },
+  "memory": {
+    "tensors_start": 1157,
+    "tensors_end": 1157,
+    "tensors_max": 1157,
+    "tensor_growth": 0,
+    "js_heap_start_mb": null,
+    "js_heap_end_mb": null,
+    "js_heap_slope_mb_per_min": null,
+    "samples": [
+      {
+        "tS": 1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 2,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 3,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 4,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 5,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 6,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 7,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 8,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 9,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 10,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 11,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 12,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 13,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 14,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 15,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 16,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 17,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 18,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 19,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 20,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 21,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 22.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 23.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 24.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 25.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 26.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 27.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 28.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 29.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 30.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 31.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 32.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 33.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 34.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 35.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 36.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 37.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 38.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 39.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 40.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 41.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 42.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 43.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 44.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 45.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 46.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 47.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 48.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 49.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 50.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 51.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 52.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 53.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 54.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 55.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 56.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 57.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 58.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 59.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 60.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 61.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 62.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 63.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 64.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 65.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 66.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 67.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 68.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 69.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 70.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 71.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 72.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 73.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 74.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 75.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 76.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 77.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 78.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 79.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 80.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 81.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 82.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 83.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 84.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 85.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 86.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 87.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 88.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 89.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 90.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 91.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 92.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 93.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 94.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 95.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 96.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 97.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 98.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 99.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 100.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 101.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 102.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 103.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 104.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 105.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 106.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 107.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 108.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 109.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 110.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 111.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 112.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 113.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 114.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 115.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 116.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 117.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 118.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 119.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      },
+      {
+        "tS": 120.1,
+        "tensors": 1157,
+        "jsHeapMb": null
+      }
+    ]
+  },
+  "within_budget": {
+    "frame_latency_p95": false,
+    "event_latency_p95": true,
+    "classifier_p95": null,
+    "no_long_tasks": null,
+    "no_main_thread_stalls": false,
+    "tensors_flat": true
+  },
+  "warnings": [
+    "A face was found in 0 % of frames (needs ≥ 80 %). Without a face the landmark model does not run, so these latencies understate real use. Use a real camera with a face in view, or a face clip.",
+    "The classifier never ran: it needs a finished baseline and a full 30 s window with a face. Classifier time was not measured; run longer with a face in view.",
+    "This browser has no Long Tasks API, so long tasks were not measured."
+  ],
+  "run_info": {
+    "browser": "firefox",
+    "browser_version": "155.0",
+    "headless": false,
+    "camera_source": "synthetic-pattern",
+    "commit": "29d3089-dirty",
+    "host": {
+      "cpu": "12th Gen Intel(R) Core(TM) i5-1240P",
+      "logical_cores": 16,
+      "memory_gb": 15.7,
+      "os": "win32 10.0.26200 x64"
+    },
+    "command": "pnpm bench --browser=chromium,msedge,firefox"
+  }
+}

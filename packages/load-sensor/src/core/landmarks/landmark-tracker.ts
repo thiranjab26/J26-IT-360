@@ -1,5 +1,5 @@
 import { FrameGate } from '../camera/frame-gate.js';
-import type { CameraFrame } from '../camera/types.js';
+import type { CameraFrame, FrameArrival } from '../camera/types.js';
 import { RateMeter, RollingSamples } from '../util/rolling-stats.js';
 import type { FaceResult, LandmarkProvider } from './types.js';
 
@@ -7,6 +7,8 @@ import type { FaceResult, LandmarkProvider } from './types.js';
 export interface LandmarkSample {
   /** Frame timestamp (ms, media clock) the landmarks belong to. */
   readonly tMs: number;
+  /** When the frame became available (performance clock); for latency measurement only. */
+  readonly arrival: FrameArrival;
   readonly face: FaceResult | null;
   /** Wall time spent in `provider.estimate()` for this frame, in ms. */
   readonly inferenceMs: number;
@@ -138,7 +140,12 @@ export class LandmarkTracker {
           const inferenceMs = this.#now() - started;
           this.#inferenceMs.push(inferenceMs);
           this.#rate.mark(frame.tMs);
-          const sample: LandmarkSample = { tMs: frame.tMs, face, inferenceMs };
+          const sample: LandmarkSample = {
+            tMs: frame.tMs,
+            arrival: frame.arrival,
+            face,
+            inferenceMs,
+          };
           for (const listener of this.#sampleListeners) listener(sample);
         },
         (error: unknown) => {

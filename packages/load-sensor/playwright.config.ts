@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { FAKE_CAMERA_ARGS } from './tests/e2e/fake-camera.js';
 
 const PORT = 4174;
 const isCI = Boolean(process.env.CI);
@@ -27,12 +28,11 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
-        // Synthetic camera, so tests never need a real webcam or a permission prompt.
-        // A recorded clip is wired in with --use-file-for-fake-video-capture (TODO A7).
+        // Fake camera, so tests never need a real webcam or a permission prompt:
+        // the synthetic pattern, or a face clip from ADAPTLEARN_FAKE_VIDEO
+        // (tests/e2e/fake-camera.ts).
         permissions: ['camera'],
-        launchOptions: {
-          args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
-        },
+        launchOptions: { args: [...FAKE_CAMERA_ARGS] },
       },
     },
   ],

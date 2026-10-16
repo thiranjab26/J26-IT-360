@@ -14,7 +14,7 @@ const modelsPresent = existsSync(
   fileURLToPath(new URL('../../public/models/facemesh/landmarks/model.json', import.meta.url)),
 );
 
-const PAGES = ['/', '/consumer.html', '/cog-admin.html'] as const;
+const PAGES = ['/', '/consumer.html', '/cog-admin.html', '/bench.html'] as const;
 
 /** A different origin that must never be reachable (port 9 is "discard"). */
 const FOREIGN_ORIGIN = 'http://127.0.0.1:9';
@@ -200,8 +200,10 @@ test.describe('Content Security Policy (FR7, NFR2)', () => {
   test.describe('the app runs under the policy with zero violations', () => {
     test.skip(!modelsPresent, 'Face mesh assets missing: run `pnpm fetch-models` first.');
 
-    test('sensor (default backend), mock consumer and cog admin', async ({ context }) => {
-      test.setTimeout(90_000);
+    test('sensor (default backend), mock consumer, cog admin and benchmark', async ({
+      context,
+    }) => {
+      test.setTimeout(150_000);
       await recordViolations(context);
 
       const sensor = await context.newPage();
@@ -224,6 +226,15 @@ test.describe('Content Security Policy (FR7, NFR2)', () => {
         await p.waitForLoadState('networkidle');
         others.push(p);
       }
+
+      // The benchmark page runs the bare library (A7): a short run end to end.
+      const bench = await context.newPage();
+      await bench.goto('/bench.html?seconds=10&warmup=0');
+      await bench.getByTestId('bench-start').click();
+      await expect(bench.getByTestId('bench-status')).toHaveAttribute('data-state', 'done', {
+        timeout: 60_000,
+      });
+      others.push(bench);
 
       for (const p of [sensor, ...others]) {
         expect(await violations(p), p.url()).toEqual([]);

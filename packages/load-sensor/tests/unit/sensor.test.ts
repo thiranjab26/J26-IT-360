@@ -11,6 +11,7 @@ import {
   type FaceResult,
   type LandmarkProvider,
 } from '../../src/core/landmarks/index.js';
+import { LatencyProbe } from '../../src/core/util/latency-probe.js';
 import { syntheticFace } from '../fixtures/synthetic-face.js';
 import { FakeChannelBus, ManualTimers } from './helpers/fake-channel.js';
 import { domException, fakeEnvironment, flush } from './helpers/fake-media.js';
@@ -64,6 +65,7 @@ function setup(options: Partial<LoadSensorOptions> = {}) {
     strainStorage: null,
     ...options,
     environment: {
+      ...options.environment,
       camera: media.env,
       provider,
       timers,
@@ -133,6 +135,34 @@ describe('createLoadSensor (FR6, NFR8, invariant 4)', () => {
     expect(e.meta).toMatchObject({ backend: 'webgl', model_version: 'heuristic-0' });
     expect(e.meta?.fps).toBeGreaterThan(10);
     sensor.destroy();
+  });
+
+  it('feeds an optional latency probe (A7 bench) and behaves exactly as without one', async () => {
+    // The fake video presents frames at performance time 0; a probe clock
+    // fixed at 7 ms makes every frame latency exactly 7 ms.
+    const probe = new LatencyProbe(4096, () => 7);
+    const withProbe = setup({ environment: { latencyProbe: probe } });
+    const without = setup();
+    for (const s of [withProbe, without]) {
+      await s.enabled();
+      await s.frames(95);
+    }
+
+    const r = probe.report();
+    expect(r.frames).toBe(95 * 15);
+    expect(r.framesWithFace).toBe(r.frames);
+    expect(r.frameLatency).toMatchObject({ p50: 7, max: 7 });
+    expect(r.arrivalOrigins).toEqual({ presentation: 95 * 15 });
+    // One decision per finished second (the last second is still open).
+    expect(r.eventLatency.n).toBe(94);
+    expect(r.inference.n).toBe(95 * 15);
+    // The classifier ran once the baseline and window were ready, and was timed.
+    expect(r.classifier.n).toBeGreaterThan(0);
+
+    const strip = (e: LoadStateEvent): unknown => ({ ...e, timestamp: null });
+    expect(withProbe.events.map(strip)).toEqual(without.events.map(strip));
+    withProbe.sensor.destroy();
+    without.sensor.destroy();
   });
 
   it('every emitted event is valid and small: numbers and labels only (FR7)', async () => {

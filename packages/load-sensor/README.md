@@ -31,7 +31,8 @@ pnpm lint         # eslint + prettier --check
 pnpm test         # vitest unit tests
 pnpm test:e2e     # playwright against the production build, fake camera
 pnpm check        # typecheck + lint + test: run before calling a change done
-pnpm bench        # latency and memory benchmark (TODO A7; exits 1 until then)
+pnpm bench        # latency + memory benchmark on bench.html → docs/bench/*.json (see scripts/bench.ts)
+pnpm evidence     # NFR2: 60 s sensing with zero requests → docs/evidence/*.har
 ```
 
 ## Layout

@@ -23,7 +23,13 @@ class FakeSource implements FrameSource {
   }
 
   emit(tMs: number): void {
-    const frame = { video: {} as HTMLVideoElement, tMs, width: 640, height: 480 };
+    const frame: CameraFrame = {
+      video: {} as HTMLVideoElement,
+      tMs,
+      arrival: { ms: tMs, origin: 'presentation' },
+      width: 640,
+      height: 480,
+    };
     for (const l of this.#listeners) l(frame);
   }
 }
@@ -100,14 +106,21 @@ describe('LandmarkTracker skip-frame scheduling (ARCHITECTURE.md §4)', () => {
     expect(tracker.stats.droppedBusy).toBe(15);
   });
 
-  it('emits one sample per processed frame with its frame timestamp and inference time', async () => {
+  it('emits one sample per processed frame with its frame timestamp, arrival and inference time', async () => {
     const { source, provider, tracker, samples, advance } = setup();
     tracker.start();
     source.emit(1000);
     advance(42);
     provider.resolveNext(FACE);
     await flush();
-    expect(samples).toEqual([{ tMs: 1000, face: FACE, inferenceMs: 42 }]);
+    expect(samples).toEqual([
+      {
+        tMs: 1000,
+        arrival: { ms: 1000, origin: 'presentation' },
+        face: FACE,
+        inferenceMs: 42,
+      },
+    ]);
     expect(tracker.stats.inferenceP50).toBe(42);
   });
 

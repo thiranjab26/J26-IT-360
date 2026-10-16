@@ -270,10 +270,11 @@ export class Camera {
     this.#stopLoop();
     this.#loop = startFrameLoop(
       this.#video,
-      (tMs) => {
+      (tMs, arrival) => {
         const frame: CameraFrame = {
           video: this.#video,
           tMs,
+          arrival,
           width: this.#video.videoWidth,
           height: this.#video.videoHeight,
         };

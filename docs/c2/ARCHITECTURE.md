@@ -284,9 +284,9 @@ Study mode is behind a build flag and absent from the normal build.
 ## 10. Offline (zero runtime network)
 
 - Model and runtime assets are copied into `public/models/` and `public/wasm/` by an `npm run fetch-models` script that downloads once at setup time, verifies a checksum, and records source URL + version in `public/models/MANIFEST.json`.
-- Service worker precaches app shell + all model/WASM files. Model files are large; use cache-first with revisioned filenames.
+- Service worker precaches app shell + all model/WASM files. Model files are large; use cache-first with revisioned filenames. Built: Workbox via `vite-plugin-pwa` (`vite.config.ts`). Every entry has a content-hash revision. The service worker is registered by the demo page (`src/demo/service-worker.ts`), not by `src/core`, because each host app owns its own service worker.
 - Lint rule fails the build on any CDN hostname in `src/`.
-- e2e: load once online → go offline → reload → sensing still reaches `status: "active"`.
+- e2e: load once online → go offline → reload → sensing still reaches `status: "active"` (`tests/e2e/offline.spec.ts`). The test only requires `active` when a face clip is set in `ADAPTLEARN_FAKE_VIDEO`. With the synthetic camera, which has no face, it requires `no_face` with frames processed.
 
 ## 11. Performance budget (NFR1, NFR6)
 
@@ -302,7 +302,15 @@ Study mode is behind a build flag and absent from the normal build.
 
 The classifier looks at 30 s of history, so a *change* in the learner's state takes several seconds to appear by design. NFR1 is about processing delay, not that. Write this distinction into the report so the number isn't misread.
 
-`npm run bench` runs a fixed fake-camera clip and writes these numbers with device/browser info to `docs/bench/`. Run it on the weakest laptop available, in Chrome, Edge and Firefox.
+`pnpm bench` runs `bench.html`, which is the bare library with no demo UI. It runs in Chrome, Edge and/or Firefox and writes these numbers with device and browser info to `packages/load-sensor/docs/bench/`. The real measurement is `--camera=real` on the weakest laptop available, with a face in view. Fake-camera runs have no face, so the landmark model barely runs, and the report says so in `warnings`.
+
+How the definitions above are measured (`src/core/util/latency-probe.ts`):
+
+- **Frame arrival** is rVFC `captureTime` where the browser reports it (Chromium), else `presentationTime`, else the rAF time. The report records which source was used.
+- **Event latency** is timed from the newest frame of the finished second. A second is only known to be over when the next second's first frame arrives, so the number includes up to one frame interval of waiting.
+- **Long tasks** use the Long Tasks API (Chromium only). A 50 ms event-loop lag monitor covers every browser.
+- **Tensors** are read between two inferences, so an inference's temporary tensors never appear as a leak.
+- **Warm-up** starts after the first processed frame and lasts 30 s by default. Firefox showed a one-off main-thread freeze of about 7 s around 25 s after start (TODO A7, under investigation). Startup is reported separately in `startup_s`.
 
 ## 12. Training and evaluation (offline)
 

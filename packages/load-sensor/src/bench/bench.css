@@ -1,0 +1,126 @@
+/* Latency benchmark page. Plain on purpose: it is a measuring tool, and the
+   less the page itself draws, the less it adds to what is measured. */
+:root {
+  --bg: #f5f7fc;
+  --surface: #ffffff;
+  --border: #e2e6f0;
+  --text: #0f172e;
+  --muted: #4a5470;
+  --ok: #15803d;
+  --bad: #b91c1c;
+  --warn: #b45309;
+  --accent: #335bd5;
+  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    15px/1.5 system-ui,
+    sans-serif;
+}
+
+.bench {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.bench h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+
+.bench p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+.bench-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 16px;
+}
+
+.bench-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.bench video {
+  width: 160px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #000;
+  transform: scaleX(-1);
+}
+
+.bench button {
+  font: inherit;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.bench button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.bench button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.bench-status {
+  font-weight: 600;
+}
+
+.bench table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.bench th,
+.bench td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.bench td.ok {
+  color: var(--ok);
+}
+
+.bench td.bad {
+  color: var(--bad);
+}
+
+.bench ul.warnings {
+  color: var(--warn);
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.bench pre {
+  font-family: var(--mono);
+  font-size: 12px;
+  overflow-x: auto;
+  max-height: 320px;
+}

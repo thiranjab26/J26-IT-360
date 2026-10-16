@@ -1,0 +1,15 @@
+{
+  "evidence": "NFR2 / FR7: zero network requests while sensing",
+  "test": "tests/e2e/privacy-network.spec.ts",
+  "recorded_at": "2026-10-16T14:34:01.592Z",
+  "browser": "chromium 153.0.8010.12",
+  "camera_source": "synthetic-pattern",
+  "backend": "webgl",
+  "event_status_at_end": "no_face",
+  "sensing_window_s": 60.012,
+  "frames_received_in_window": 874,
+  "requests_total_session": 49,
+  "requests_during_window": 0,
+  "requests_to_other_origins": 0,
+  "har": "nfr2-sensing-60s.har"
+}

@@ -1,0 +1,718 @@
+{
+  "schema": 1,
+  "tool": "adaptlearn-c2-bench",
+  "definitions": "ARCHITECTURE.md §11. frame_latency: frame arrival (rVFC captureTime, else presentationTime, else rAF time; see run.frame_arrival_origins) to per-frame signals computed. event_latency: arrival of the newest frame of a finished second to the hub having classified it and emitted any event (includes up to one frame interval of waiting for the second to close). face_mesh_inference: one landmark estimate. classifier: one classify() call. Percentiles: linear interpolation (NumPy default). Warm-up starts after the first processed frame; startup_s is reported separately.",
+  "started_at": "2026-10-16T14:34:59.389Z",
+  "startup_s": {
+    "camera_and_model": 0.56,
+    "first_processed_frame": 6.97
+  },
+  "config": {
+    "warmup_s": 30,
+    "measured_s": 120,
+    "target_fps": 15
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+    "hardwareConcurrency": 16,
+    "deviceMemoryGb": 16,
+    "gpu": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics (0x000046A6) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "backend": "webgl",
+    "frameClock": "video-frame-callback",
+    "camera": {
+      "width": 640,
+      "height": 480
+    }
+  },
+  "run": {
+    "frames_processed": 1793,
+    "landmark_fps": 14.9,
+    "face_ratio": 0,
+    "frame_arrival_origins": {
+      "capture": 621,
+      "presentation": 1172
+    },
+    "status_seconds": {
+      "no_face": 120
+    }
+  },
+  "metrics_ms": {
+    "frame_latency": {
+      "n": 1793,
+      "p50": 26.4,
+      "p95": 43.1,
+      "max": 102.7,
+      "mean": 28.21
+    },
+    "event_latency": {
+      "n": 120,
+      "p50": 93.05,
+      "p95": 119.65,
+      "max": 144,
+      "mean": 96.69
+    },
+    "face_mesh_inference": {
+      "n": 1793,
+      "p50": 24.5,
+      "p95": 33.5,
+      "max": 74,
+      "mean": 25.18
+    },
+    "classifier": {
+      "n": 0,
+      "p50": null,
+      "p95": null,
+      "max": null,
+      "mean": null
+    }
+  },
+  "long_tasks": {
+    "supported": true,
+    "count": 0,
+    "totalMs": 0,
+    "maxMs": 0
+  },
+  "event_loop_lag_ms": {
+    "n": 2400,
+    "p95": 7.9,
+    "max": 23,
+    "stalls": 0
+  },
+  "memory": {
+    "tensors_start": 1157,
+    "tensors_end": 1157,
+    "tensors_max": 1157,
+    "tensor_growth": 0,
+    "js_heap_start_mb": 27.26,
+    "js_heap_end_mb": 31.97,
+    "js_heap_slope_mb_per_min": 1.414,
+    "samples": [
+      {
+        "tS": 1,
+        "tensors": 1157,
+        "jsHeapMb": 27.26
+      },
+      {
+        "tS": 2,
+        "tensors": 1157,
+        "jsHeapMb": 26.69
+      },
+      {
+        "tS": 3,
+        "tensors": 1157,
+        "jsHeapMb": 26.21
+      },
+      {
+        "tS": 4,
+        "tensors": 1157,
+        "jsHeapMb": 21.37
+      },
+      {
+        "tS": 5,
+        "tensors": 1157,
+        "jsHeapMb": 20.85
+      },
+      {
+        "tS": 6,
+        "tensors": 1157,
+        "jsHeapMb": 27.65
+      },
+      {
+        "tS": 7,
+        "tensors": 1157,
+        "jsHeapMb": 27.13
+      },
+      {
+        "tS": 8,
+        "tensors": 1157,
+        "jsHeapMb": 24.61
+      },
+      {
+        "tS": 9,
+        "tensors": 1157,
+        "jsHeapMb": 21.75
+      },
+      {
+        "tS": 10,
+        "tensors": 1157,
+        "jsHeapMb": 21.19
+      },
+      {
+        "tS": 11,
+        "tensors": 1157,
+        "jsHeapMb": 19.73
+      },
+      {
+        "tS": 12,
+        "tensors": 1157,
+        "jsHeapMb": 22.95
+      },
+      {
+        "tS": 13,
+        "tensors": 1157,
+        "jsHeapMb": 26.16
+      },
+      {
+        "tS": 14,
+        "tensors": 1157,
+        "jsHeapMb": 29.21
+      },
+      {
+        "tS": 15,
+        "tensors": 1157,
+        "jsHeapMb": 32.27
+      },
+      {
+        "tS": 16,
+        "tensors": 1157,
+        "jsHeapMb": 25.4
+      },
+      {
+        "tS": 17,
+        "tensors": 1157,
+        "jsHeapMb": 28.54
+      },
+      {
+        "tS": 18,
+        "tensors": 1157,
+        "jsHeapMb": 31.8
+      },
+      {
+        "tS": 19,
+        "tensors": 1157,
+        "jsHeapMb": 34.89
+      },
+      {
+        "tS": 20,
+        "tensors": 1157,
+        "jsHeapMb": 25.25
+      },
+      {
+        "tS": 21,
+        "tensors": 1157,
+        "jsHeapMb": 25.79
+      },
+      {
+        "tS": 22,
+        "tensors": 1157,
+        "jsHeapMb": 34.27
+      },
+      {
+        "tS": 23,
+        "tensors": 1157,
+        "jsHeapMb": 29.22
+      },
+      {
+        "tS": 24,
+        "tensors": 1157,
+        "jsHeapMb": 24.16
+      },
+      {
+        "tS": 25,
+        "tensors": 1157,
+        "jsHeapMb": 32.43
+      },
+      {
+        "tS": 26,
+        "tensors": 1157,
+        "jsHeapMb": 25.58
+      },
+      {
+        "tS": 27,
+        "tensors": 1157,
+        "jsHeapMb": 29.21
+      },
+      {
+        "tS": 28,
+        "tensors": 1157,
+        "jsHeapMb": 30.91
+      },
+      {
+        "tS": 29,
+        "tensors": 1157,
+        "jsHeapMb": 34.68
+      },
+      {
+        "tS": 30,
+        "tensors": 1157,
+        "jsHeapMb": 36.23
+      },
+      {
+        "tS": 31,
+        "tensors": 1157,
+        "jsHeapMb": 25.29
+      },
+      {
+        "tS": 32,
+        "tensors": 1157,
+        "jsHeapMb": 30.86
+      },
+      {
+        "tS": 33,
+        "tensors": 1157,
+        "jsHeapMb": 30.27
+      },
+      {
+        "tS": 34,
+        "tensors": 1157,
+        "jsHeapMb": 34.04
+      },
+      {
+        "tS": 35,
+        "tensors": 1157,
+        "jsHeapMb": 37.71
+      },
+      {
+        "tS": 36,
+        "tensors": 1157,
+        "jsHeapMb": 31.02
+      },
+      {
+        "tS": 37,
+        "tensors": 1157,
+        "jsHeapMb": 34.82
+      },
+      {
+        "tS": 38,
+        "tensors": 1157,
+        "jsHeapMb": 23.97
+      },
+      {
+        "tS": 39,
+        "tensors": 1157,
+        "jsHeapMb": 27.54
+      },
+      {
+        "tS": 40,
+        "tensors": 1157,
+        "jsHeapMb": 33.05
+      },
+      {
+        "tS": 41,
+        "tensors": 1157,
+        "jsHeapMb": 36.69
+      },
+      {
+        "tS": 42,
+        "tensors": 1157,
+        "jsHeapMb": 25.96
+      },
+      {
+        "tS": 43,
+        "tensors": 1157,
+        "jsHeapMb": 21.39
+      },
+      {
+        "tS": 44,
+        "tensors": 1157,
+        "jsHeapMb": 25.15
+      },
+      {
+        "tS": 45,
+        "tensors": 1157,
+        "jsHeapMb": 28.79
+      },
+      {
+        "tS": 46,
+        "tensors": 1157,
+        "jsHeapMb": 30.42
+      },
+      {
+        "tS": 47,
+        "tensors": 1157,
+        "jsHeapMb": 31.91
+      },
+      {
+        "tS": 48,
+        "tensors": 1157,
+        "jsHeapMb": 20.92
+      },
+      {
+        "tS": 49,
+        "tensors": 1157,
+        "jsHeapMb": 24.55
+      },
+      {
+        "tS": 50,
+        "tensors": 1157,
+        "jsHeapMb": 28.36
+      },
+      {
+        "tS": 51,
+        "tensors": 1157,
+        "jsHeapMb": 19.23
+      },
+      {
+        "tS": 52,
+        "tensors": 1157,
+        "jsHeapMb": 22.98
+      },
+      {
+        "tS": 53,
+        "tensors": 1157,
+        "jsHeapMb": 26.67
+      },
+      {
+        "tS": 54,
+        "tensors": 1157,
+        "jsHeapMb": 30.45
+      },
+      {
+        "tS": 55,
+        "tensors": 1157,
+        "jsHeapMb": 21.46
+      },
+      {
+        "tS": 56,
+        "tensors": 1157,
+        "jsHeapMb": 25.28
+      },
+      {
+        "tS": 57,
+        "tensors": 1157,
+        "jsHeapMb": 28.89
+      },
+      {
+        "tS": 58,
+        "tensors": 1157,
+        "jsHeapMb": 32.63
+      },
+      {
+        "tS": 59,
+        "tensors": 1157,
+        "jsHeapMb": 23.6
+      },
+      {
+        "tS": 60,
+        "tensors": 1157,
+        "jsHeapMb": 27.48
+      },
+      {
+        "tS": 61,
+        "tensors": 1157,
+        "jsHeapMb": 31.14
+      },
+      {
+        "tS": 62,
+        "tensors": 1157,
+        "jsHeapMb": 34.8
+      },
+      {
+        "tS": 63,
+        "tensors": 1157,
+        "jsHeapMb": 25.74
+      },
+      {
+        "tS": 64,
+        "tensors": 1157,
+        "jsHeapMb": 29.44
+      },
+      {
+        "tS": 65,
+        "tensors": 1157,
+        "jsHeapMb": 33.2
+      },
+      {
+        "tS": 66,
+        "tensors": 1157,
+        "jsHeapMb": 36.85
+      },
+      {
+        "tS": 67,
+        "tensors": 1157,
+        "jsHeapMb": 30.14
+      },
+      {
+        "tS": 68,
+        "tensors": 1157,
+        "jsHeapMb": 33.92
+      },
+      {
+        "tS": 69,
+        "tensors": 1157,
+        "jsHeapMb": 23.28
+      },
+      {
+        "tS": 70,
+        "tensors": 1157,
+        "jsHeapMb": 26.87
+      },
+      {
+        "tS": 71,
+        "tensors": 1157,
+        "jsHeapMb": 32.23
+      },
+      {
+        "tS": 72,
+        "tensors": 1157,
+        "jsHeapMb": 21.73
+      },
+      {
+        "tS": 73,
+        "tensors": 1157,
+        "jsHeapMb": 25.49
+      },
+      {
+        "tS": 74,
+        "tensors": 1157,
+        "jsHeapMb": 29.08
+      },
+      {
+        "tS": 75,
+        "tensors": 1157,
+        "jsHeapMb": 32.2
+      },
+      {
+        "tS": 76,
+        "tensors": 1157,
+        "jsHeapMb": 21.71
+      },
+      {
+        "tS": 77,
+        "tensors": 1157,
+        "jsHeapMb": 25.38
+      },
+      {
+        "tS": 78,
+        "tensors": 1157,
+        "jsHeapMb": 28.98
+      },
+      {
+        "tS": 79,
+        "tensors": 1157,
+        "jsHeapMb": 30.08
+      },
+      {
+        "tS": 80,
+        "tensors": 1157,
+        "jsHeapMb": 33.82
+      },
+      {
+        "tS": 81,
+        "tensors": 1157,
+        "jsHeapMb": 23.3
+      },
+      {
+        "tS": 82,
+        "tensors": 1157,
+        "jsHeapMb": 26.88
+      },
+      {
+        "tS": 83,
+        "tensors": 1157,
+        "jsHeapMb": 27.93
+      },
+      {
+        "tS": 84,
+        "tensors": 1157,
+        "jsHeapMb": 31.64
+      },
+      {
+        "tS": 85,
+        "tensors": 1157,
+        "jsHeapMb": 35.37
+      },
+      {
+        "tS": 86,
+        "tensors": 1157,
+        "jsHeapMb": 24.78
+      },
+      {
+        "tS": 87,
+        "tensors": 1157,
+        "jsHeapMb": 30.01
+      },
+      {
+        "tS": 88,
+        "tensors": 1157,
+        "jsHeapMb": 33.69
+      },
+      {
+        "tS": 89,
+        "tensors": 1157,
+        "jsHeapMb": 23.3
+      },
+      {
+        "tS": 90,
+        "tensors": 1157,
+        "jsHeapMb": 26.89
+      },
+      {
+        "tS": 91,
+        "tensors": 1157,
+        "jsHeapMb": 30.05
+      },
+      {
+        "tS": 92,
+        "tensors": 1157,
+        "jsHeapMb": 33.73
+      },
+      {
+        "tS": 93,
+        "tensors": 1157,
+        "jsHeapMb": 23.26
+      },
+      {
+        "tS": 94,
+        "tensors": 1157,
+        "jsHeapMb": 26.97
+      },
+      {
+        "tS": 95,
+        "tensors": 1157,
+        "jsHeapMb": 32.41
+      },
+      {
+        "tS": 96,
+        "tensors": 1157,
+        "jsHeapMb": 21.82
+      },
+      {
+        "tS": 97,
+        "tensors": 1157,
+        "jsHeapMb": 25.52
+      },
+      {
+        "tS": 98,
+        "tensors": 1157,
+        "jsHeapMb": 29.09
+      },
+      {
+        "tS": 99,
+        "tensors": 1157,
+        "jsHeapMb": 24.51
+      },
+      {
+        "tS": 100,
+        "tensors": 1157,
+        "jsHeapMb": 28.16
+      },
+      {
+        "tS": 101,
+        "tensors": 1157,
+        "jsHeapMb": 31.76
+      },
+      {
+        "tS": 102,
+        "tensors": 1157,
+        "jsHeapMb": 35.37
+      },
+      {
+        "tS": 103,
+        "tensors": 1157,
+        "jsHeapMb": 20.26
+      },
+      {
+        "tS": 104,
+        "tensors": 1157,
+        "jsHeapMb": 23.93
+      },
+      {
+        "tS": 105,
+        "tensors": 1157,
+        "jsHeapMb": 27.71
+      },
+      {
+        "tS": 106,
+        "tensors": 1157,
+        "jsHeapMb": 31.17
+      },
+      {
+        "tS": 107,
+        "tensors": 1157,
+        "jsHeapMb": 22.4
+      },
+      {
+        "tS": 108,
+        "tensors": 1157,
+        "jsHeapMb": 26
+      },
+      {
+        "tS": 109,
+        "tensors": 1157,
+        "jsHeapMb": 29.61
+      },
+      {
+        "tS": 110,
+        "tensors": 1157,
+        "jsHeapMb": 33.24
+      },
+      {
+        "tS": 111,
+        "tensors": 1157,
+        "jsHeapMb": 22.4
+      },
+      {
+        "tS": 112,
+        "tensors": 1157,
+        "jsHeapMb": 23.73
+      },
+      {
+        "tS": 113,
+        "tensors": 1157,
+        "jsHeapMb": 29.49
+      },
+      {
+        "tS": 114,
+        "tensors": 1157,
+        "jsHeapMb": 35.04
+      },
+      {
+        "tS": 115,
+        "tensors": 1157,
+        "jsHeapMb": 40.76
+      },
+      {
+        "tS": 116,
+        "tensors": 1157,
+        "jsHeapMb": 25.77
+      },
+      {
+        "tS": 117,
+        "tensors": 1157,
+        "jsHeapMb": 31.54
+      },
+      {
+        "tS": 118,
+        "tensors": 1157,
+        "jsHeapMb": 37.15
+      },
+      {
+        "tS": 119,
+        "tensors": 1157,
+        "jsHeapMb": 42.76
+      },
+      {
+        "tS": 120,
+        "tensors": 1157,
+        "jsHeapMb": 31.97
+      }
+    ]
+  },
+  "within_budget": {
+    "frame_latency_p95": true,
+    "event_latency_p95": true,
+    "classifier_p95": null,
+    "no_long_tasks": true,
+    "no_main_thread_stalls": true,
+    "tensors_flat": true
+  },
+  "warnings": [
+    "A face was found in 0 % of frames (needs ≥ 80 %). Without a face the landmark model does not run, so these latencies understate real use. Use a real camera with a face in view, or a face clip.",
+    "The classifier never ran: it needs a finished baseline and a full 30 s window with a face. Classifier time was not measured; run longer with a face in view."
+  ],
+  "run_info": {
+    "browser": "chromium",
+    "browser_version": "153.0.8010.12",
+    "headless": false,
+    "camera_source": "synthetic-pattern",
+    "commit": "29d3089-dirty",
+    "host": {
+      "cpu": "12th Gen Intel(R) Core(TM) i5-1240P",
+      "logical_cores": 16,
+      "memory_gb": 15.7,
+      "os": "win32 10.0.26200 x64"
+    },
+    "command": "pnpm bench --browser=chromium,msedge,firefox"
+  }
+}

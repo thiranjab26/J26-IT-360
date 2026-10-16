@@ -56,15 +56,38 @@ export interface CameraError {
 }
 
 /**
+ * Which browser timestamp marks when a frame became available (bench output).
+ *
+ * - `capture`: `requestVideoFrameCallback` `captureTime`, when the camera took
+ *   the frame (Chromium for camera streams). Includes the browser's own capture
+ *   and decode delay, so latencies measured from it are the honest upper bound.
+ * - `presentation`: rVFC `presentationTime`, when the frame was handed to the
+ *   compositor (browsers that do not report `captureTime`).
+ * - `animation-frame`: the rAF timestamp on browsers without rVFC; the frame
+ *   may have arrived up to one display refresh earlier.
+ */
+export type FrameArrivalOrigin = 'capture' | 'presentation' | 'animation-frame';
+
+/** When a frame became available, on the `performance.now()` clock. */
+export interface FrameArrival {
+  readonly ms: number;
+  readonly origin: FrameArrivalOrigin;
+}
+
+/**
  * One camera frame handed to the landmark provider.
  *
  * `tMs` is the frame's own media timestamp, not the wall clock, so features
  * stay correct when the frame rate varies (CLAUDE.md: time comes from the frame).
  * It increases strictly from one frame to the next within a session.
+ *
+ * `arrival` is for latency measurement only (ARCHITECTURE.md §11); feature
+ * code must keep using `tMs`.
  */
 export interface CameraFrame {
   readonly video: HTMLVideoElement;
   readonly tMs: number;
+  readonly arrival: FrameArrival;
   readonly width: number;
   readonly height: number;
 }

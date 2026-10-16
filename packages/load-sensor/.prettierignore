@@ -3,3 +3,6 @@ coverage/
 playwright-report/
 test-results/
 public/models/
+
+# Generated evidence (HAR from `pnpm evidence`): kept exactly as the browser wrote it.
+docs/evidence/*.har
