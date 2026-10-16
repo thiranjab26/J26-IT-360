@@ -104,7 +104,7 @@ export interface LoadSensor {
   getState(): LoadStateEvent;
   /** The learner took a break: resets "time since last break" in `strain`. */
   markBreak(): void;
-  /** Starts a new 60 s baseline (e.g. after the learner moved seats or lighting changed). */
+  /** Starts a new baseline (FEATURE_CONFIG.baseline.seconds) (e.g. after the learner moved seats or lighting changed). */
   recalibrate(): void;
   /** `disable()`, then releases the model, timers and the channel. The sensor is unusable afterwards. */
   destroy(): void;

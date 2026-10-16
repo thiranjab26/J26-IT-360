@@ -1,17 +1,17 @@
+import { FEATURE_CONFIG } from '../core/features/config.js';
 import { STORAGE_PREFIX } from './settings.js';
 
 /**
  * Consent for camera sensing (TODO A6, CLAUDE.md invariant 4).
  *
  * Sensing stays off until the learner has read a plain-language notice and
- * agreed to it. The page never turns the camera on by itself, not even with
- * consent on record: consent only means that a later click on "Turn sensing
- * on" goes straight to the camera instead of showing the notice again.
+ * agreed to it. The notice shows before every camera start (main.ts
+ * `requestSensing`), and the page never turns the camera on by itself.
  *
- * What is kept: one small record `{ version, at }` in localStorage, on this
- * device only. Bump CONSENT_VERSION whenever the notice changes in meaning,
- * so everyone who agreed to the old wording is asked again. Withdrawing
- * deletes the record and turns sensing off.
+ * What is kept: one small record `{ version, at }` of the latest agreement in
+ * localStorage, on this device only, shown as "Agreed on …" under
+ * "Privacy & consent". Bump CONSENT_VERSION whenever the notice changes in
+ * meaning. Withdrawing deletes the record and turns sensing off.
  */
 
 /** Version of the notice text below. */
@@ -178,7 +178,7 @@ export class ConsentDialog {
       ),
       point(
         ICONS.target,
-        'The first minute is calibration',
+        `The first ${String(FEATURE_CONFIG.baseline.seconds)} seconds are calibration`,
         'Look at the screen as you normally would. Your normal is the baseline: you are only ever compared with yourself, never with other people.',
       ),
     );
@@ -188,7 +188,7 @@ export class ConsentDialog {
     const fine = el(
       'p',
       'consent-fine',
-      'Your browser will ask for camera permission next. Your choice is remembered on this device only; you can withdraw it under “Privacy & consent”.',
+      'Your browser may ask for camera permission next. This notice shows each time the camera is turned on; you can read it again or withdraw under “Privacy & consent”.',
     );
 
     const actions = el('footer', 'consent-actions');
@@ -234,7 +234,7 @@ export class ConsentDialog {
     this.element.dataset.mode = mode;
     this.#title.textContent = review ? 'Privacy & consent' : 'Before you turn on the camera';
     this.#lead.textContent = review
-      ? 'You agreed to camera sensing on this device. Here is what that covers. Withdrawing turns the camera off and asks you again next time.'
+      ? 'You agreed to camera sensing on this device. Here is what that covers. Withdrawing turns the camera off at once.'
       : 'AdaptLearn can notice when a task is getting hard for you, so lessons can adapt. It does this from your webcam, and it is off until you agree.';
     this.#stamp.hidden = !review || !record;
     this.#stamp.textContent = record ? `Agreed on ${formatDate(record.at)}.` : '';

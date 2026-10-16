@@ -124,7 +124,7 @@ Do **not** add a separate emotion-classification CNN unless the ablation shows e
 
 Individual differences (resting blink rate, brow position, glasses) are larger than the load effect. So:
 
-- First 60 s of a session **(tune)** is a calibration period. Status is `"calibrating"`, `load_state` is `null`.
+- First 30 valid seconds of a session **(tune)** are a calibration period (60 s until 2026-10-14; shortened so the first estimate arrives ~60 s after opt-in, see `FEATURE_CONFIG.baseline`). Status is `"calibrating"`, `load_state` is `null`.
 - Compute per-user mean and std of each feature over calibration; z-score every feature vector after that.
 - The same procedure is applied to pilot-study recordings (using each participant's rest block), so training and inference see identically normalised inputs.
 

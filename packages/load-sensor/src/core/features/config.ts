@@ -83,8 +83,15 @@ export const FEATURE_CONFIG = Object.freeze({
     maxInvalidFraction: 0.3,
   }),
   baseline: Object.freeze({
-    /** Valid seconds collected for per-learner normalisation (§5.4). */
-    seconds: 60,
+    /**
+     * Valid seconds collected for per-learner normalisation (§5.4). Was 60;
+     * cut to 30 on 2026-10-14 (owner's decision) so the first estimate comes
+     * ~60 s after opt-in instead of ~90 s. The limit is blinks: at a typical
+     * 15–20 blinks/min, 30 s still holds ~8 blinks for the blink baseline;
+     * 20 s (~5) would make blink_count's spread too noisy. (tune) — check
+     * against pilot data whether 30 s z-scores are as stable as 60 s ones.
+     */
+    seconds: 30,
     /** Absent this long and the baseline is recollected (§5.5). */
     recalibrateAfterMs: 5 * 60_000,
     /** Standard deviations below this are treated as "no variation": z = 0. */

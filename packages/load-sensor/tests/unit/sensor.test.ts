@@ -114,7 +114,7 @@ describe('createLoadSensor (FR6, NFR8, invariant 4)', () => {
     expect(() => setup({ cameraPolicy: 'required' })).toThrow(CameraPolicyNotApprovedError);
   });
 
-  it('enable → starting → calibrating, and to active after baseline + window (≈ 90 s)', async () => {
+  it('enable → starting → calibrating, and to active after baseline + window (≈ 60 s)', async () => {
     const { sensor, events, frames, enabled } = setup();
     const p = enabled();
     await p;

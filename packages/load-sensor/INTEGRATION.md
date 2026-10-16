@@ -76,7 +76,7 @@ Every listener returns an `unsubscribe()` function.
 
 | Field            | Type                                      | Meaning                                                                                                                                                         | `null` when                                                      |
 | ---------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `load_state`     | `'Low' \| 'Medium' \| 'High'`             | Cognitive load relative to **this learner's own first minute**, smoothed (EMA α 0.3 plus a 2-second confirmation to stop flapping).                             | `status` is not `active`                                         |
+| `load_state`     | `'Low' \| 'Medium' \| 'High'`             | Cognitive load relative to **this learner's own first 30 seconds**, smoothed (EMA α 0.3 plus a 2-second confirmation to stop flapping).                         | `status` is not `active`                                         |
 | `confidence`     | number 0..1                               | Smoothed probability of `load_state`. Not yet checked for calibration, so don't read it as an exact probability.                                                | exactly when `load_state` is `null`                              |
 | `frustration`    | boolean                                   | Load `High` for ≥ 15 s **and** inner brows drawn together or lips pressed, relative to baseline.                                                                | `status` is not `active`                                         |
 | `engagement`     | `'Low' \| 'Medium' \| 'High'`             | Face present, facing the screen, gaze steady, averaged over 30 s. No ground truth exists for it.                                                                | `status` is not `active`                                         |
@@ -98,7 +98,7 @@ Every listener returns an `unsubscribe()` function.
 | ------------------- | -------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `disabled`          | Sensing is off (the default: sensing is opt-in) or the sensor page was closed cleanly. | `null`                                        |
 | `starting`¹         | Waiting for camera permission or loading the face model.                               | `null`                                        |
-| `calibrating`       | Collecting the learner's 60 s baseline, or (re)filling the 30 s window.                | `null` (`presence`, `strain` known)           |
+| `calibrating`       | Collecting the learner's 30 s baseline, or (re)filling the 30 s window.                | `null` (`presence`, `strain` known)           |
 | `active`            | A load estimate is available.                                                          | all set                                       |
 | `no_face`           | No face for > 2 s.                                                                     | `null` (`presence: "absent"`, `strain` known) |
 | `paused`            | The learner paused sensing, or the tab is hidden.                                      | `null`                                        |
@@ -157,7 +157,7 @@ toggle.onclick = () => (sensor.status === 'disabled' ? sensor.enable() : sensor.
 | `on('state' \| 'change' \| 'error', cb)` | `state`: every event. `change`: only real changes. `error`: non-fatal problems.                                                  |
 | `getState()`                             | Last emitted event, synchronously.                                                                                               |
 | `markBreak()`                            | The learner took a break. Resets "time since the last break" in `strain`.                                                        |
-| `recalibrate()`                          | Starts a new 60 s baseline.                                                                                                      |
+| `recalibrate()`                          | Starts a new 30 s baseline.                                                                                                      |
 | `destroy()`                              | Disables, then releases the model, timers and channel.                                                                           |
 | `studyGate`                              | `'open'`, or `'needs_camera'` under the (not yet approved) `required` policy.                                                    |
 

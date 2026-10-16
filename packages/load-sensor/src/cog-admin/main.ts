@@ -273,7 +273,7 @@ function buildOverview(send: (c: ControlCommand) => void): {
   const calibHint = el(
     'p',
     'admin-hint',
-    'Per-learner normalisation collects 60 valid seconds before load can be classified.',
+    `Per-learner normalisation collects ${String(FEATURE_CONFIG.baseline.seconds)} valid seconds before load can be classified.`,
   );
   calib.append(calibTop, track, calibHint);
 

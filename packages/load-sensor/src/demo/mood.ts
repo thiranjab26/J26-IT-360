@@ -32,7 +32,7 @@ import type { NormalisedSecond } from '../core/window/index.js';
  *  distracted mostly looking away (engagement score low)
  *  neutral    none of the above
  *
- * Expression rules need z-scores, so they start once the 60 s baseline is
+ * Expression rules need z-scores, so they start once the 30 s baseline is
  * ready, and they switch off with the FR3 expression features (ablation).
  */
 

@@ -222,7 +222,7 @@ function mount(root: HTMLElement): void {
   const alarmText = el('span', '');
   alarmBanner.append(icon(ICONS.bell), alarmText);
 
-  // What to do during the baseline minute, over the video (A6).
+  // What to do during the baseline, over the video (A6).
   const calibPrompt = new CalibrationPrompt();
 
   stage.append(
@@ -698,16 +698,16 @@ function mount(root: HTMLElement): void {
 
   /**
    * Every "turn sensing on" (buttons, sidebar switch, Break game) comes here:
-   * no camera before the learner has agreed to the notice (A6, invariant 4).
+   * the notice shows before EVERY camera start, not only the first one, so
+   * the learner always knows what turning it on means (A6, invariant 4).
+   * Resuming from pause does not ask again: the camera never stopped.
    */
   async function requestSensing(): Promise<void> {
     // Unlock audio inside the click, before any await (autoplay policy).
     alarmSound.unlock();
-    if (!consent.granted) {
-      const choice = await consentDialog.show('ask');
-      if (choice !== 'accept') return;
-      consent.grant();
-    }
+    const choice = await consentDialog.show('ask');
+    if (choice !== 'accept') return;
+    consent.grant();
     await enable();
   }
 

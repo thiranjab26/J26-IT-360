@@ -2,7 +2,7 @@ import type { PipelineState } from '../core/window/index.js';
 
 /**
  * Calibration prompt over the camera view (TODO A6): tells the learner what to
- * do during the baseline minute (ARCHITECTURE.md §5.4), how far along it is,
+ * do during the baseline (ARCHITECTURE.md §5.4), how far along it is,
  * and when it is done.
  *
  * `calibrationView` is pure (state in, words out) so it is unit-tested;

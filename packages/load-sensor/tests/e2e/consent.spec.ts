@@ -98,27 +98,34 @@ test.describe('consent and control (A6)', () => {
     await expect(page).toHaveTitle(baseTitle);
   });
 
-  test('consent is remembered on this device and can be withdrawn', async ({ page }) => {
+  test('the notice shows before every camera start; consent can be withdrawn', async ({ page }) => {
     await page.goto('/');
     await turnSensingOn(page);
     await expect(page.getByTestId('camera-status')).toHaveText('active');
-    await page.getByTestId('disable').click();
-    await expect(page.getByTestId('camera-status')).toHaveText('stopped');
 
-    // Remembered: after a reload sensing is still off, and turning it on asks no more.
-    await page.reload();
-    await expect(page.getByTestId('camera-status')).toHaveText('idle');
-    await page.getByTestId('enable').click();
+    // Pause and resume do not ask again: the camera never stopped.
+    await page.getByTestId('pause').click();
+    await expect(page.getByTestId('camera-status')).toHaveText('paused');
+    await page.getByTestId('resume').click();
     await expect(page.getByTestId('camera-status')).toHaveText('active');
     await expect(page.getByTestId('consent-dialog')).toBeHidden();
 
-    // Withdrawing turns the camera off at once and brings the notice back.
+    // Off, then on again: the notice comes back, in this visit and after a reload.
+    await page.getByTestId('disable').click();
+    await expect(page.getByTestId('camera-status')).toHaveText('stopped');
+    await page.getByTestId('enable').click();
+    await expect(page.getByTestId('consent-dialog')).toBeVisible();
+    await page.getByTestId('consent-decline').click();
+    await expect(page.getByTestId('camera-status')).toHaveText('stopped');
+    await page.reload();
+    await turnSensingOn(page);
+    await expect(page.getByTestId('camera-status')).toHaveText('active');
+
+    // Withdrawing turns the camera off at once.
     await page.getByTestId('review-consent').click();
     await expect(page.getByTestId('consent-stamp')).toContainText('Agreed on');
     await page.getByTestId('consent-withdraw').click();
     await expect(page.getByTestId('camera-status')).toHaveText('stopped');
     await expect(page.getByTestId('live-tracks')).toHaveText('0');
-    await page.getByTestId('enable').click();
-    await expect(page.getByTestId('consent-dialog')).toBeVisible();
   });
 });
