@@ -161,7 +161,13 @@ Preparation material for every item below (question lists, request text, checkli
 
 ### A7. Privacy, offline and performance evidence [NFR1, NFR2, NFR6]
 
-- [ ] Content Security Policy in the served HTML / dev server headers
+- [x] Content Security Policy in the served HTML / dev server headers
+  - One directive table in `packages/load-sensor/security-headers.config.ts` feeds the dev and preview server headers and a `<meta>` tag that the build prepends to every page, so the policy travels with the static files to any host. Production: `default-src 'none'`, then only `'self'` per resource type; `connect-src 'self'` is the line that stops data leaving. `frame-ancestors 'none'` is header-only (browsers ignore it in `<meta>`).
+  - `script-src` needs `'wasm-unsafe-eval'` for the TF.js WASM fallback; that allows WebAssembly compilation only, not JavaScript `eval`. The bundle has no `eval` / `new Function` and the built HTML has no inline script or style. Dev adds only `style-src 'unsafe-inline'` (Vite injects CSS as `<style>` for hot reload).
+  - No `blob:` in `worker-src`: the threaded TF.js WASM build spawns blob workers only under cross-origin isolation (COOP/COEP), which the app does not enable. Turning isolation on later means adding `blob:` on purpose.
+  - Also sent: `Permissions-Policy: camera=(self), microphone=(), geolocation=()`, `Referrer-Policy: no-referrer` and `X-Content-Type-Options: nosniff`. No `report-uri`, because a reporting endpoint would itself be a network dependency (invariant 3).
+  - Evidence in `tests/e2e/csp.spec.ts`. Checks: the header and the first `<head>` element on all 3 pages; a deliberate cross-origin `fetch` POST, `sendBeacon` and WebSocket are each blocked by both the header and the meta copy; an injected inline script and page `eval` are refused; the self-hosted `.wasm` compiles. The sensor, consumer and cog admin pages all run with zero violations, on WebGL and on WASM with WebGL stubbed out. Firefox has not been checked yet (no Playwright Firefox project); its support for `'wasm-unsafe-eval'` starts at Firefox 102.
+  - Playwright note: `page.evaluate` runs through DevTools, which Chrome exempts from the eval check, so the eval probe runs from a same-origin script file instead.
 - [ ] Service worker precaching app shell + models
 - [ ] Playwright + fake camera: **zero network requests** during 60 s of sensing; save HAR to `docs/evidence/`
 - [ ] Playwright: load online → go offline → reload → reaches `status: "active"`

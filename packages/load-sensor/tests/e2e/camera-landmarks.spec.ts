@@ -60,7 +60,7 @@ test.describe('camera and landmarks (FR1, FR7, NFR2)', () => {
     await page.getByTestId('tab-signals').click();
     await expect(page.getByTestId('kpi-presence')).toBeVisible();
     await expect(page.getByTestId('kpi-presence')).toHaveText('Absent', { timeout: 30_000 });
-    await expect(page.getByTestId('calibration')).toContainText('0 / 60 s');
+    await expect(page.getByTestId('calibration')).toContainText('0 / 30 s');
 
     // On the Signals tab the camera is docked as a mini preview and keeps
     // delivering frames (a display:none video could stop its frame callbacks).

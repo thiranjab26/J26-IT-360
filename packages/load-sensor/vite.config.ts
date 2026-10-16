@@ -1,5 +1,28 @@
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
+import { contentSecurityPolicy, securityHeaders } from './security-headers.config.js';
+
+/**
+ * Bakes the production CSP into every built page as a <meta> tag, so the policy
+ * travels with the static files to any host, even one that sends no headers.
+ * Prepended so it is in force before the first <script> or <link> is parsed.
+ */
+function cspMetaTag(): Plugin {
+  return {
+    name: 'adaptlearn-csp-meta',
+    apply: 'build',
+    transformIndexHtml: () => [
+      {
+        tag: 'meta',
+        attrs: {
+          'http-equiv': 'Content-Security-Policy',
+          content: contentSecurityPolicy('production', 'meta'),
+        },
+        injectTo: 'head-prepend',
+      },
+    ],
+  };
+}
 
 const mediapipeRuntimeStub = fileURLToPath(
   new URL('./src/core/landmarks/mediapipe-runtime-stub.ts', import.meta.url),
@@ -10,6 +33,7 @@ const mediapipeRuntimeStub = fileURLToPath(
 // through the workspace package's `exports` (package.json), so there is no
 // separate library build.
 export default defineConfig({
+  plugins: [cspMetaTag()],
   resolve: {
     // Adapter A uses runtime 'tfjs' only. The MediaPipe-runtime packages that
     // face-landmarks-detection imports are replaced by a stub that throws: they
@@ -22,10 +46,14 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
+    // Dev policy = production policy plus inline <style> for hot reload.
+    headers: securityHeaders('development'),
   },
   preview: {
     port: 4174,
     strictPort: true,
+    // Exactly what a production host should send (e2e tests run against this).
+    headers: securityHeaders('production'),
   },
   build: {
     target: 'es2022',
