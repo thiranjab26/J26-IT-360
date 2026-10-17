@@ -7,21 +7,26 @@ import {
   FlaskConical,
   MessagesSquare,
   RefreshCw,
+  Server,
   Users,
-} from "lucide-react";
-import { ago, api, date, gapLabels, label } from "../api/client";
-import type { Auth, Case, Overview, Report } from "../api/types";
+} from "../components/icons";
+import { ago, api, date, label, resultLabels, resultOf } from "../api/client";
+import type { Auth, Case, Health, Overview, Report } from "../api/types";
 import { Badge, PageTitle, Skeleton } from "../components/components";
 import { BarList, Columns, CountUp, Donut, Legend, Ring, type Slice } from "../components/charts";
+import { providerName } from "../hooks/useSpeech";
+import type { LecturerPage } from "./LecturerApp";
 import "../styles/dashboard.css";
 
-export type StaffView = "bank" | "research" | "lab";
+type StaffView = Exclude<LecturerPage, "overview">;
+type OnReport = (r: Report, participant?: string) => void;
 
 const OUTCOME_COLORS: Record<string, string> = {
   STRONG: "#2f9e74",
   LIKELY_KNOWLEDGE_GAP: "#e0566f",
   LIKELY_COMMUNICATION_DIFFICULTY: "#e3a33f",
-  MIXED_INSUFFICIENT_EVIDENCE: "#9aa8bc",
+  MIXED_RESULTS: "#7d8fb3",
+  NOT_ENOUGH_EVIDENCE: "#c3ccda",
 };
 const STATE_COLORS: Record<string, string> = {
   complete: "#2f9e74",
@@ -32,20 +37,22 @@ const STATE_COLORS: Record<string, string> = {
   non_answer: "#9aa8bc",
 };
 
-/** Staff landing page: the admin overview dashboard, or the evaluator's rating queue. */
+/** Lecturer landing page: the overview dashboard, or a rater's queue. */
 export default function StaffHome({
   auth,
+  health,
   navigate,
   onReport,
   onError,
 }: {
   auth: Auth;
+  health: Health | null;
   navigate: (view: StaffView) => void;
-  onReport: (r: Report) => void;
+  onReport: OnReport;
   onError: (s: string) => void;
 }) {
   return auth.user.role === "admin" ? (
-    <AdminOverview auth={auth} navigate={navigate} onReport={onReport} onError={onError} />
+    <AdminOverview auth={auth} health={health} navigate={navigate} onReport={onReport} onError={onError} />
   ) : (
     <EvaluatorHome auth={auth} navigate={navigate} onError={onError} />
   );
@@ -53,13 +60,15 @@ export default function StaffHome({
 
 function AdminOverview({
   auth,
+  health,
   navigate,
   onReport,
   onError,
 }: {
   auth: Auth;
+  health: Health | null;
   navigate: (view: StaffView) => void;
-  onReport: (r: Report) => void;
+  onReport: OnReport;
   onError: (s: string) => void;
 }) {
   const [data, setData] = useState<Overview | null>(null),
@@ -78,10 +87,10 @@ function AdminOverview({
   useEffect(() => {
     void load();
   }, [auth.token]);
-  async function openReport(id: string) {
+  async function openReport(id: string, participant: string) {
     setOpening(id);
     try {
-      onReport(await api<Report>(`/sessions/${id}/report`, auth.token));
+      onReport(await api<Report>(`/sessions/${id}/report`, auth.token), participant);
     } catch (e) {
       onError((e as Error).message);
     } finally {
@@ -90,20 +99,17 @@ function AdminOverview({
   }
   const t = data?.totals;
   const completion = t && t.sessions ? (100 * t.completed) / t.sessions : 0;
+  // Older services send only the research categories; their mixed count shows as "Mixed results".
+  const results = data?.results ?? { ...data?.outcomes, MIXED_RESULTS: data?.outcomes.MIXED_INSUFFICIENT_EVIDENCE ?? 0 };
   const outcomes: Slice[] = data
-    ? [
-        { label: "No gap identified", value: data.outcomes.STRONG ?? 0, color: OUTCOME_COLORS.STRONG! },
-        { label: gapLabels.LIKELY_KNOWLEDGE_GAP!, value: data.outcomes.LIKELY_KNOWLEDGE_GAP ?? 0, color: OUTCOME_COLORS.LIKELY_KNOWLEDGE_GAP! },
-        { label: gapLabels.LIKELY_COMMUNICATION_DIFFICULTY!, value: data.outcomes.LIKELY_COMMUNICATION_DIFFICULTY ?? 0, color: OUTCOME_COLORS.LIKELY_COMMUNICATION_DIFFICULTY! },
-        { label: "Mixed / insufficient", value: data.outcomes.MIXED_INSUFFICIENT_EVIDENCE ?? 0, color: OUTCOME_COLORS.MIXED_INSUFFICIENT_EVIDENCE! },
-      ]
+    ? Object.keys(OUTCOME_COLORS).map((key) => ({ label: resultLabels[key]!, value: results[key] ?? 0, color: OUTCOME_COLORS[key]! }))
     : [];
   return (
     <div className="dash">
       <PageTitle
-        eyebrow="STAFF WORKSPACE · OVERVIEW"
+        eyebrow="OVERVIEW"
         title="Viva overview"
-        description="Live numbers from every session, question and rating in this workspace."
+        description="How your students' vivas are going: sessions, results, questions and ratings."
         action={
           <div className="dash-actions">
             {data && <span className="small muted">Updated {new Date(data.generated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
@@ -121,14 +127,14 @@ function AdminOverview({
           <section className="kpi-grid">
             <article className="kpi">
               <div className="kpi-icon"><Users size={18} /></div>
-              <span>Participants</span>
+              <span>Students</span>
               <strong><CountUp value={t!.participants} /></strong>
-              <small>Pseudonymous codes</small>
+              <small>Signed in with a participant code</small>
             </article>
             <article className="kpi kpi-ring">
               <div>
                 <div className="kpi-icon"><MessagesSquare size={18} /></div>
-                <span>Sessions</span>
+                <span>Vivas</span>
                 <strong><CountUp value={t!.sessions} /></strong>
                 <small>{t!.completed} completed · {t!.active} in progress</small>
               </div>
@@ -176,7 +182,7 @@ function AdminOverview({
           <section className="dash-row dash-row-wide">
             <article className="panel dash-card">
               <header>
-                <h2>Sessions in the last 14 days</h2>
+                <h2>Vivas in the last 14 days</h2>
                 <span className="small muted">Started and completed per day</span>
               </header>
               <Columns
@@ -194,7 +200,7 @@ function AdminOverview({
             <article className="panel dash-card">
               <header>
                 <h2>Outcomes</h2>
-                <span className="small muted">Completed sessions</span>
+                <span className="small muted">Finished vivas</span>
               </header>
               <div className="dash-donut">
                 <Donut
@@ -228,14 +234,14 @@ function AdminOverview({
             <article className="panel dash-card">
               <header>
                 <h2>Topics</h2>
-                <span className="small muted">Sessions and average coverage</span>
+                <span className="small muted">Vivas and average coverage</span>
               </header>
               {data.topics.length ? (
                 <table className="dash-table">
                   <thead>
                     <tr>
                       <th>Topic</th>
-                      <th>Sessions</th>
+                      <th>Vivas</th>
                       <th>Done</th>
                       <th>Coverage</th>
                     </tr>
@@ -257,22 +263,24 @@ function AdminOverview({
                   </tbody>
                 </table>
               ) : (
-                <p className="muted small">No sessions yet.</p>
+                <p className="muted small">No vivas yet.</p>
               )}
             </article>
           </section>
 
           <article className="panel dash-card">
-            <header>
-              <h2>Recent sessions</h2>
-              <span className="small muted">Newest first</span>
+            <header className="dash-head-row">
+              <h2>Recent vivas</h2>
+              <button className="text-button" onClick={() => navigate("vivas")}>
+                See all
+              </button>
             </header>
             {data.recent.length ? (
               <div className="table-scroll">
                 <table className="dash-table dash-recent">
                   <thead>
                     <tr>
-                      <th>Participant</th>
+                      <th>Student</th>
                       <th>Topic</th>
                       <th>Status</th>
                       <th>Outcome</th>
@@ -284,7 +292,7 @@ function AdminOverview({
                   </thead>
                   <tbody>
                     {data.recent.map((s) => {
-                      const key = s.strong ? "STRONG" : s.outcome ?? "";
+                      const key = resultOf(s);
                       return (
                         <tr key={s.id}>
                           <td><code>{s.participant_code}</code></td>
@@ -296,7 +304,7 @@ function AdminOverview({
                             {s.status === "completed" ? (
                               <span className="dash-outcome">
                                 <i style={{ background: OUTCOME_COLORS[key] ?? "#9aa8bc" }} />
-                                {s.strong ? "No gap identified" : gapLabels[s.outcome ?? ""] ?? "n/a"}
+                                {resultLabels[key] ?? "n/a"}
                               </span>
                             ) : (
                               <span className="muted">n/a</span>
@@ -307,7 +315,7 @@ function AdminOverview({
                           <td title={date(s.created_at)}>{ago(s.created_at)}</td>
                           <td>
                             {s.status === "completed" && (
-                              <button className="text-button" disabled={!!opening} onClick={() => openReport(s.id)}>
+                              <button className="text-button" disabled={!!opening} onClick={() => openReport(s.id, s.participant_code)}>
                                 {opening === s.id ? "Opening…" : "Report"}
                               </button>
                             )}
@@ -319,16 +327,17 @@ function AdminOverview({
                 </table>
               </div>
             ) : (
-              <p className="muted small">No sessions yet. They appear here as students take vivas.</p>
+              <p className="muted small">No vivas yet. They appear here as students take them.</p>
             )}
           </article>
 
           <section className="dash-quick">
             {(
               [
+                ["vivas", MessagesSquare, "Student vivas", "Every viva, with reports and answers"],
                 ["bank", BookOpenCheck, "Question bank", "Courses, material, AI drafts and approval"],
                 ["lab", AudioLines, "Speech lab", "Measure pauses and speed in a recorded viva"],
-                ["research", FlaskConical, "Research dashboard", "Blinded ratings and study metrics"],
+                ["research", FlaskConical, "Research", "Blinded ratings and agreement"],
               ] as const
             ).map(([view, Icon, title, text]) => (
               <button key={view} className="dash-quick-card" onClick={() => navigate(view)}>
@@ -341,6 +350,32 @@ function AdminOverview({
               </button>
             ))}
           </section>
+
+          {health && (
+            <article className="panel dash-card dash-system">
+              <header>
+                <h2>
+                  <Server size={17} /> System
+                </h2>
+                <span className="small muted">Services this workspace uses</span>
+              </header>
+              <dl className="signal-details">
+                {(
+                  [
+                    ["Marking", health.assessment_provider],
+                    ["Speech to text", providerName(health.live_speech_provider) || health.speech_provider],
+                    ["Question voice", providerName(health.voice_provider) || "Browser voice"],
+                    ["Learning context (C1 to C3)", health.integration_mode],
+                  ] as const
+                ).map(([name, value]) => (
+                  <div key={name}>
+                    <dt>{name}</dt>
+                    <dd>{value || "Off"}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          )}
         </>
       )}
     </div>
@@ -373,7 +408,7 @@ function EvaluatorHome({
   const names: Record<string, string> = { A: "Initial answer", B: "Follow-up evidence", C: "Full available evidence" };
   return (
     <div className="dash">
-      <PageTitle eyebrow="STAFF WORKSPACE · EVALUATOR" title="Your rating queue" description="Rate each case on the evidence shown. System decisions stay hidden from you." />
+      <PageTitle eyebrow="RATER" title="Your rating queue" description="Rate each case on the evidence shown. The system's decisions stay hidden from you." />
       {!progress ? (
         <Skeleton rows={1} height={170} />
       ) : (

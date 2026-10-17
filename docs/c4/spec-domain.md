@@ -8,8 +8,10 @@ Source of truth for the current behaviour: the standalone demo at
 `Desktop/Research Project/Astra Prototype/Astra version 2/adaptlearn-c4`
 (`backend/services/viva-service/app/logic.py`, `providers.py`, `disfluency.py`, `research.py`, `seed.py`).
 
-Versions to record on every session: policy `c04-policy-1.4-clarify` (1.3 `c04-policy-1.3-skip-stop`
-until 9 Oct 2026), gap rules `c04-gap-1.4-literature-profile`
+Versions to record on every session: policy `c04-policy-1.6-misheard-viva` (1.6 also accepts the ways
+speech-to-text mishears "viva"; 1.5 `c04-policy-1.5-commands`: spoken stop and skip commands
+count only when said on their own, 12 words or fewer; 1.4 `c04-policy-1.4-clarify` until 16 Oct 2026,
+1.3 `c04-policy-1.3-skip-stop` until 9 Oct 2026), gap rules `c04-gap-1.4-literature-profile`
 (1.3 `c04-gap-1.3-verbal-signal` until 9 Oct 2026).
 
 ## 1. Research purpose

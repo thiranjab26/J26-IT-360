@@ -162,16 +162,6 @@
 .viva-app .hx-none { padding: 20px 4px; }
 
 /* Welcome: keep the closing line clear of the orbit drawing, and let the drawing breathe. */
-.viva-app .welcome-story > p { margin-top: 250px; }
-.viva-app .welcome-orbits > span { animation: viva-float 5s ease-in-out infinite; }
-.viva-app .welcome-orbits > div { animation: viva-orbit-a 90s linear infinite; }
-.viva-app .welcome-orbits > div + div { animation: viva-orbit-b 120s linear infinite; }
-.viva-app .welcome-form,
-.viva-app .welcome-story { animation: viva-rise 0.5s backwards; }
-.viva-app .welcome-story { animation-delay: 80ms; }
-.viva-app .welcome-bottom > div { animation: viva-rise 0.5s backwards; }
-.viva-app .welcome-bottom > div:nth-child(2) { animation-delay: 80ms; }
-.viva-app .welcome-bottom > div:nth-child(3) { animation-delay: 160ms; }
 
 /* Live viva */
 .viva-app .st-question { animation: viva-rise 0.4s backwards; }

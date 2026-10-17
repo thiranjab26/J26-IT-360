@@ -9,8 +9,31 @@ import {
   Sparkles,
   Activity,
   X,
-} from "lucide-react";
+} from "./icons";
 import type { Context } from "../api/types";
+/** The AdaptLearn logo with a small line under the name. */
+export function Brand({ sub, onClick }: { sub: string; onClick: () => void }) {
+  return (
+    <a
+      className="brand"
+      href="#"
+      onClick={(e) => {
+        e.preventDefault();
+        onClick();
+      }}
+    >
+      <span className="brand-symbol">
+        <svg viewBox="0 0 40 40" aria-hidden="true">
+          <path d="M10 27L20 10l10 17-10 6z" />
+          <path d="M15 23h10" />
+        </svg>
+      </span>
+      <span>
+        AdaptLearn<span className="brand-sub">{sub}</span>
+      </span>
+    </a>
+  );
+}
 export function Busy({ text = "Loading…" }: { text?: string }) {
   return (
     <div className="busy">
@@ -190,7 +213,9 @@ export function Integrations({
     </div>
   );
 }
-export function ResourceLink({ title, url }: { title: string; url?: string }) {
+export function ResourceLink({ title: raw, url }: { title: string; url?: string }) {
+  // Older reports kept the stored file name, e.g. "C3 IT1010 Programming basics notes.md".
+  const title = raw.replace(/^C3\s+/i, "").replace(/\.(md|txt|pdf|docx?|pptx?)$/i, "");
   const safeUrl = url && /^https?:\/\//i.test(url) ? url : undefined;
   return safeUrl ? (
     <a className="resource" href={safeUrl} target="_blank" rel="noreferrer">

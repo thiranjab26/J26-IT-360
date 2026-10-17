@@ -234,3 +234,138 @@ back. What stayed:
   the same voice; question dots instead of the bar and "Question 2 of 5"; a neutral "Thank you.
   Here is the next question." between questions; and a short celebration on the report straight
   after a viva (for finishing, never for being right; not shown when a report is opened from history).
+
+## 17. Separate student and lecturer pages (15 Oct 2026)
+
+The single page with a mixed sidebar and a "Staff sign in" pop-up became two pages. Colours, fonts,
+cards and the mascot are unchanged.
+
+| Page | Address | What it has |
+|---|---|---|
+| Student | `/viva` (`/viva/history` for "My vivas") | A slim top bar (logo, Viva and My vivas tabs, the participant code, sign out), a centred sign-in page, the viva, the report, and a footer link to the lecturer page |
+| Lecturer | `/viva/lecturer` (`/vivas`, `/questions`, `/speech-lab`, `/research`) | A full sign-in page (Lecturer or Rater and an access key), then the sidebar: Overview, Student vivas, Question bank, Speech lab, Research; a rater sees only the rating queue and blind review |
+
+- Each page keeps its own sign-in for the browser tab (`adaptlearn-auth-v1` for students,
+  `adaptlearn-staff-auth-v1` for lecturers), so both can be open side by side. Each top-level page
+  has its own address, so refresh and the back button work.
+- Demo wording removed: "Research workspace v1.1", "Research prototype", "C04 / Component 04",
+  the "Built for understanding" card, the provider footer and the "About this workspace" pop-up,
+  "e.g. learner-042", the "research prototype" consent text, the voice-provider chip and
+  "Transcribed by ..." during the viva, and "built-in sample" labels.
+- Students no longer see the C1 to C3 learning-context panel. Lecturers see it, as saved when the
+  viva started, at the bottom of each student report, with an "Export data" button. Students
+  get "Print or save as PDF" only.
+- New lecturer "Student vivas" page: every viva with the participant code, a search box and the
+  report. `GET /sessions` now returns `participant_code` (all codes for staff, the student's own
+  for a student); covered by `test_session_list_includes_coverage`.
+- The service and provider details moved to a "System" panel at the bottom of the lecturer
+  Overview; the lecturer top bar shows "Service online" or "Service offline".
+- Code: `pages/StudentApp.tsx` and `pages/LecturerApp.tsx` replace `pages/VivaApp.tsx`;
+  `hooks/useViva.ts` holds the shared sign-in and service hooks; `components/StaffLogin.tsx` is now
+  the lecturer sign-in page; unused CSS for the old welcome page and sidebar card was removed.
+- Checked: typecheck and build pass, 107 backend tests pass; every page clicked through at desktop
+  and phone size against a throwaway test backend (temporary database, demo keys).
+- Undo: `Intelligent Viva System/C4-backups/ui-2026-10-15/README.txt` (restores the frontend
+  feature folder and the router), and revert the `participant_code` lines in
+  `app/api/v1/routes/sessions.py` and the test.
+
+## 18. Fit to the screen, the viva rail, and provider fixes (15 Oct 2026)
+
+- The owner's browser window is about 1536 x 710 (1920 x 1080 at 125 % scaling). The sign-in,
+  start, viva and "My vivas" pages now fit that window and a 1366 x 640 laptop without page
+  scrolling; only the report (long by nature) and phones scroll. Cards scroll inside only when
+  their own content is longer. The footer shows on the sign-in page only.
+- Start page: topics in a grid on the left (scrolls inside when there are many), and a "Your
+  viva" panel on the right (Speak or Type, what to expect, Start).
+- Viva page (owner's choice of layout): a progress rail on the left (each question done, current
+  or to come, a tip, previous answers, Save & leave, Finish) and one card with the examiner and
+  the question on top and the answer (recorder, transcript, Submit) underneath. Turns now carry
+  their `concept` so the rail can name answered questions.
+- The report's result and coverage ring share the first card.
+- Fixes: the browser voice "Slower" button (Chrome dropped speech started straight after
+  `cancel()`); a rejected API key (401 or 403) is skipped for 2 minutes instead of being tried on
+  every answer (`test_rejected_key_is_skipped_on_later_calls`); students see a plain "marking is
+  busy, press Submit again" message instead of the provider error, and "Still marking your
+  answer" after 12 seconds.
+- Cause of the slow, failing answers on 15 Oct: the Groq key in `.env` returned 401 for marking,
+  speech-to-text and the voice, so every answer fell back to Gemini, which was returning 503
+  (high demand). Fix: a valid Groq key in `.env`, then restart the backend.
+
+## 19. Clearer results, two plans, course groups and one font (15 Oct 2026)
+
+- Result wording (owner's choice): the research category `MIXED_INSUFFICIENT_EVIDENCE` is unchanged,
+  but readers now see "Mixed results" when some topic gave a clear result and "Not enough evidence
+  yet" when none did (`result_label()` in `logic.py`, sent as `result` on reports, the viva list and
+  the lecturer overview, with `results` counts beside the research `outcomes`). A single topic that
+  is mixed reads "Not enough evidence". Blind-review options keep the research wording.
+- Plans: each report has a study plan (what to revise, naming the missed points and the review
+  material) and a speaking plan (how to explain out loud, chosen from fillers and time to first
+  word). Groq writes both when it is available; otherwise the rule-based plans in `logic.py` are
+  used. `improvement_plan` still holds both lists for exports.
+- Review material names drop the "C3 " prefix and the file extension.
+- Report: one card per section with an icon and a one-line description; facts (questions,
+  follow-ups, spoken or typed); a coverage bar per topic; plain help text under each speaking
+  measure. "About this report" became "How this works" (three plain sentences); lecturers also
+  see the research notes there under "Method notes".
+- Start page: topics grouped by module (IT1010 first), a search box, a course-code badge, and a
+  "Before you start" checklist. The topic list sends `code`, `module`, `short_name` and `summary`
+  for C3 courses. The 4 old sample topics were hidden (`scripts/hide_sample_topics.py --apply`;
+  backup `C4-db-backups/viva-backup-2026-10-15-2310.json`; undo by approving them again).
+- Viva rail tip: a short heading and two lines. Font: Geist (as in the rest of AdaptLearn), weights
+  400 to 700, loaded by `viva.css`; Inter and the system font are fallbacks. "My vivas" uses the
+  student titles, cards and buttons.
+- Checked: typecheck and build pass, 110 backend tests pass; every page screenshotted at 1536 x 710
+  against a throwaway database loaded with the C3 courses.
+
+## 20. 3D examiner, Phosphor icons, spoken commands and reasoned plans (16 Oct 2026)
+
+- Examiner: the 3D Avaturn sample avatar (non-commercial use, credited in the sign-in footer),
+  animated by TalkingHead (MIT). Both load from jsDelivr at fixed versions (three 0.180.0,
+  TalkingHead 1.7, avatar file at commit `2afe6d7`); `components/Examiner.tsx`. The question voice
+  plays exactly as before (Slower, the voice meter and the time-to-first-word measure are unchanged);
+  the avatar mouths the same words silently, spread over the clip's length. One avatar per page is
+  moved between cards. A still portrait (`assets/examiner.png`, rendered from the same avatar) shows
+  while it loads, on the sign-in and start pages, and wherever 3D cannot run. The drawn mascot was
+  removed.
+- Icons: Phosphor duotone (bold for small marks), MIT, copied as SVG into `components/icons.tsx`
+  (no new package); the names match the old Lucide names. Font: Geist throughout; the student
+  styles use one size scale (12, 13, 14, 15, 16, 18, 20, 24 px, with larger page headings).
+- Spoken commands (policy `c04-policy-1.5-commands`): "Stop the viva", "End the viva", "I don't want
+  to continue" end the viva; "Skip this question", "Next question" skip. They count only when said on
+  their own (12 words or fewer), so an answer such as "the loop will stop when this is false" is
+  marked as an answer. The rail lists the commands; tests cover both.
+- Plans: the rules choose every study and speaking step from the evidence (missed points,
+  misunderstandings, skipped questions, coverage, fillers per 100 words, time to first word, and the
+  hedges, restarts or fluency signals that counted), and each step carries its reason ("Why: ...").
+  Groq may only reword a step, keeping the same number and order; the reasons are never model-written.
+- Smaller fixes: no course-code badges on topic cards; the topic search box has no browser autofill
+  list; a spinner inside a button keeps the button's size; skipped questions read "Skipped" in the
+  rail and the report; answer states read in plain words ("partly complete", "not an answer").
+- Fix (16 Oct): the lips did not move because the voice signalled the start on the audio's `play`
+  event, before the clip's length was known; it now signals on `playing`. The examiner is framed
+  head to chest in a wider box, moves its hands while speaking (TalkingHead's own hand movement) and
+  often adds an explaining index-finger gesture, alternating hands; thumbs and "OK" gestures are never
+  used.
+
+## 21. One voice, faster marking, spoken commands that are heard, a livelier examiner (16 Oct 2026)
+
+- One voice: Groq's Orpheus voices drift between clips (diana's median pitch measured 140 to 166 Hz
+  over four questions), which sounded like a different person per question. Every clip is now moved to
+  one median pitch (`tts_pitch_hz`, default 160 Hz; `even_pitch()` in `app/integrations/speech.py`,
+  Praat PSOLA, about 0.03 s a clip; 0 turns it off). Test: `test_every_voice_clip_gets_the_same_median_pitch`.
+- Faster marking: `gpt-oss` models are asked to think briefly (`llm_reasoning_effort`, default "low").
+  One marking call measured 3.0 to 3.5 s by default and 0.9 to 1.6 s on "low", with the same answer
+  state. Set `VIVA_LLM_REASONING_EFFORT=medium` to go back. The database (Neon, us-east-2) adds about
+  0.3 s a round trip from Sri Lanka; a viva answer makes four.
+- Spoken commands: "viva" is often misheard, so the stop command also accepts diva, river, fever and
+  similar (policy `c04-policy-1.6-misheard-viva`); Whisper's hint now mentions a viva (never whole
+  commands, which Whisper can echo into a silent recording). Speech-to-text returns the `command` it
+  heard; the page shows "Heard 'Stop the viva'" and the button becomes "Finish viva" or "Skip question"
+  until the words are edited.
+- Student view: "What we heard" (pauses and fillers) is no longer shown; the measures are still saved.
+  The voice commands are a row of chips beside "Your answer", so the rail always has room for the
+  questions; Save & leave and Finish sit side by side.
+- Examiner: the lips follow the clip's real pauses (words are laid over the stretches that have sound,
+  measured in the browser from the clip); she keeps eye contact, smiles softly while the student
+  answers, makes a thinking face with a hand to the chin while an answer is marked, and gives the same
+  small nod after every answer. Framed a little closer; the still portrait matches the framing.

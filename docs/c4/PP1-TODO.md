@@ -186,9 +186,9 @@ Each evening:
 
 You:
 
-- [ ] Colab: upload all `*_student.m4a` files to `analysis/crisperwhisper_colab.ipynb`, Run all,
+- [x] Colab: upload all `*_student.m4a` files to `analysis/crisperwhisper_colab.ipynb`, Run all,
       download `words.zip`, unzip it into the recordings folder. Then tell me; I re-run the tool.
-- [ ] **Counting check:** open `results/count_check.csv`. For each student, play the given
+- [x] **Counting check:** open `results/count_check.csv`. For each student, play the given
       minute (`listen_from` to `listen_to` in `listen_in`); by ear, tick each "um"/"uh" and each
       repair (a repeat like "the the", a cut-off word, or "sorry, I mean"). Ears cannot time
       pauses, so count those in desktop Audacity (not the browser version): select the same
@@ -196,7 +196,8 @@ You:
       minimum label interval 0, Region around sounds. Pauses = number of labels minus 1 (the gaps
       between them; the silence after the last label does not count). Type the totals into `your_fillers`, `your_repairs` and
       `your_pauses_1s` in Notepad (Excel changes the times and locks the file). About 30
-      minutes in total. Rerunning the tool keeps what you typed.
+      minutes in total. Rerunning the tool keeps what you typed, and once you have typed counts
+      it measures the tool's counts over the `listen_from` to `listen_to` you typed.
 
 Claude:
 
@@ -204,7 +205,7 @@ Claude:
 
 ## Fri 16 Oct
 
-- [ ] Claude runs `run_stats.py`: `results/report.md`, `summary.csv` and charts.
+- [x] Claude runs `run_stats.py`: `results/report.md`, `summary.csv` and charts.
 - [ ] You and Claude read the report together. I explain every number in plain words. We
       write down the pilot cut-offs to show next to the literature ones.
 

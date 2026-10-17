@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { Plus, Save, Trash2 } from "./icons";
 import type { BankQuestion } from "../api/types";
 
 /** The five stored follow-ups, keyed by answer state, with plain names for staff. */
@@ -230,7 +230,7 @@ export function QuestionEditor({
         </div>
       ) : unlinked > 0 ? (
         <p className="field-help">
-          {unlinked} marking {unlinked === 1 ? "point has" : "points have"} no follow-up question or course evidence. Fine for built-in sample topics; uploaded courses need both to be approved.
+          {unlinked} marking {unlinked === 1 ? "point has" : "points have"} no follow-up question or course evidence. Fine for built-in topics; uploaded courses need both to be approved.
         </p>
       ) : null}
       <button className="button primary" disabled={working || blocking.length > 0} onClick={() => onSave(toQuestion(question, form))}>

@@ -21,7 +21,8 @@ MAX_AUDIO_SECONDS = 180
 MIN_PAUSE_MS = 400
 # Whisper drops disfluencies unless primed with disfluent text; this keeps "um", "uh" and restarts in the transcript.
 FILLER_PROMPT = (
-    "Umm, uh, so, like, hmm... I mean, uh, I think, um, maybe. Erm, well, you know, uhh."
+    "Umm, uh, so, like, hmm... I mean, uh, I think, um, maybe. Erm, well, you know, uhh. This viva is about"
+    " programming."
 )
 _inference_lock = threading.Lock()
 _model_lock = threading.Lock()
@@ -262,6 +263,41 @@ def speakable(text):
     return " ".join(text.split())
 
 
+def even_pitch(wav, target_hz):
+    """Move a WAV clip to one median pitch, so every question sounds like the same person.
+
+    The Orpheus voices drift between generations; diana's median pitch measured 140 to 166 Hz over
+    four questions. PSOLA keeps the voice and the timing. Off when target_hz is 0 or Praat is missing.
+    """
+    if not target_hz:
+        return wav
+    try:
+        import wave
+
+        import numpy as np
+        import parselmouth
+        from parselmouth.praat import call
+
+        with wave.open(io.BytesIO(wav)) as w:
+            rate, width, channels = w.getframerate(), w.getsampwidth(), w.getnchannels()
+            frames = w.readframes(w.getnframes())
+        if width != 2:
+            return wav
+        samples = np.frombuffer(frames, dtype="<i2").reshape(-1, channels).mean(axis=1) / 32768
+        sound = parselmouth.Sound(samples, sampling_frequency=rate)
+        shifted = call(sound, "Change gender", 75, 500, 1.0, target_hz, 1.0, 1.0)
+        out = (np.clip(shifted.values[0], -1, 1) * 32767).astype("<i2").tobytes()
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(rate)
+            w.writeframes(out)
+        return buffer.getvalue()
+    except Exception:  # any decoding or Praat problem: the original clip is still fine to play
+        return wav
+
+
 @lru_cache(maxsize=128)
 def synthesize(text):
     """Question audio as (bytes, media type, provider). Cached so replays cost nothing."""
@@ -303,7 +339,7 @@ def synthesize(text):
             },
         )
         response.raise_for_status()
-        return response.content, "audio/wav", "groq:" + cfg.tts_model
+        return even_pitch(response.content, cfg.tts_pitch_hz), "audio/wav", "groq:" + cfg.tts_model
     except httpx.HTTPError as exc:
         raise ProviderUnavailable(
             f"Cloud voice failed ({type(exc).__name__}); the browser voice is used instead."

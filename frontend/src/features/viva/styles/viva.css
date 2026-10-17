@@ -1,8 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap");
 /* C4 viva styles, scoped to .viva-app so they never affect other features. */
 .viva-app { min-height: 100vh; }
 
 .viva-app {
   font-family:
+    Geist,
     Inter,
     ui-sans-serif,
     -apple-system,
@@ -180,24 +182,7 @@
   font-weight: 700;
   color: #8190a5;
 }
-.viva-app .workspace-label {
-  border: 1px solid #e5eaf1;
-  border-radius: 6px;
-  background: #f9fafc;
-  font-size: 9px;
-  font-weight: 650;
-  letter-spacing: 1px;
-  display: flex;
-  justify-content: space-between;
-  padding: 9px;
-  margin-bottom: 28px;
-  color: #7a899d;
-}
-.viva-app .workspace-label span {
-  font-size: 9px;
-  letter-spacing: 0;
-  color: #9aabc1;
-}
+
 .viva-app .nav-label {
   display: block;
   font-size: 9px;
@@ -234,51 +219,12 @@
   color: #315bd6;
   font-weight: 650;
 }
-.viva-app .nav-lock {
-  margin-left: auto;
-  color: #a0aec0;
-}
-.viva-app .nav-active-dot {
-  display: none;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #315bd6;
-  margin-left: auto;
-}
-.viva-app .nav-item.selected .nav-active-dot {
-  display: block;
-}
+
 .viva-app .sidebar-bottom {
   margin-top: auto;
   padding-top: 30px;
 }
-.viva-app .research-note {
-  background: linear-gradient(135deg, #f7f9fe, #eff3fc);
-  border: 1px solid #e7ecf6;
-  border-radius: 10px;
-  padding: 18px 15px;
-  margin-bottom: 20px;
-}
-.viva-app .research-note-icon {
-  display: flex;
-  color: #5578cf;
-  margin-bottom: 13px;
-}
-.viva-app .research-note strong {
-  font-size: 12px;
-}
-.viva-app .research-note p {
-  font-size: 12px;
-  color: #8391a6;
-  margin: 7px 0 13px;
-  line-height: 1.55;
-}
-.viva-app .research-note > span {
-  font-size: 9px;
-  color: #9aa8bd;
-  letter-spacing: 0.2px;
-}
+
 .viva-app .sidebar-bottom > .nav-item {
   font-size: 11px;
   gap: 8px;
@@ -377,17 +323,7 @@
 .viva-app .green-dot {
   background: #34a887;
 }
-.viva-app .staff-button {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  border: 0;
-  border-left: 1px solid #e6ecf4;
-  padding-left: 22px;
-  background: none;
-  font-size: 12px;
-  color: #58708f;
-}
+
 .viva-app .main-content {
   padding: 38px 40px 20px;
   max-width: 1570px;
@@ -1019,212 +955,7 @@
   max-width: 500px;
   margin: auto;
 }
-.viva-app .page-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 9px;
-  color: #a7b3c4;
-  border-top: 1px solid #e4eaf2;
-  margin-top: 42px;
-  padding: 22px 0;
-  gap: 20px;
-}
-.viva-app .page-footer > span > span {
-  margin: 0 7px;
-}
-.viva-app .welcome-grid {
-  display: grid;
-  grid-template-columns: 1.05fr 1fr;
-  gap: 32px;
-  max-width: 1080px;
-}
-.viva-app .welcome-form {
-  padding: 33px;
-  margin: 0;
-}
-.viva-app .welcome-form h2 {
-  font-size: 25px;
-  letter-spacing: -0.7px;
-  margin: 24px 0 12px;
-  max-width: 310px;
-}
-.viva-app .welcome-form > p {
-  font-size: 13px;
-  max-width: 380px;
-}
-.viva-app .welcome-form form {
-  margin-top: 28px;
-}
-.viva-app .welcome-form .field {
-  margin-bottom: 21px;
-}
-.viva-app .welcome-form .button {
-  margin-top: 26px;
-  min-height: 46px;
-}
-.viva-app .consent-row {
-  font-size: 11px;
-  color: #8696ac;
-  line-height: 1.7;
-  font-weight: 400;
-  display: flex;
-  gap: 11px;
-  align-items: flex-start;
-}
-.viva-app .consent-row input {
-  margin-top: 3px;
-}
-.viva-app .welcome-privacy {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 10px;
-  color: #a0aec0;
-  margin-top: 24px;
-  line-height: 1.65;
-}
-.viva-app .welcome-privacy svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.viva-app .welcome-story {
-  position: relative;
-  overflow: hidden;
-  border-radius: 13px;
-  background: #eaf0fe;
-  border: 1px solid #dde7fa;
-  padding: 35px 37px;
-  min-height: 520px;
-}
-.viva-app .welcome-story > .eyebrow {
-  font-size: 9px;
-  letter-spacing: 1.4px;
-}
-.viva-app .welcome-story h2 {
-  font-size: 35px;
-  letter-spacing: -1.2px;
-  line-height: 1.3;
-  position: relative;
-  z-index: 1;
-}
-.viva-app .welcome-story em {
-  font-style: normal;
-  color: #5277d4;
-}
-.viva-app .welcome-story > p {
-  font-size: 12px;
-  color: #8b9bb7;
-  position: relative;
-  z-index: 1;
-  margin-top: 205px;
-}
-.viva-app .topic-tags {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-  margin-top: 20px;
-}
-.viva-app .topic-tags span {
-  border: 1px solid #cfdbf2;
-  background: #eff4ff;
-  color: #879cc0;
-  border-radius: 5px;
-  font-size: 9px;
-  padding: 4px 7px;
-}
-.viva-app .welcome-orbits {
-  position: absolute;
-  top: 228px;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 195px;
-  width: 290px;
-}
-.viva-app .welcome-orbits > div {
-  border: 1px solid #cbdaf7;
-  position: absolute;
-  width: 260px;
-  height: 150px;
-  left: 15px;
-  top: 30px;
-  border-radius: 50%;
-  transform: rotate(-30deg);
-}
-.viva-app .welcome-orbits > div + div {
-  transform: rotate(40deg);
-  width: 200px;
-  height: 180px;
-  left: 45px;
-  top: 7px;
-}
-.viva-app .welcome-orbits > span {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 82px;
-  height: 82px;
-  left: 104px;
-  top: 53px;
-  border: 1px solid #c3d5fa;
-  border-radius: 24px;
-  transform: rotate(-10deg);
-  background: linear-gradient(140deg, #fff, #dbe6ff);
-  box-shadow: 0 15px 25px #7999d627;
-  color: #6a8dde;
-}
-.viva-app .orbit-label {
-  position: absolute;
-  background: #f9fbff;
-  border: 1px solid #dae5fb;
-  border-radius: 6px;
-  color: #7d96c0;
-  box-shadow: 0 6px 12px #638acd09;
-  font-style: normal;
-  font-size: 10px;
-  padding: 6px 11px;
-}
-.viva-app .label-reason {
-  top: 10px;
-  left: 40px;
-}
-.viva-app .label-reflect {
-  bottom: 10px;
-  left: 20px;
-}
-.viva-app .label-connect {
-  right: 0;
-  top: 105px;
-}
-.viva-app .welcome-bottom {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 25px;
-  margin-top: 28px;
-  max-width: 1080px;
-}
-.viva-app .welcome-bottom > div {
-  padding: 20px 5px;
-  position: relative;
-  padding-left: 40px;
-}
-.viva-app .welcome-bottom span {
-  position: absolute;
-  left: 0;
-  top: 20px;
-  font-size: 12px;
-  color: #a5b9dc;
-}
-.viva-app .welcome-bottom strong {
-  font-size: 12px;
-  color: #66809f;
-}
-.viva-app .welcome-bottom p {
-  font-size: 11px;
-  color: #9ba9bb;
-  margin-top: 5px;
-}
+
 .viva-app .check-questions {
   border-top: 1px solid #e4ebf5;
   margin-top: 20px;
@@ -1982,25 +1713,16 @@
   .viva-app .integration-card {
     padding: 14px 11px;
   }
-  .viva-app .welcome-story {
-    padding: 30px;
-  }
-  .viva-app .welcome-story h2 {
-    font-size: 30px;
-  }
-  .viva-app .welcome-form {
-    padding: 28px;
-  }
+  
+  
+  
   .viva-app .topbar-right {
     gap: 12px;
   }
   .viva-app .environment-label {
     font-size: 10px;
   }
-  .viva-app .staff-button {
-    padding-left: 12px;
-    font-size: 11px;
-  }
+  
   .viva-app .start-row {
     align-items: flex-start;
     flex-direction: column;
@@ -2071,15 +1793,9 @@
   .viva-app .session-outline {
     margin: 0;
   }
-  .viva-app .welcome-grid {
-    grid-template-columns: 1fr;
-  }
-  .viva-app .welcome-story {
-    display: none;
-  }
-  .viva-app .welcome-bottom {
-    gap: 10px;
-  }
+  
+  
+  
   .viva-app .topbar-right .environment-label {
     display: none;
   }
@@ -2125,9 +1841,7 @@
   .viva-app .history-card > .button {
     margin-left: 60px;
   }
-  .viva-app .page-footer {
-    font-size: 8px;
-  }
+  
   .viva-app .filter-bar {
     flex-wrap: wrap;
   }
@@ -2182,12 +1896,7 @@
   .viva-app .breadcrumb > span {
     display: none;
   }
-  .viva-app .staff-button {
-    border: 0;
-    padding: 0;
-    font-size: 10px;
-    gap: 4px;
-  }
+  
   .viva-app .main-content {
     padding: 27px 18px 12px;
   }
@@ -2208,30 +1917,13 @@
     font-size: 8px;
     letter-spacing: 1.4px;
   }
-  .viva-app .welcome-form {
-    padding: 25px;
-  }
-  .viva-app .welcome-form h2 {
-    font-size: 25px;
-  }
-  .viva-app .welcome-bottom {
-    grid-template-columns: 1fr;
-    gap: 0;
-    margin-top: 14px;
-  }
-  .viva-app .welcome-bottom > div {
-    padding-top: 13px;
-    padding-bottom: 13px;
-  }
-  .viva-app .welcome-bottom span {
-    top: 13px;
-  }
-  .viva-app .welcome-form > .section-heading {
-    margin-bottom: 10px;
-  }
-  .viva-app .welcome-form .badge {
-    font-size: 9px;
-  }
+  
+  
+  
+  
+  
+  
+  
   .viva-app .panel {
     padding: 21px 18px;
   }
@@ -2421,12 +2113,7 @@
     margin: 0;
     width: 100%;
   }
-  .viva-app .page-footer {
-    margin-top: 30px;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-  }
+  
   .viva-app .modal-backdrop {
     padding: 13px;
   }
@@ -2446,9 +2133,7 @@
   .viva-app .answer-footer .button {
     width: 100%;
   }
-  .viva-app .welcome-privacy {
-    font-size: 10px;
-  }
+  
   .viva-app .notice {
     font-size: 11px;
   }
@@ -2475,7 +2160,7 @@
     color: #111;
     font-size: 11pt;
   }
-  .viva-app .sidebar, .viva-app .topbar, .viva-app .page-footer, .viva-app .no-print, .viva-app .nav-scrim {
+  .viva-app .sidebar, .viva-app .topbar, .viva-app .no-print, .viva-app .nav-scrim {
     display: none !important;
   }
   .viva-app .main-shell {
@@ -2541,8 +2226,7 @@
   }
 }
 
-
-.viva-app .button, .viva-app .text-button, .viva-app .staff-button, .viva-app .small, .viva-app .mode-option strong {
+.viva-app .button, .viva-app .text-button, .viva-app .small, .viva-app .mode-option strong {
   font-size: 14px;
 }
 .viva-app .field-help, .viva-app .footnote, .viva-app .badge, .viva-app .heading-with-icon p, .viva-app .mode-option small, .viva-app .integration-card small, .viva-app .sidebar-user strong, .viva-app .sidebar-user span {
@@ -2560,9 +2244,6 @@
 }
 .viva-app .nav-item > svg {
   flex-shrink: 0;
-}
-.viva-app .nav-lock {
-  display: none;
 }
 
 .viva-app .course-studio { margin: 24px 0; }
@@ -2598,3 +2279,42 @@
 .viva-app .qe-check input { width: auto; }
 .viva-app .qe-remove { justify-self: start; display: inline-flex; gap: 6px; align-items: center; }
 .viva-app .qe details > summary { cursor: pointer; font-size: 14px; }
+
+/* Lecturer page: sign-in, service status, the student vivas list and the system panel. */
+.viva-app .lecturer-login { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.viva-app .ll-intro { display: flex; flex-direction: column; justify-content: space-between; gap: 40px; padding: 44px 56px; background: linear-gradient(150deg, #f7f9fe 0%, #e9effc 100%); border-right: 1px solid #e3e9f2; }
+.viva-app .ll-intro .brand { margin: 0; }
+.viva-app .ll-intro h1 { font-size: clamp(28px, 3vw, 38px); line-height: 1.15; max-width: 480px; }
+.viva-app .ll-intro p { font-size: 16px; color: #58708f; max-width: 460px; margin-top: 14px; }
+.viva-app .ll-intro ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
+.viva-app .ll-intro li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #3d5372; }
+.viva-app .ll-intro li svg { flex: none; width: 34px; height: 34px; padding: 8px; border-radius: 10px; background: #fff; color: #315bd6; box-shadow: 0 2px 6px #1c36500d; }
+.viva-app .ll-form { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 48px 24px; }
+.viva-app .ll-form .panel { width: min(420px, 100%); padding: 34px; margin: 0; box-shadow: 0 12px 32px #1c36500d; }
+.viva-app .ll-form h2 { font-size: 22px; margin-bottom: 4px; }
+.viva-app .ll-form .notice { margin: 16px 0 0; }
+.viva-app .ll-form .field { margin: 18px 0; }
+.viva-app .ll-form .button { margin-top: 6px; padding-block: 13px; }
+.viva-app .ll-lock { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: #edf2ff; color: #315bd6; margin-bottom: 18px; }
+.viva-app .ll-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #58708f; }
+.viva-app .ll-back:hover { color: #315bd6; }
+.viva-app .red-dot { background: #e0566f; }
+.viva-app .grey-dot { background: #9aa8bc; }
+.viva-app .hx-tools { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.viva-app .hx-search { display: flex; align-items: center; gap: 8px; min-width: min(320px, 100%); padding: 0 12px; border: 1px solid #e3e9f2; border-radius: 10px; background: #fff; color: #8190a5; }
+.viva-app .hx-search:focus-within { border-color: #5679de; box-shadow: 0 0 0 3px #e6ecff; }
+.viva-app .hx-search input { border: 0; padding: 10px 0; background: transparent; font-size: 14px; width: 100%; box-shadow: none; }
+.viva-app .hx-search input:focus { box-shadow: none; }
+.viva-app .hx-code { font-size: 12px; font-weight: 600; background: #eef2f8; color: #1b304b; padding: 2px 7px; border-radius: 5px; margin-right: 8px; }
+.viva-app .dash-head-row { display: flex !important; align-items: baseline; justify-content: space-between; gap: 12px; }
+.viva-app .dash-system h2 { display: flex; align-items: center; gap: 8px; }
+.viva-app .sidebar-bottom > a.nav-item { font-size: 12px; }
+@media (max-width: 900px) {
+  .viva-app .lecturer-login { grid-template-columns: 1fr; }
+  .viva-app .ll-intro { padding: 28px 20px; gap: 22px; border-right: 0; border-bottom: 1px solid #e3e9f2; }
+  .viva-app .ll-intro ul { display: none; }
+  .viva-app .ll-form { padding: 28px 16px 40px; justify-content: flex-start; }
+}
+/* Speech lab transcript: fillers and measured pauses (lecturers only). */
+.viva-app .st-filler { background: #fde7b0; color: inherit; border-radius: 4px; padding: 0 2px; }
+.viva-app .st-pause { display: inline-block; margin: 0 4px; padding: 0 7px; border-radius: 999px; background: #e3e9f2; color: #4a5b74; font-size: 12px; line-height: 1.6; vertical-align: 1px; }

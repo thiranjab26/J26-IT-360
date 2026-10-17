@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { FileText, Plus, Upload } from 'lucide-react';
+import { FileText, Plus, Upload } from '../components/icons';
 import { api } from '../api/client';
 import type { Auth, Topic } from '../api/types';
 type Course = { id: string; name: string; description: string; materials: { id: string; name: string; chunk_count: number }[] };
@@ -52,7 +52,7 @@ export default function Courses({ auth, topics, selected, onSelect, onChanged, o
         <label className="field-inline">Course
           <select value={selected} onChange={e => { onSelect(e.target.value); setPreview([]); setMessage(''); }}>
             {!selected && <option value="">Select a course</option>}
-            {topics.map(t => <option value={t.id} key={t.id}>{t.name}{courses.some(c => c.id === t.id) ? '' : ' (built-in sample)'}</option>)}
+            {topics.map(t => <option value={t.id} key={t.id}>{t.name}{courses.some(c => c.id === t.id) ? '' : ' (built-in)'}</option>)}
           </select>
         </label>
         <button className="button secondary" onClick={() => setCreating(v => !v)}><Plus size={16} />{creating ? 'Cancel' : 'New course'}</button>
@@ -70,7 +70,7 @@ export default function Courses({ auth, topics, selected, onSelect, onChanged, o
 
     <Step n={2} title="Add course material" hint="Questions are written only from this material, so add the notes or slides students studied." done={sample || !!course?.materials.length}>
       {!selected ? <p className="muted">Choose a course in step 1 first.</p>
-        : sample ? <p className="muted">This built-in sample topic already has its material. Go to step 3.</p>
+        : sample ? <p className="muted">This built-in topic already has its material. Go to step 3.</p>
         : <>
           {course && course.materials.length > 0 && <ul className="bank-materials">
             {course.materials.map(m => <li key={m.id}><FileText size={16} /><span>{m.name}<small className="muted"> · {m.chunk_count} excerpts</small></span>

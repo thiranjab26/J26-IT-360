@@ -11,9 +11,19 @@ from app.core.auth import current_user
 from app.db.repositories.materials import course_context, topic_catalog
 from app.db.session import get_db
 from app.db.tables import Bank, User
+from app.domain.c3_bank import CONCEPTS, COURSES, MODULES
 from app.integrations.context import TOPICS
 
 router = APIRouter()
+C3_LABELS = {
+    f"c3-{key}": {
+        "code": code,
+        "module": MODULES[code],
+        "short_name": topic,
+        "summary": "; ".join(CONCEPTS[i]["name"] for i in ids) + ".",
+    }
+    for key, code, topic, ids in COURSES
+}
 
 
 @router.get("/topics")
@@ -27,6 +37,8 @@ def topics(db: Session = Depends(get_db)):
                 "course_id": c,
                 "description": d,
                 "question_count": approved[id],
+                # C3 courses name their module, so the student page can group and label them.
+                **C3_LABELS.get(id, {}),
             }
             for id, (n, c, d) in topic_catalog(db).items()
             # Built-in demo topics drop out once they have no approved questions; courses stay.

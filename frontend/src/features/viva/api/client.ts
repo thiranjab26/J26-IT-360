@@ -90,3 +90,19 @@ export const gapLabels: Record<string, string> = {
   LIKELY_COMMUNICATION_DIFFICULTY: "Likely communication difficulty",
   MIXED_INSUFFICIENT_EVIDENCE: "Mixed / insufficient evidence",
 };
+/** What students and lecturers read. The backend splits the research MIXED category in two. */
+export const resultLabels: Record<string, string> = {
+  STRONG: "No gap identified",
+  LIKELY_KNOWLEDGE_GAP: "Likely knowledge gap",
+  LIKELY_COMMUNICATION_DIFFICULTY: "Likely communication difficulty",
+  MIXED_RESULTS: "Mixed results",
+  NOT_ENOUGH_EVIDENCE: "Not enough evidence yet",
+};
+/** The result of a whole viva, also for reports saved before the split (they fall back to MIXED). */
+export function resultOf(r: { result?: string | null; strong?: boolean; strong_answers?: boolean; outcome?: string | null }) {
+  return r.result || (r.strong || r.strong_answers ? "STRONG" : r.outcome === "MIXED_INSUFFICIENT_EVIDENCE" ? "MIXED_RESULTS" : r.outcome || "");
+}
+/** One concept's result: a mixed concept is always "not enough evidence". */
+export function conceptLabel(c: { outcome: string; no_weakness?: boolean }) {
+  return c.no_weakness ? "No gap identified" : c.outcome === "MIXED_INSUFFICIENT_EVIDENCE" ? "Not enough evidence" : gapLabels[c.outcome] || label(c.outcome);
+}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Mic } from "lucide-react";
+import { CheckCircle2, Mic } from "./icons";
 
 /** Loudness from 0 to 1 of what an analyser hears right now (RMS of the waveform, scaled for speech). */
 function loudness(analyser: AnalyserNode, buffer: Uint8Array<ArrayBuffer>) {

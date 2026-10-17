@@ -34,6 +34,9 @@ def test_session_list_includes_coverage(client):
     client.post(f"/api/v1/viva/sessions/{session['id']}/finish", headers=learner)
     item = client.get("/api/v1/viva/sessions", headers=learner).json()["items"][0]
     assert item["coverage"] == 0 and item["strong"] is False
+    assert item["participant_code"] == "P001"
+    staff = client.get("/api/v1/viva/sessions", headers=auth(client, "admin")).json()["items"]
+    assert [s["participant_code"] for s in staff] == ["P001"]
 
 
 def test_lab_analyses_a_recording_from_the_sound(client, monkeypatch):

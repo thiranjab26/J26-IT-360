@@ -1,43 +1,90 @@
-import { ArrowLeft, Download, PartyPopper, Printer } from "lucide-react";
-import type { CSSProperties } from "react";
-import type { Report } from "../api/types";
-import { api, date, downloadJson, gapLabels, label } from "../api/client";
-import { ResourceLink } from "../components/components";
+import { ArrowLeft, BookOpen, CheckCircle2, Download, Info, ListChecks, Mic, PartyPopper, Printer, Target } from "../components/icons";
+import type { CSSProperties, ReactNode } from "react";
+import type { Context, PlanItem, Report } from "../api/types";
+import { api, conceptLabel, date, downloadJson, label, resultLabels, resultOf } from "../api/client";
+import { Integrations, integrationLabel, ResourceLink } from "../components/components";
 import { CountUp } from "../components/charts";
 import "../styles/student.css";
 
-const STRONG = {
-  tone: "tone-strong",
-  color: "var(--st-green)",
-  meaning: "You covered the expected points in every concept without needing help. There is no weakness to explain.",
-};
-const TONE: Record<string, { tone: string; color: string; meaning: string }> = {
+const RESULT: Record<string, { tone: string; meaning: string }> = {
+  STRONG: { tone: "tone-strong", meaning: "You covered the expected points in every topic without needing help." },
   LIKELY_KNOWLEDGE_GAP: {
     tone: "tone-knowledge",
-    color: "var(--st-rose)",
-    meaning: "Some ideas were still missing after follow-up questions. Reviewing the material should help most.",
+    meaning: "Some ideas were still missing after the follow-up questions. Revising them should help most: your study plan lists what to revise.",
   },
   LIKELY_COMMUNICATION_DIFFICULTY: {
     tone: "tone-communication",
-    color: "var(--st-amber)",
-    meaning: "You showed the knowledge once prompted, but found it harder to explain at first. Practising explanations should help most.",
+    meaning: "You showed the knowledge once prompted, but found it harder to explain at first. Your speaking plan shows how to practise.",
   },
-  MIXED_INSUFFICIENT_EVIDENCE: {
+  MIXED_RESULTS: { tone: "tone-mixed", meaning: "Some topics came through well and some need more work. See each topic below." },
+  NOT_ENOUGH_EVIDENCE: {
     tone: "tone-mixed",
-    color: "var(--st-muted)",
-    meaning: "The evidence does not clearly point one way. Read the concept notes below for details.",
+    meaning: "There were not enough clear answers to give a result. Try the viva again and answer each question as fully as you can.",
   },
 };
+const STATE_WORDS: Record<string, string> = {
+  complete: "complete",
+  partial: "partly complete",
+  superficial: "too brief",
+  incorrect: "incorrect",
+  misconception_bearing: "based on a misunderstanding",
+  non_answer: "not an answer",
+};
+const COLOR: Record<string, string> = {
+  "No gap identified": "var(--st-green)",
+  "Likely knowledge gap": "var(--st-rose)",
+  "Likely communication difficulty": "var(--st-amber)",
+};
 
+/** A numbered plan: each step, and under it the evidence it was chosen from. */
+function Plan({ items }: { items: (PlanItem | string)[] }) {
+  return (
+    <ol className="st-plan">
+      {items.map((item, i) => {
+        const { step, reason } = typeof item === "string" ? { step: item, reason: "" } : item;
+        return (
+          <li key={i}>
+            <span>
+              {step}
+              {reason && <small className="st-plan-why">Why: {reason}</small>}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function Section({ icon, title, sub, children, className = "" }: { icon: ReactNode; title: string; sub?: string; children: ReactNode; className?: string }) {
+  return (
+    <section className={`st-card st-section ${className}`}>
+      <header className="st-section-head">
+        <span className="st-section-icon">{icon}</span>
+        <div>
+          <h2>{title}</h2>
+          {sub && <p className="st-muted st-small">{sub}</p>}
+        </div>
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * The viva report as the student sees it. With `staff`, a lecturer opens a student's report:
+ * it names the participant, adds the learning context (C1 to C3), the method notes and a data export.
+ */
 export default function ReportView({
   report,
   celebrate = false,
+  staff,
   token,
   onBack,
   onError,
 }: {
   report: Report;
   celebrate?: boolean;
+  staff?: { participant?: string; context: Context | null };
   token: string;
   onBack: () => void;
   onError: (s: string) => void;
@@ -49,11 +96,18 @@ export default function ReportView({
       onError((e as Error).message);
     }
   };
-  // Student-facing wording only: a session with no weakness keeps the stored MIXED research category.
-  const outcome = report.strong_answers ? STRONG : TONE[report.outcome] ?? TONE.MIXED_INSUFFICIENT_EVIDENCE!;
-  const title = report.strong_answers ? "No gap identified: strong answers" : gapLabels[report.outcome] || label(report.outcome);
+  const result = resultOf(report);
+  const shown = RESULT[result] ?? RESULT.NOT_ENOUGH_EVIDENCE!;
   const h = report.hesitation;
   const coverage = Math.round(report.rubric_coverage);
+  const followUps = report.transcript?.filter((t) => t.follow_up).length ?? 0;
+  // Topics where every question was skipped.
+  const skipped = new Set(
+    (report.transcript ?? []).filter((t) => t.skipped).map((t) => t.concept).filter((c) => report.transcript!.every((t) => t.concept !== c || t.skipped)),
+  );
+  // Reports saved before the two plans existed have one combined list.
+  const study = report.study_plan ?? report.improvement_plan;
+  const speaking = report.speaking_plan ?? [];
   return (
     <div className="st st-report">
       <div className="st-row st-between no-print">
@@ -61,14 +115,23 @@ export default function ReportView({
           <ArrowLeft size={15} style={{ verticalAlign: "-2px" }} /> Back
         </button>
         <div className="st-row">
-          <button className="st-btn st-btn-ghost" onClick={exportReport}>
-            <Download size={16} /> Export
-          </button>
-          <button className="st-btn st-btn-ghost" onClick={() => window.print()}>
-            <Printer size={16} /> Print / PDF
+          {staff && (
+            <button className="st-btn st-btn-ghost st-btn-sm" onClick={exportReport}>
+              <Download size={15} /> Export data
+            </button>
+          )}
+          <button className="st-btn st-btn-ghost st-btn-sm" onClick={() => window.print()}>
+            <Printer size={15} /> Print or save as PDF
           </button>
         </div>
       </div>
+
+      {staff && (
+        <p className="st-staff-note st-small">
+          {staff.participant ? <code>{staff.participant}</code> : "A student"}
+          <span>This is the report the student sees.</span>
+        </p>
+      )}
 
       {celebrate && (
         <section className="st-card st-celebrate no-print" role="status">
@@ -85,140 +148,169 @@ export default function ReportView({
         </section>
       )}
 
-      <section className={`st-card st-outcome ${outcome.tone}`}>
+      <section className={`st-card st-outcome ${shown.tone}`}>
         <div>
           <div className="st-eyebrow">
             {report.topic} · {date(report.created_at)}
           </div>
-          <h1>{title}</h1>
-          <p className="st-muted">{outcome.meaning}</p>
-        </div>
-      </section>
-
-      <section className="st-card st-row" style={{ gap: 20 }}>
-        <div className="st-ring" style={{ ["--value" as string]: coverage }} aria-label={`Rubric coverage ${coverage}%`}>
-          <div>
+          <h1>{resultLabels[result] ?? label(report.outcome)}</h1>
+          <p className="st-muted">{shown.meaning}</p>
+          <div className="st-facts">
             <span>
-              <strong>
-                <CountUp value={coverage} />%
-              </strong>
-              <br />
-              <small>rubric coverage</small>
+              {report.concepts.length} {report.concepts.length === 1 ? "question" : "questions"}
             </span>
+            <span>
+              {followUps} {followUps === 1 ? "follow-up" : "follow-ups"}
+            </span>
+            <span>{h.available ? "Spoken answers" : "Typed answers"}</span>
           </div>
         </div>
-        <p className="st-muted st-small" style={{ flex: 1, minWidth: 220 }}>
-          <strong>Rubric coverage</strong> is the share of expected points your answers covered. It is not a confidence score
-          for the result above.
-        </p>
-      </section>
-
-      <section className="st-card">
-        <h2>Your plan to improve</h2>
-        {report.plan_summary && <p className="st-muted" style={{ marginTop: 8 }}>{report.plan_summary}</p>}
-        <ol className="st-plan">
-          {report.improvement_plan.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ol>
-        {report.review_resources.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <div className="st-label">Review material</div>
-            {report.review_resources.map((r, i) => (
-              <ResourceLink key={i} title={r.title} url={r.url} />
-            ))}
+        <div className="st-outcome-ring" title="The share of the expected points your answers covered. It is not a confidence score for the result.">
+          <div className="st-ring" style={{ ["--value" as string]: coverage }} aria-label={`Points covered ${coverage}%`}>
+            <div>
+              <span>
+                <strong>
+                  <CountUp value={coverage} />%
+                </strong>
+                <br />
+                <small>covered</small>
+              </span>
+            </div>
           </div>
-        )}
+          <small className="st-muted">Expected points covered</small>
+        </div>
       </section>
 
-      <div className="st-grid-2">
-        <section className="st-card">
-          <h3>What came through</h3>
-          {report.strengths.length ? (
-            <div className="st-tags">
-              {report.strengths.map((s, i) => (
-                <span className="st-tag good" key={i}>{s}</span>
+      {report.plan_summary && (
+        <p className="st-card st-summary">
+          <Target size={18} />
+          <span>{report.plan_summary}</span>
+        </p>
+      )}
+
+      <div className="st-grid-2 st-plans">
+        <Section icon={<BookOpen size={18} />} title="Study plan" sub="What to learn or revise">
+          <Plan items={study} />
+          {report.review_resources.length > 0 && (
+            <div className="st-resources">
+              <div className="st-label">Review material</div>
+              {report.review_resources.map((r, i) => (
+                <ResourceLink key={i} title={r.title} url={r.url} />
               ))}
             </div>
-          ) : (
-            <p className="st-muted st-small" style={{ marginTop: 10 }}>Not enough evidence yet to name a clear strength.</p>
           )}
-        </section>
-        <section className="st-card">
-          <h3>Worth revisiting</h3>
-          {report.missing_concepts.length ? (
-            <div className="st-tags">
-              {report.missing_concepts.map((s, i) => (
-                <span className="st-tag warn" key={i}>{s}</span>
-              ))}
-            </div>
-          ) : (
-            <p className="st-muted st-small" style={{ marginTop: 10 }}>Nothing missing in the evidence collected.</p>
-          )}
-        </section>
+        </Section>
+        {speaking.length > 0 && (
+          <Section icon={<Mic size={18} />} title="Speaking plan" sub="How to explain your answers out loud">
+            <Plan items={speaking} />
+          </Section>
+        )}
       </div>
 
-      <section className="st-card">
-        <h2>Concept by concept</h2>
-        <div style={{ display: "grid", gap: 12, marginTop: 14 }}>
+      <div className="st-grid-2">
+        <Section icon={<CheckCircle2 size={18} />} title="What came through" sub="Points your answers covered">
+          {report.strengths.length ? (
+            <ul className="st-points good">
+              {report.strengths.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="st-muted st-small">Not enough evidence yet to name a clear strength.</p>
+          )}
+        </Section>
+        <Section icon={<ListChecks size={18} />} title="Worth revisiting" sub="Points that were missing">
+          {report.missing_concepts.length ? (
+            <ul className="st-points warn">
+              {report.missing_concepts.map((s, i) => (
+                <li key={i}>{s}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="st-muted st-small">Nothing missing in the answers collected.</p>
+          )}
+        </Section>
+      </div>
+
+      <Section icon={<ListChecks size={18} />} title="Topic by topic" sub="The result for each question, and how your answer changed after follow-ups">
+        <div className="st-topic-results">
           {report.concepts.map((c, i) => {
-            const t = c.no_weakness ? STRONG : TONE[c.outcome] ?? TONE.MIXED_INSUFFICIENT_EVIDENCE!;
+            const name = conceptLabel(c);
+            const covered = Math.round(c.rubric_coverage);
             return (
               <article className="st-concept" key={i}>
-                <div className="st-row st-between">
+                <div className="st-concept-top">
                   <strong>{c.concept}</strong>
-                  <span className="st-row" style={{ gap: 8 }}>
-                    <span className="st-dot" style={{ background: t.color }} />
-                    <span className="st-small">{c.no_weakness ? "No gap identified" : gapLabels[c.outcome] || label(c.outcome)}</span>
+                  <span className="st-result-pill">
+                    <span className="st-dot" style={{ background: COLOR[name] ?? "var(--st-muted)" }} />
+                    {name}
+                  </span>
+                </div>
+                <div className="st-concept-bar" aria-label={`${covered}% of the points covered`}>
+                  <span style={{ width: `${covered}%` }} />
+                </div>
+                <div className="st-row st-concept-meta">
+                  <span>{covered}% of points covered</span>
+                  {skipped.has(c.concept) ? (
+                    <span>Skipped</span>
+                  ) : (
+                    c.initial_state && (
+                      <span>
+                        First answer {STATE_WORDS[c.initial_state] ?? label(c.initial_state).toLowerCase()}
+                        {c.final_state && c.final_state !== c.initial_state ? `, then ${STATE_WORDS[c.final_state] ?? label(c.final_state).toLowerCase()}` : ""}
+                      </span>
+                    )
+                  )}
+                  <span>
+                    {c.turn_count} {c.turn_count === 1 ? "answer" : "answers"}
                   </span>
                 </div>
                 <details>
                   <summary className="st-small">Why this result</summary>
-                  <p className="st-small" style={{ marginTop: 8 }}>{c.explanation}</p>
+                  <p className="st-small" style={{ marginTop: 8 }}>
+                    {c.explanation}
+                  </p>
                   {c.signal_details && c.signal_details.length > 0 ? (
                     <div style={{ overflowX: "auto", marginTop: 8 }}>
                       <table className="st-signals">
                         <thead>
-                          <tr><th>Hesitation signal (first answer)</th><th>Your value</th><th>Counts when</th><th>Counted</th></tr>
+                          <tr>
+                            <th>Hesitation signal (first answer)</th>
+                            <th>Your value</th>
+                            <th>Counts when</th>
+                            <th>Counted</th>
+                          </tr>
                         </thead>
                         <tbody>
                           {c.signal_details.map((s) => (
                             <tr key={s.signal}>
-                              <td>{s.signal}</td><td>{s.value}</td><td>{s.threshold}</td>
+                              <td>{s.signal}</td>
+                              <td>{s.value}</td>
+                              <td>{s.threshold}</td>
                               <td className={s.counted ? "is-counted" : ""}>{s.counted ? "Yes" : "No"}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                       <p className="st-small st-muted" style={{ marginTop: 6 }}>
-                        A complete answer only counts as a communication difficulty with 2 or more signals, at least one of
-                        them fillers, restarts or hedges. Timing alone never decides it.
+                        A complete answer only counts as a communication difficulty with 2 or more signals, at least one of them fillers, restarts
+                        or hedges. Timing alone never decides it.
                       </p>
                     </div>
                   ) : (
-                    <p className="st-small st-muted" style={{ marginTop: 6 }}>Typed first answer: no hesitation signals were measured.</p>
+                    <p className="st-small st-muted" style={{ marginTop: 6 }}>
+                      Typed first answer: no hesitation signals were measured.
+                    </p>
                   )}
                 </details>
-                <div className="st-row">
-                  <span className="st-chip">{Math.round(c.rubric_coverage)}% covered</span>
-                  {c.initial_state && (
-                    <span className="st-chip">
-                      {label(c.initial_state)} → {label(c.final_state || c.initial_state)}
-                    </span>
-                  )}
-                  <span className="st-chip">
-                    {c.turn_count} {c.turn_count === 1 ? "answer" : "answers"}
-                  </span>
-                </div>
               </article>
             );
           })}
         </div>
-      </section>
+      </Section>
 
       {report.transcript && report.transcript.length > 0 && (
-        <section className="st-card">
-          <h2>Questions and your answers</h2>
+        <Section icon={<Mic size={18} />} title="Questions and your answers" sub="Everything you were asked, in order">
           <ol className="st-qa">
             {report.transcript.map((t, i) => (
               <li key={i}>
@@ -230,48 +322,60 @@ export default function ReportView({
               </li>
             ))}
           </ol>
-        </section>
+        </Section>
       )}
 
-      <section className="st-card">
-        <h2>How you spoke</h2>
-        <p className="st-muted st-small" style={{ marginTop: 6 }}>
-          Supporting information only. Pauses and fillers never decide the outcome on their own.
-        </p>
+      <Section icon={<Mic size={18} />} title="How you spoke" sub="For practice only: pauses and filler words never decide the result on their own">
         {h.available ? (
           <div className="st-stats">
             {(
               [
-                ["Time to first word", h.response_latency_ms, "ms"],
-                ["Pauses", h.pause_count, ""],
-                ["Total pause time", h.total_pause_ms, "ms"],
-                ["Fillers per 100 words", h.fillers_per_100_words, ""],
-              ] as [string, number | undefined, string][]
-            ).map(([name, value, unit]) => (
+                ["Time to first word", h.response_latency_ms == null ? null : `${(h.response_latency_ms / 1000).toFixed(1)} s`, "How long before you started to answer"],
+                ["Pauses", h.pause_count == null ? null : String(h.pause_count), "Silent breaks while you spoke"],
+                ["Total pause time", h.total_pause_ms == null ? null : `${(h.total_pause_ms / 1000).toFixed(1)} s`, "All the silent breaks added up"],
+                ["Fillers per 100 words", h.fillers_per_100_words == null ? null : String(Math.round(h.fillers_per_100_words)), 'Words like "um" and "uh"'],
+              ] as [string, string | null, string][]
+            ).map(([name, value, help]) => (
               <div className="st-stat" key={name}>
-                <strong>{value == null ? "Not measured" : `${Math.round(value)}${unit ? ` ${unit}` : ""}`}</strong>
+                <strong>{value ?? "Not measured"}</strong>
                 <span>{name}</span>
+                <small>{help}</small>
               </div>
             ))}
           </div>
         ) : (
-          <p className="st-small" style={{ marginTop: 12 }}>No spoken answers were recorded, so there is no timing data.</p>
+          <p className="st-small">No spoken answers were recorded, so there is no timing data.</p>
         )}
-      </section>
+      </Section>
 
-      <details className="st-card">
-        <summary>About this report</summary>
-        <ul className="st-small st-muted" style={{ marginTop: 12, paddingLeft: 18, display: "grid", gap: 6 }}>
-          {report.limitations.map((l, i) => (
-            <li key={i}>{l}</li>
-          ))}
-        </ul>
-        {report.mastery_mismatch && (
-          <p className="st-small" style={{ marginTop: 10 }}>
-            This result differs from your AdaptLearn mastery level. Your mastery has not been changed.
+      {staff && (
+        <details className="st-card" open>
+          <summary>Learning context from AdaptLearn · {staff.context ? integrationLabel(staff.context) : "Loading"}</summary>
+          <p className="st-small st-muted" style={{ margin: "8px 0 14px" }}>
+            Saved when the viva started. Lecturers only: students do not see this.
           </p>
+          <Integrations context={staff.context} />
+        </details>
+      )}
+
+      <Section icon={<Info size={18} />} title="How this works" className="st-howto">
+        <ul className="st-points">
+          <li>Each answer was marked against the points a full answer should cover. An idea in your own words earns part of a point; using the correct technical term earns all of it.</li>
+          <li>Follow-up questions gave you a chance to add more, and the result looks at all your answers together.</li>
+          <li>Pauses and filler words are shown to help you practise. They never decide the result on their own.</li>
+          {report.mastery_mismatch && <li>This result differs from your AdaptLearn mastery level. Your mastery has not been changed.</li>}
+        </ul>
+        {staff && (
+          <details>
+            <summary className="st-small">Method notes (lecturers only)</summary>
+            <ul className="st-small st-muted" style={{ marginTop: 10, paddingLeft: 18, display: "grid", gap: 6 }}>
+              {report.limitations.map((l, i) => (
+                <li key={i}>{l}</li>
+              ))}
+            </ul>
+          </details>
         )}
-      </details>
+      </Section>
     </div>
   );
 }

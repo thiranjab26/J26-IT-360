@@ -5,7 +5,7 @@
 | Component | C4 Intelligent Viva System (AdaptLearn, J26-IT-360) |
 | Owner | R. J. Vanderheyden (IT23212022) |
 | Service | `backend/services/viva-service` (FastAPI, Python 3.11, port 8401) |
-| Frontend feature | `frontend/src/features/viva` (React, TypeScript), route `/viva` |
+| Frontend feature | `frontend/src/features/viva` (React, TypeScript), routes `/viva` (students) and `/viva/lecturer` (lecturers) |
 | Database | Neon Postgres, schema `viva`, role `svc_viva` |
 | Rule versions | Policy `c04-policy-1.3-skip-stop`, gap rules `c04-gap-1.3-verbal-signal` |
 | Status | Recreated from the standalone prototype on `feature-c4-viva-system`; not yet merged |

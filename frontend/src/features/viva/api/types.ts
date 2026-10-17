@@ -9,6 +9,11 @@ export type Topic = {
   course_id: string;
   description: string;
   question_count: number;
+  // C3 courses only: the module they belong to, and a clean name and summary.
+  code?: string;
+  module?: string;
+  short_name?: string;
+  summary?: string;
 };
 export type Context = {
   c01: {
@@ -44,6 +49,7 @@ export type Turn = {
   input_mode: string;
   hesitation?: Record<string, unknown>;
   created_at: string;
+  concept?: string;
 };
 export type Session = {
   id: string;
@@ -69,6 +75,7 @@ export type Session = {
 };
 export type Summary = {
   id: string;
+  participant_code?: string | null;
   topic_id: string;
   topic: string;
   status: string;
@@ -80,7 +87,9 @@ export type Summary = {
   outcome?: string;
   coverage?: number | null;
   strong?: boolean;
+  result?: string | null;
 };
+export type PlanItem = { step: string; reason: string };
 export type Report = {
   session_id: string;
   topic: string;
@@ -114,6 +123,10 @@ export type Report = {
     notes: string[];
   };
   improvement_plan: string[];
+  // Each step says why it was chosen; reports from before 16 Oct 2026 hold plain strings.
+  study_plan?: (PlanItem | string)[];
+  speaking_plan?: (PlanItem | string)[];
+  result?: string | null;
   plan_summary?: string;
   plan_provider?: string;
   review_resources: { title: string; resource_id: string; url?: string }[];
@@ -232,6 +245,7 @@ export type Overview = {
   bank: { approved: number; draft: number; rejected: number; courses: number };
   ratings: { total: number; raters: number };
   outcomes: Record<string, number>;
+  results?: Record<string, number>;
   answer_states: Record<string, number>;
   daily: { date: string; started: number; completed: number }[];
   topics: { topic: string; sessions: number; completed: number; average_coverage: number | null }[];
@@ -245,6 +259,7 @@ export type Overview = {
     outcome?: string | null;
     strong: boolean;
     coverage?: number | null;
+    result?: string | null;
   }[];
 };
 export type FluencyMeasures = {

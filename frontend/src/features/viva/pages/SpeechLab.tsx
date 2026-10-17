@@ -1,5 +1,5 @@
 import { useRef, useState, type DragEvent, type ReactNode } from "react";
-import { AudioLines, Download, FileAudio, Info, UploadCloud, X } from "lucide-react";
+import { AudioLines, Download, FileAudio, Info, UploadCloud, X } from "../components/icons";
 import { api, downloadJson } from "../api/client";
 import type { Auth, LabResult } from "../api/types";
 import { PageTitle } from "../components/components";
@@ -56,7 +56,7 @@ export default function SpeechLab({ auth, onError }: { auth: Auth; onError: (s: 
   return (
     <div className="dash">
       <PageTitle
-        eyebrow="SPEECH LAB · ADMIN"
+        eyebrow="SPEECH LAB"
         title="Analyse a recording"
         description="Measure pauses, speed and fillers in a recorded viva and compare them with the literature thresholds. Audio is analysed in memory and never stored."
       />

@@ -42,11 +42,26 @@ def clock(seconds):
     return f"{int(seconds // 60):02d}:{int(seconds % 60):02d}"
 
 
+def seconds(text):
+    """'1:28' or '01:28' (or Excel's '1:28:00') as seconds."""
+    minutes, secs = text.split(":")[:2]
+    return int(minutes) * 60 + int(secs)
+
+
 def find(folder, stem):
     return next((p for p in folder.iterdir() if p.stem == stem and p.suffix.lower() in AUDIO), None)
 
 
-def analyse(code, folder, args):
+def listened(typed):
+    """The stretch you counted, once you typed counts for it, so a re-run counts the same one."""
+    if typed.get("listen_from") and typed.get("listen_to") and any(
+        v for k, v in typed.items() if k.startswith("your_")
+    ):
+        return seconds(typed["listen_from"]), seconds(typed["listen_to"])
+    return None
+
+
+def analyse(code, folder, args, check_window=None):
     student = find(folder, f"{code}_student")
     examiner = find(folder, f"{code}_examiner")
     print(f"{code}: decoding and detecting speech", flush=True)
@@ -76,6 +91,7 @@ def analyse(code, folder, args):
         warmup=args.warmup,
         check_answer=args.check_answer,
         check_seconds=args.check_seconds,
+        check_window=check_window,
     )
     summary = {"code": code, "transcript_source": source, **result["session"]}
     rows = [{"code": code, **r} for r in result["answers"]]
@@ -114,12 +130,16 @@ def analyse(code, folder, args):
     return summary, rows, window_rows, count_row, detail
 
 
-def keep_your_counts(path, rows):
-    """Carry the counts you typed into count_check.csv over to the new file."""
+def read_typed(path):
+    """count_check.csv as you left it, by participant code."""
     if not path.exists():
-        return rows
+        return {}
     with path.open(newline="", encoding="utf-8") as f:
-        typed = {r["code"]: r for r in csv.DictReader(f)}
+        return {r["code"]: r for r in csv.DictReader(f)}
+
+
+def keep_your_counts(typed, rows):
+    """Carry the counts you typed into count_check.csv over to the new file."""
     for row in rows:
         old = typed.get(row["code"], {})
         row.update({k: old[k] for k in row if k.startswith("your_") and old.get(k)})
@@ -165,6 +185,7 @@ def main():
         sys.exit(f"No *_student audio files found in {folder}")
     out = folder / "results"
     out.mkdir(exist_ok=True)
+    typed = read_typed(out / "count_check.csv")
     sessions, answers, windows, checks = [], [], [], []
     for code in codes:
         if not find(folder, f"{code}_examiner"):
@@ -172,7 +193,9 @@ def main():
             # listening and thinking time would count as pauses.
             print(f"{code}: SKIPPED, no {code}_examiner audio file", flush=True)
             continue
-        summary, rows, window_rows, count_row, detail = analyse(code, folder, args)
+        summary, rows, window_rows, count_row, detail = analyse(
+            code, folder, args, listened(typed.get(code, {}))
+        )
         sessions.append(summary)
         answers += rows
         windows += window_rows
@@ -181,7 +204,7 @@ def main():
     write_csv(out / "sessions.csv", sessions)
     write_csv(out / "answers.csv", answers)
     write_csv(out / "windows.csv", windows)
-    write_csv(out / "count_check.csv", keep_your_counts(out / "count_check.csv", checks))
+    write_csv(out / "count_check.csv", keep_your_counts(typed, checks))
     print(f"Done: {len(codes)} participants. Results in {out}")
 
 

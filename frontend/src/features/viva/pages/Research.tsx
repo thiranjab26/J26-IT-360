@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, FlaskConical, Save, ShieldCheck } from "lucide-react";
+import { Download, FlaskConical, Save, ShieldCheck } from "../components/icons";
 import { api, downloadJson, gapLabels, label } from "../api/client";
 import type { Auth, Case, Metrics, Rating } from "../api/types";
 import { Badge, Empty, PageTitle, Skeleton } from "../components/components";
@@ -66,8 +66,8 @@ export default function Research({
   return (
     <>
       <PageTitle
-        eyebrow="RESEARCH WORKSPACE"
-        title="Let the evidence lead."
+        eyebrow="RESEARCH"
+        title="Ratings and agreement"
         description="Independent human ratings and measured agreement across three evidence conditions."
         action={
           auth.user.role === "admin" ? (
@@ -150,10 +150,9 @@ export default function Research({
           ) : (
             <Empty
               icon={<FlaskConical size={28} />}
-              title="The study begins with a conversation"
+              title="No cases to rate yet"
             >
-              Complete participant sessions to create evidence cases. No ratings
-              or research results have been invented.
+              Cases appear here after students finish their vivas.
             </Empty>
           )}
         </>

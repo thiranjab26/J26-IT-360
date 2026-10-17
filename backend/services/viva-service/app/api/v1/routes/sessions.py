@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import re
 from copy import deepcopy
 
 from fastapi import (
@@ -33,6 +32,8 @@ from app.domain.logic import (
     issue_question,
     next_question,
     policy,
+    result_label,
+    spoken_command,
 )
 from app.integrations import speech
 from app.integrations.llm import (
@@ -77,6 +78,7 @@ def report_view(data):
     """Stored report plus the questions asked and the student's own answers, in order."""
     return {
         **data["report"],
+        "result": result_label(data["report"]),
         "transcript": [
             {
                 "concept": data["snapshots"][t["concept_index"]]["concept"],
@@ -130,6 +132,7 @@ def session_view(session):
                     },
                     "state": t["assessment"]["state"],
                     "coverage": t["assessment"]["coverage"],
+                    "concept": data["snapshots"][t["concept_index"]]["concept"],
                 }
                 for t in data["turns"]
             ],
@@ -168,16 +171,6 @@ def save_session(db, session, data, status):
     set_committed_value(session, "data", data)
     set_committed_value(session, "status", status)
     set_committed_value(session, "version", session.version)
-
-
-STOP_INTENT = re.compile(
-    r"\b(stop|end|quit|finish|exit)\b.{0,20}\b(session|viva|interview|this|now|here)\b"
-    r"|\bi (do not|don t|dont) want to (answer|continue|do this|go on)\b|\bi want to (stop|quit|end|leave)\b|\bno more questions\b"
-)
-
-
-def wants_to_stop(transcript):
-    return bool(STOP_INTENT.search(re.sub(r"[^a-z0-9 ]", " ", transcript.lower())))
 
 
 def llm_wording():
@@ -267,7 +260,9 @@ def complete(db, session, data):
     if llm_wording() and data["turns"]:
         try:
             plan, report["plan_provider"] = improvement_plan(report, data)
-            report["plan_summary"], report["improvement_plan"] = plan["summary"], plan["steps"]
+            report["plan_summary"] = plan["summary"]
+            report["study_plan"], report["speaking_plan"] = plan["study"], plan["speaking"]
+            report["improvement_plan"] = [i["step"] for i in plan["study"] + plan["speaking"]]
         except (ProviderUnavailable, ValueError, HTTPException) as exc:
             report["plan_fallback_reason"] = str(getattr(exc, "detail", exc))[:300]
     data["report"] = report
@@ -341,13 +336,18 @@ def list_sessions(user: User = Depends(current_user), db: Session = Depends(get_
     if user.role == "evaluator":
         raise HTTPException(403, "Evaluators access only blinded cases.")
     query = select(VivaSession)
-    if user.role != "admin":
+    codes = {user.id: user.participant_code}
+    if user.role == "admin":
+        # Lecturers see every student's vivas, so each row names its participant.
+        codes |= {u.id: u.participant_code for u in db.scalars(select(User))}
+    else:
         query = query.where(VivaSession.user_id == user.id)
     sessions = sorted(db.scalars(query), key=lambda s: s.data["created_at"], reverse=True)
     return {
         "items": [
             {
                 "id": s.id,
+                "participant_code": codes.get(s.user_id),
                 "topic_id": s.data["topic_id"],
                 "topic": s.data["topic"],
                 "status": s.status,
@@ -359,6 +359,7 @@ def list_sessions(user: User = Depends(current_user), db: Session = Depends(get_
                 "outcome": s.data.get("report", {}).get("outcome"),
                 "coverage": s.data.get("report", {}).get("rubric_coverage"),
                 "strong": bool(s.data.get("report", {}).get("strong_answers")),
+                "result": result_label(s.data.get("report")),
             }
             for s in sessions
         ]
@@ -397,7 +398,9 @@ def submit_answer(
         raise HTTPException(409, "This question is stale. Refresh the current session.")
     index = current["_concept_index"]
     prior = [t for t in data["turns"] if t["concept_index"] == index]
-    if not body.skip and wants_to_stop(body.transcript):
+    command = None if body.skip else spoken_command(body.transcript)
+    skip = body.skip or command == "skip"
+    if command == "stop":
         # The student asked to end: finish with the evidence so far, without assessing this utterance.
         data["ended_early"] = True
         data["completed_concepts"] = index
@@ -410,7 +413,7 @@ def submit_answer(
             "assessment": None,
             "action": "STUDENT_ENDED_SESSION",
         }
-    if body.skip:
+    if skip:
         turn = {
             "id": uid(),
             "question_id": current["id"],

@@ -330,6 +330,8 @@ def call_llm(provider, instruction, payload, schema, max_tokens=None):
                 url = endpoint["base"].rstrip("/") + "/chat/completions"
                 headers = {"Authorization": f"Bearer {endpoint['key']}"}
                 body = {"model": endpoint["model"], "messages": messages, "max_tokens": max_tokens}
+                if cfg.llm_reasoning_effort and "gpt-oss" in endpoint["model"]:
+                    body["reasoning_effort"] = cfg.llm_reasoning_effort
                 # Google recommends the default sampling settings for its thinking models.
                 if endpoint["host"] != "generativelanguage.googleapis.com":
                     body["temperature"] = 0
@@ -379,6 +381,9 @@ def call_llm(provider, instruction, payload, schema, max_tokens=None):
                 if exc.response.status_code in (408, 500, 502, 503, 504):
                     cool(endpoint, 30)
                     retry_later.append(endpoint)
+                elif exc.response.status_code in (401, 403):
+                    # A rejected key stays rejected: skip this endpoint on the next calls too.
+                    cool(endpoint, 120)
             except (
                 TimeoutError,
                 httpx.TimeoutException,
@@ -838,7 +843,8 @@ def phrase_follow_up(bank, action, target, assessment, transcript, history, seen
 
 class Plan(BaseModel):
     summary: str = Field(min_length=10, max_length=600)
-    steps: list[str] = Field(min_length=2, max_length=5)
+    study_steps: list[str] = Field(min_length=1, max_length=4)
+    speaking_steps: list[str] = Field(min_length=1, max_length=4)
 
 
 @bounded_operation
@@ -876,19 +882,34 @@ def improvement_plan(report, data):
             )
         },
         "review_resources": [r["title"] for r in report["review_resources"]],
+        # The rules already chose these steps from the evidence; the model only words them.
+        "study_items": report["study_plan"],
+        "speaking_items": report["speaking_plan"],
     }
     raw = call_llm(
         cfg.assessment_provider,
-        "Write a short personalised improvement plan for a student after a technical viva. Do not change or question the outcome. "
-        "For LIKELY_KNOWLEDGE_GAP concepts, give concrete study steps on the missing points and misconceptions, naming the review resources. "
-        "For LIKELY_COMMUNICATION_DIFFICULTY, give concrete spoken-explanation practice steps. For mixed evidence, give balanced steps for both. "
-        "Each step is one actionable sentence. Never diagnose anxiety, confidence or personality; hesitation is only supporting evidence. Address the student as you.",
+        "Personalise a plan for a student after a technical viva, in plain English for a second-language speaker. "
+        "Do not change or question the outcome. summary: two sentences on what went well and what to work on, based only on the payload. "
+        "study_steps: rewrite each study_items step in the same order, one for one, as a short personal instruction; keep its meaning, "
+        "name the same point or resource, and add no new advice. speaking_steps: do the same for speaking_items. "
+        "Each step is one sentence of at most 30 words. Never diagnose anxiety, confidence, accent or personality. Address the student as you.",
         payload,
         Plan.model_json_schema(),
         max_tokens=1536,
     )
     plan = Plan.model_validate(raw)
+
+    def reword(items, steps):
+        # Same count and order, or the rules' own wording stays; the reasons never change.
+        steps = [" ".join(t.split()) for t in steps if t.strip()]
+        return (
+            [{**i, "step": t} for i, t in zip(items, steps, strict=True)]
+            if len(steps) == len(items)
+            else items
+        )
+
     return {
         "summary": " ".join(plan.summary.split()),
-        "steps": [" ".join(s.split()) for s in plan.steps if s.strip()],
+        "study": reword(report["study_plan"], plan.study_steps),
+        "speaking": reword(report["speaking_plan"], plan.speaking_steps),
     }, _last_call.get() or cfg.assessment_provider

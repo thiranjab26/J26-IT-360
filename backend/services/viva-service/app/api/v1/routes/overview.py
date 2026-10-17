@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import admin
 from app.db.session import get_db
 from app.db.tables import Bank, Course, HumanRating, User, VivaSession
+from app.domain.logic import result_label
 
 router = APIRouter()
 
@@ -43,6 +44,7 @@ def overview(user: User = Depends(admin), db: Session = Depends(get_db)):
         "STRONG" if r.get("strong_answers") else r.get("outcome", "MIXED_INSUFFICIENT_EVIDENCE")
         for r in reports
     )
+    results = Counter(result_label(r) for r in reports)
     states = Counter(t["assessment"]["state"] for t in answered)
     coverage = [r["rubric_coverage"] for r in reports if r.get("rubric_coverage") is not None]
     durations = []
@@ -102,6 +104,17 @@ def overview(user: User = Depends(admin), db: Session = Depends(get_db)):
                 "MIXED_INSUFFICIENT_EVIDENCE",
             )
         },
+        # The two kinds of mixed result are told apart for reading; "outcomes" keeps the research categories.
+        "results": {
+            key: results.get(key, 0)
+            for key in (
+                "STRONG",
+                "LIKELY_KNOWLEDGE_GAP",
+                "LIKELY_COMMUNICATION_DIFFICULTY",
+                "MIXED_RESULTS",
+                "NOT_ENOUGH_EVIDENCE",
+            )
+        },
         "answer_states": {state: states.get(state, 0) for state in STATES},
         "daily": [
             {"date": d, "started": started.get(d, 0), "completed": finished.get(d, 0)} for d in days
@@ -129,6 +142,7 @@ def overview(user: User = Depends(admin), db: Session = Depends(get_db)):
                 "outcome": (s.data.get("report") or {}).get("outcome"),
                 "strong": bool((s.data.get("report") or {}).get("strong_answers")),
                 "coverage": (s.data.get("report") or {}).get("rubric_coverage"),
+                "result": result_label(s.data.get("report")),
             }
             for s in recent
         ],

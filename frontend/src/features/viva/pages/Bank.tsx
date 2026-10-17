@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BookOpenCheck, Check, ChevronDown, Pencil, RefreshCw, Sparkles, X } from "lucide-react";
+import { BookOpenCheck, Check, ChevronDown, Pencil, RefreshCw, Sparkles, X } from "../components/icons";
 import { api, label } from "../api/client";
 import type { Auth, BankQuestion, Topic } from "../api/types";
 import { Badge, Empty, Modal, PageTitle, Skeleton } from "../components/components";
@@ -100,7 +100,7 @@ export default function Bank({
   return (
     <>
       <PageTitle
-        eyebrow="QUESTION BANK · ADMIN"
+        eyebrow="QUESTION BANK"
         title="Create viva questions"
         description="Four steps: choose a course, add its material, generate questions, then approve the ones students should get."
       />

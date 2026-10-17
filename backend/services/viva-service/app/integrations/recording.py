@@ -106,13 +106,20 @@ def answer_windows(turns, student_speech, duration):
 
 
 def analyse(
-    audio, words, nuclei, examiner_speech=None, warmup=False, check_answer=2, check_seconds=60.0
+    audio,
+    words,
+    nuclei,
+    examiner_speech=None,
+    warmup=False,
+    check_answer=2,
+    check_seconds=60.0,
+    check_window=None,
 ):
     """Measures for one recorded viva.
 
     Returns session (whole-viva measures and literature flags), answers (one row per answer),
-    windows (15-second timeline), check (the counting-check minute) and the detected speech
-    and question turns.
+    windows (15-second timeline), check (the counting-check minute, or check_window when the
+    listener already chose one) and the detected speech and question turns.
     """
     duration = len(audio) / SAMPLE_RATE
     speech = speech_intervals(audio)
@@ -163,6 +170,7 @@ def analyse(
     if chosen:
         begin = chosen["counts"]["first_speech"]
         finish = min(begin + check_seconds, chosen["end_s"])
+        begin, finish = check_window or (begin, finish)
         check = {"begin": begin, "finish": finish, **fluency.noticed(speech, words, begin, finish)}
     for r in rows:
         r.pop("counts")

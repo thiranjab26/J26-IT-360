@@ -25,6 +25,7 @@ from app.core import limits
 from app.core.auth import current_user, lookup, participant
 from app.db.session import SessionLocal
 from app.db.tables import Bank, User
+from app.domain.logic import spoken_command
 from app.integrations import speech
 from app.integrations.llm import ProviderUnavailable
 from app.models.schemas import SpeakIn
@@ -79,7 +80,8 @@ async def transcribe_audio(
         live = (" ".join(live_transcript.split()), f"deepgram:{settings().deepgram_stt_model}:live")
     else:
         await run_in_threadpool(limits.reserve_speech, user.id)
-    return await run_in_threadpool(speech.transcribe, content, types[mime], live)
+    result = await run_in_threadpool(speech.transcribe, content, types[mime], live)
+    return {**result, "command": spoken_command(result.get("transcript", ""))}
 
 
 def topic_terms(db, topic_id):

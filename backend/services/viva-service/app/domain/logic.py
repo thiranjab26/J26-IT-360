@@ -6,7 +6,9 @@ from statistics import mean
 from app.db.tables import now, uid
 from app.domain import fluency
 
-POLICY_VERSION = "c04-policy-1.4-clarify"
+# 1.5: stop and skip are spoken commands only when said on their own (12 words or fewer).
+# 1.6: the stop command also accepts the ways speech-to-text mishears "viva" (diva, river, ...).
+POLICY_VERSION = "c04-policy-1.6-misheard-viva"
 GAP_VERSION = "c04-gap-1.4-literature-profile"
 # The research's fluency thresholds; switch to the pilot profile after the 16 Oct statistics.
 GAP_PROFILE = fluency.LITERATURE_PROFILE
@@ -393,8 +395,191 @@ def aggregate_hesitation(turns):
     return result
 
 
+# Speech-to-text often mishears "viva"; these are the misspellings seen for it.
+VIVA = r"(viva|vivas|vivo|vive|veeva|diva|visa|vista|reva|river|fever|beaver|weaver|viber|bieber|test|exam|quiz)"
+STOP_INTENT = re.compile(
+    r"\b(stop|end|quit|finish|exit)\b.{0,20}\b(session|interview|this|now|here|"
+    + VIVA[1:-1]
+    + r")\b"
+    r"|\bi (do not|don t|dont) want to (answer|continue|do this|go on)\b|\bi want to (stop|quit|end|leave)\b"
+    r"|\bno more questions\b|^(stop|stop it|end|end it|i m done|i am done|that s all)$"
+)
+SKIP_INTENT = re.compile(
+    r"^(please )?(skip|pass)( (this|the|it))?( question)?( please)?$|\bnext question\b|\b(can|could) (i|we) skip\b"
+    r"|\bi (want|would like) to skip\b|^(let s |lets )?move on$"
+)
+# Commands must be said on their own: a long answer that mentions "stop" or "next" is an answer.
+COMMAND_WORDS = 12
+
+
+def spoken_command(transcript):
+    """'stop' or 'skip' when the whole utterance is a short command (policy 1.5), otherwise None."""
+    text = " ".join(re.sub(r"[^a-z0-9 ]", " ", (transcript or "").lower()).split())
+    if not text or len(text.split()) > COMMAND_WORDS:
+        return None
+    return "stop" if STOP_INTENT.search(text) else "skip" if SKIP_INTENT.search(text) else None
+
+
+def result_label(report):
+    """What students and lecturers read. The stored research category never changes: MIXED is
+    shown as mixed results when some concept gave a clear result, otherwise as not enough evidence."""
+    if not report:
+        return None
+    if report.get("strong_answers"):
+        return "STRONG"
+    if report["outcome"] != MIXED:
+        return report["outcome"]
+    clear = any(c["outcome"] != MIXED or c.get("no_weakness") for c in report.get("concepts", []))
+    return "MIXED_RESULTS" if clear else "NOT_ENOUGH_EVIDENCE"
+
+
+def resource_title(title):
+    """'C3 IT1010 Programming basics notes.md' reads as 'IT1010 Programming basics notes'."""
+    return re.sub(
+        r"\.(md|txt|pdf|docx?|pptx?)$", "", re.sub(r"^C3\s+", "", title), flags=re.I
+    ).strip()
+
+
+STATE_WORDS = {
+    "complete": "complete",
+    "partial": "partly complete",
+    "superficial": "too brief",
+    "incorrect": "incorrect",
+    "misconception_bearing": "based on a misunderstanding",
+    "non_answer": "not an answer",
+}
+SIGNAL_KEYS = {label: key for key, label, _ in SIGNAL_INFO}
+
+
+def plan_item(step, reason):
+    return {"step": step, "reason": reason}
+
+
+def study_plan(concepts, needs, resources):
+    """Study steps chosen from what each answer missed. Every step carries the reason it was chosen."""
+    items = []
+    for c in concepts:
+        info, name = needs.get(c["concept"]), c["concept"]
+        if not info:
+            continue
+        if info["skipped"]:
+            items.append(
+                plan_item(
+                    f"Learn {name} from the start, then explain it in your own words.",
+                    f"You skipped the {name} question, so it was not marked.",
+                )
+            )
+            continue
+        if info["misconceptions"]:
+            items.append(
+                plan_item(
+                    f"Fix this idea about {name}: {info['misconceptions'][0].rstrip('.')}.",
+                    f"Your answer to the {name} question showed this misunderstanding.",
+                )
+            )
+        if info["missing"]:
+            more = len(info["missing"]) - 1
+            items.append(
+                plan_item(
+                    f"Revise {name}. Make sure you can explain: {info['missing'][0].rstrip('.')}.",
+                    f"Your answers to the {name} question covered {round(c['rubric_coverage'])}% of the expected "
+                    f"points, and this point was missing"
+                    + (
+                        f" ({more} more {'point' if more == 1 else 'points'} also missing)."
+                        if more
+                        else "."
+                    ),
+                )
+            )
+    items = items[:3]
+    if items and resources:
+        items.append(
+            plan_item(
+                f"Read {resources[0]['title']}, then close it and explain these points from memory.",
+                "The viva questions were written from this course material.",
+            )
+        )
+    if not items:
+        n = len(concepts)
+        items = [
+            plan_item(
+                "Try a new topic next, or explain a fresh example of these ideas to check you can apply them.",
+                f"You covered every expected point in {'all ' + str(n) + ' questions' if n > 1 else 'the question'}.",
+            )
+        ]
+    return items
+
+
+SPEAKING_STEPS = {
+    "restarts": "Plan your first sentence before you speak, so you do not need to start again.",
+    "hedges": 'When you know the answer, say it directly, without "maybe" or "I think".',
+    "fluency": "Practise explaining at an even pace: short sentences, with a short pause between them.",
+}
+
+
+def speaking_plan(concepts, hesitation):
+    """Speaking steps chosen from how the answers were spoken, using the same limits as the gap
+    rules. Every step carries the reason it was chosen; nothing is added without a reason."""
+    if not hesitation.get("available"):
+        return [
+            plan_item(
+                "Answer by speaking next time, even if it feels slower than typing.",
+                "You typed every answer, so your speaking could not be measured.",
+            )
+        ]
+    items = []
+    fillers = hesitation.get("fillers_per_100_words") or 0
+    if fillers >= 4:
+        items.append(
+            plan_item(
+                'When you need time to think, pause silently instead of saying "um" or "uh".',
+                f"You used about {fillers:.0f} filler words per 100 words"
+                + ("; the viva counts 8 or more as a sign of difficulty." if fillers >= 8 else "."),
+            )
+        )
+    seen = set()
+    for c in concepts:
+        for signal in c.get("signal_details") or []:
+            key = SIGNAL_KEYS.get(signal["signal"])
+            if signal["counted"] and key in SPEAKING_STEPS and key not in seen:
+                seen.add(key)
+                items.append(
+                    plan_item(
+                        SPEAKING_STEPS[key],
+                        f"In your first answer to the {c['concept']} question: {signal['signal'].split(' (')[0].lower()} "
+                        f"{signal['value']} (the viva counts {signal['threshold']}).",
+                    )
+                )
+    latency = hesitation.get("response_latency_ms") or 0
+    if latency >= 4000:
+        items.append(
+            plan_item(
+                "Start with one short sentence that answers the question, then add the detail.",
+                f"On average you waited {latency / 1000:.1f} seconds before your first word.",
+            )
+        )
+    helped = next((c for c in concepts if c["outcome"] == COMMUNICATION), None)
+    if helped:
+        items.append(
+            plan_item(
+                f"Practise explaining {helped['concept']} out loud in full sentences, using the technical terms.",
+                f"Your first answer to the {helped['concept']} question was "
+                f"{STATE_WORDS.get(helped['initial_state'], 'incomplete')}, but after a follow-up it was "
+                f"{STATE_WORDS.get(helped['final_state'], 'complete')}: you knew it, but explaining it took more help.",
+            )
+        )
+    if not items:
+        items = [
+            plan_item(
+                "Keep practising out loud: explain one idea for a minute without notes, a few times a week.",
+                "None of the speaking measures in this viva reached the levels the viva looks for.",
+            )
+        ]
+    return items[:4]
+
+
 def build_report(session_id, data):
-    concepts, strengths, missing = [], [], []
+    concepts, strengths, missing, needs = [], [], [], {}
     conditions = []
     for condition in ("A", "B", "C"):
         outcomes, reasons = [], []
@@ -426,6 +611,12 @@ def build_report(session_id, data):
                 if last:
                     strengths.extend(h["point"] for h in last["rubric_hits"] if h["covered"])
                     missing.extend(last["missing_points"])
+                    if last["missing_points"] or last["misconceptions"] or not answered:
+                        needs[bank["concept"]] = {
+                            "missing": last["missing_points"],
+                            "misconceptions": last["misconceptions"],
+                            "skipped": not answered,
+                        }
                 else:
                     missing.append(f"{bank['concept']}: not assessed")
         conditions.append(
@@ -472,27 +663,13 @@ def build_report(session_id, data):
                 else "A review notification is recorded locally only. C01 mastery is unchanged; no external message was sent.",
             }
         )
-    if outcome == COMMUNICATION:
-        plan = [
-            "Structure explanations as definition → principle → reasoning → example.",
-            "Practise a 30-second spoken explanation, then review the transcript.",
-        ]
-    elif any(c["outcome"] == KNOWLEDGE for c in concepts):
-        plan = [
-            "Review the listed missing concepts in the C03 course notes.",
-            "Work through two examples and explain each step before retrying the viva.",
-        ]
-    elif concepts and all(c["initial_state"] == "complete" for c in concepts):
-        plan = [
-            "Move on to another topic, or explain a new example to check that you can apply these ideas.",
-            "Revisit the concepts later to check retention.",
-        ]
-    else:
-        plan = [
-            "Review the concept-level evidence and any unassessed points.",
-            "Retake the viva on these concepts to collect more spoken evidence before attributing a gap.",
-        ]
-    return {
+    resources = [
+        {**r, "title": resource_title(r["title"])}
+        for r in data["integration_context"]["c03"]["review_resources"]
+    ]
+    hesitation = aggregate_hesitation(data["turns"])
+    study, speaking = study_plan(concepts, needs, resources), speaking_plan(concepts, hesitation)
+    report = {
         "session_id": session_id,
         "topic": data["topic"],
         "created_at": now(),
@@ -504,9 +681,11 @@ def build_report(session_id, data):
         "strengths": list(dict.fromkeys(strengths)),
         "missing_concepts": list(dict.fromkeys(missing)),
         "concepts": concepts,
-        "hesitation": aggregate_hesitation(data["turns"]),
-        "improvement_plan": plan,
-        "review_resources": data["integration_context"]["c03"]["review_resources"],
+        "hesitation": hesitation,
+        "study_plan": study,
+        "speaking_plan": speaking,
+        "improvement_plan": [i["step"] for i in study + speaking],
+        "review_resources": resources,
         "mastery_mismatch": mismatch,
         "integration_events": events,
         "evidence_conditions": conditions,
@@ -523,3 +702,5 @@ def build_report(session_id, data):
             "A/B/C reuse recorded turns; this is a retrospective evidence ablation, not a randomized intervention.",
         ],
     }
+    report["result"] = result_label(report)
+    return report

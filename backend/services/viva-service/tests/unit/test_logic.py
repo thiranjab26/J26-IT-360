@@ -9,6 +9,10 @@ from app.domain.logic import (
     issue_question,
     next_question,
     policy,
+    resource_title,
+    result_label,
+    speaking_plan,
+    study_plan,
 )
 from app.domain.seed import seed_questions
 from app.integrations.llm import demo_assess
@@ -180,3 +184,81 @@ def test_fluency_needs_a_verbal_signal_to_decide_communication():
     assert differentiate(recovered, "C")[0] == MIXED
     recovered = [evidence("partial", 50, fluency=FLUENT), evidence("complete", 100)]
     assert differentiate(recovered, "C")[0] == MIXED  # fluent speech: one filler signal only
+
+
+def test_result_label_splits_mixed_into_mixed_results_or_not_enough_evidence():
+    concept = lambda outcome, fine=False: {"outcome": outcome, "no_weakness": fine}  # noqa: E731
+    assert result_label({"outcome": MIXED, "strong_answers": True, "concepts": []}) == "STRONG"
+    assert result_label({"outcome": KNOWLEDGE, "concepts": [concept(KNOWLEDGE)]}) == KNOWLEDGE
+    mixed = {"outcome": MIXED, "concepts": [concept(KNOWLEDGE), concept(MIXED, fine=True)]}
+    assert result_label(mixed) == "MIXED_RESULTS"
+    assert result_label({"outcome": MIXED, "concepts": [concept(MIXED)]}) == "NOT_ENOUGH_EVIDENCE"
+    assert result_label(None) is None
+
+
+def test_plans_come_from_the_evidence_and_say_why():
+    concepts = [
+        {
+            "concept": "Loops",
+            "outcome": KNOWLEDGE,
+            "rubric_coverage": 25,
+            "initial_state": "partial",
+            "final_state": "partial",
+            "signal_details": [],
+        },
+        {
+            "concept": "Functions",
+            "outcome": COMMUNICATION,
+            "rubric_coverage": 100,
+            "initial_state": "superficial",
+            "final_state": "complete",
+            "signal_details": [
+                {
+                    "signal": "Hedges (maybe, I think, I guess)",
+                    "value": "3",
+                    "threshold": "2 or more",
+                    "counted": True,
+                }
+            ],
+        },
+    ]
+    needs = {
+        "Loops": {
+            "missing": ["An infinite loop never stops.", "A while loop checks first."],
+            "misconceptions": [],
+            "skipped": False,
+        }
+    }
+    study = study_plan(concepts, needs, [{"title": "IT1010 Control flow notes"}])
+    assert (
+        study[0]["step"] == "Revise Loops. Make sure you can explain: An infinite loop never stops."
+    )
+    assert "25%" in study[0]["reason"] and "1 more point" in study[0]["reason"]
+    assert "IT1010 Control flow notes" in study[1]["step"]
+    skipped = study_plan(
+        concepts[:1], {"Loops": {"missing": [], "misconceptions": [], "skipped": True}}, []
+    )
+    assert skipped[0]["reason"] == "You skipped the Loops question, so it was not marked."
+    assert (
+        study_plan(concepts[1:], {}, [])[0]["reason"]
+        == "You covered every expected point in the question."
+    )
+    spoken = speaking_plan(
+        concepts, {"available": True, "fillers_per_100_words": 9, "response_latency_ms": 5200}
+    )
+    reasons = " ".join(i["reason"] for i in spoken)
+    assert "about 9 filler words per 100 words" in reasons and "8 or more" in reasons
+    assert "hedges 3 (the viva counts 2 or more)" in reasons and "5.2 seconds" in reasons
+    assert (
+        len(spoken) == 4
+    )  # fillers, hedges, the slow start, then the follow-up help (capped at 4)
+    quiet = speaking_plan(
+        concepts[:1], {"available": True, "fillers_per_100_words": 1, "response_latency_ms": 900}
+    )
+    assert len(quiet) == 1 and quiet[0]["reason"].startswith("None of the speaking measures")
+    assert speaking_plan(concepts, {"available": False})[0]["reason"].startswith(
+        "You typed every answer"
+    )
+    assert (
+        resource_title("C3 IT1010 Programming basics notes.md") == "IT1010 Programming basics notes"
+    )

@@ -120,7 +120,11 @@ def test_session_uses_llm_follow_up_and_plan_with_audit(client, monkeypatch):
         api_main,
         "improvement_plan",
         lambda report, data: (
-            {"summary": "Personal summary for you.", "steps": ["Step one.", "Step two."]},
+            {
+                "summary": "Personal summary for you.",
+                "study": [{"step": "Step one.", "reason": "Why one."}],
+                "speaking": [{"step": "Step two.", "reason": "Why two."}],
+            },
             "openai:test-model:json_schema",
         ),
     )
@@ -134,6 +138,8 @@ def test_session_uses_llm_follow_up_and_plan_with_audit(client, monkeypatch):
     assert finished["improvement_plan"] == ["Step one.", "Step two."] and finished[
         "plan_provider"
     ].startswith("openai")
+    assert finished["study_plan"][0] == {"step": "Step one.", "reason": "Why one."}
+    assert finished["speaking_plan"][0]["reason"] == "Why two."
     exported = client.get(f"/api/v1/viva/sessions/{session['id']}/export", headers=headers).json()
     turn = exported["session"]["turns"][0]
     assert (
@@ -174,6 +180,27 @@ def test_rate_limited_endpoint_is_skipped_during_cooldown(client, monkeypatch):
             )
         return httpx.Response(
             200,
+            json={"choices": [{"message": {"content": '{"ok": true}'}}]},
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    providers.call_llm("openai", "A", {}, {"type": "object"})
+    providers.call_llm("openai", "A", {}, {"type": "object"})
+    assert calls == ["test-model", "backup", "backup"]
+
+
+def test_rejected_key_is_skipped_on_later_calls(client, monkeypatch):
+    cfg = settings()
+    monkeypatch.setattr(cfg, "fallback_llm_base_url", "http://localhost:9/v1")
+    monkeypatch.setattr(cfg, "fallback_llm_model", "backup")
+    calls = []
+
+    async def post(self, url, **kwargs):
+        calls.append(kwargs["json"]["model"])
+        status = 401 if kwargs["json"]["model"] == "test-model" else 200
+        return httpx.Response(
+            status,
             json={"choices": [{"message": {"content": '{"ok": true}'}}]},
             request=httpx.Request("POST", url),
         )
@@ -233,6 +260,83 @@ def test_student_can_stop_by_saying_so(client):
         response.json()["action"] == "STUDENT_ENDED_SESSION"
         and response.json()["session"]["status"] == "completed"
     )
+
+
+def test_spoken_commands_only_count_when_said_on_their_own():
+    from app.api.v1.routes.sessions import spoken_command
+
+    assert spoken_command("Stop.") == "stop"
+    assert spoken_command("End the viva") == "stop"
+    assert spoken_command("I don't want to continue") == "stop"
+    assert spoken_command("Skip this question") == "skip"
+    assert spoken_command("Next question, please") == "skip"
+    # An answer that mentions stopping is an answer, not a command.
+    long = "The while loop keeps going and it will stop when this condition becomes false, like a counter reaching ten"
+    assert spoken_command(long) is None
+    assert spoken_command("A stack is last in first out") is None
+    # Speech-to-text often mishears "viva".
+    assert spoken_command("Stop the diva.") == "stop" and spoken_command("stop the river") == "stop"
+
+
+def test_every_voice_clip_gets_the_same_median_pitch():
+    import io
+    import wave
+
+    import numpy as np
+    import parselmouth
+
+    from app.integrations.speech import even_pitch
+
+    def clip(hz):
+        t = np.arange(0, 1.0, 1 / 16000)
+        tone = (0.3 * np.sin(2 * np.pi * hz * t) + 0.1 * np.sin(4 * np.pi * hz * t)) * 32767
+        buffer = io.BytesIO()
+        with wave.open(buffer, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(tone.astype("<i2").tobytes())
+        return buffer.getvalue()
+
+    def median(wav):
+        with wave.open(io.BytesIO(wav)) as w:
+            samples = np.frombuffer(w.readframes(w.getnframes()), dtype="<i2") / 32768
+        f0 = parselmouth.Sound(samples, 16000).to_pitch().selected_array["frequency"]
+        return float(np.median(f0[f0 > 0]))
+
+    for hz in (140, 190):
+        assert abs(median(even_pitch(clip(hz), 160)) - 160) < 5
+    assert even_pitch(b"not a wav", 160) == b"not a wav"
+    assert even_pitch(clip(140), 0) == clip(140)
+
+
+def test_gpt_oss_models_are_asked_to_think_briefly(client, monkeypatch):
+    sent = []
+
+    async def post(self, url, **kwargs):
+        sent.append(kwargs["json"])
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"ok": true}'}}]},
+            request=httpx.Request("POST", url),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    monkeypatch.setattr(settings(), "llm_model", "openai/gpt-oss-120b")
+    providers.call_llm("openai", "A", {}, {"type": "object"})
+    assert sent[0]["reasoning_effort"] == "low"
+    monkeypatch.setattr(settings(), "llm_model", "llama-3.3-70b")
+    providers.call_llm("openai", "A", {}, {"type": "object"})
+    assert "reasoning_effort" not in sent[1]
+
+
+def test_saying_skip_moves_to_the_next_question(client):
+    headers = auth(client)
+    session = start(client, headers)
+    response = answer(client, headers, session, "Skip this question")
+    turn = response.json()["session"]["turns"][-1]
+    assert turn["action"] == "SKIPPED_NEXT_CONCEPT"
+    assert response.json()["session"]["progress"]["completed_concepts"] == 1
 
 
 def test_complete_but_hesitant_speech_is_communication_only_in_c():

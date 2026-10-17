@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, History as HistoryIcon } from "lucide-react";
-import { ago, api, date, gapLabels } from "../api/client";
+import { ArrowRight, BookOpen, History as HistoryIcon, Search } from "../components/icons";
+import { ago, api, date, resultLabels, resultOf } from "../api/client";
 import type { Auth, Report, Session, Summary } from "../api/types";
 import { Empty, PageTitle, Skeleton } from "../components/components";
 import { CountUp } from "../components/charts";
@@ -8,38 +8,37 @@ import { CountUp } from "../components/charts";
 type Filter = "all" | "active" | "completed";
 type Tone = "active" | "strong" | "knowledge" | "communication" | "mixed";
 
-const TONE_LABEL: Record<Tone, string> = {
-  active: "In progress",
-  strong: "No gap identified",
-  knowledge: gapLabels.LIKELY_KNOWLEDGE_GAP!,
-  communication: gapLabels.LIKELY_COMMUNICATION_DIFFICULTY!,
-  mixed: gapLabels.MIXED_INSUFFICIENT_EVIDENCE!,
-};
-
 function tone(s: Summary): Tone {
   if (s.status === "active") return "active";
-  if (s.strong) return "strong";
-  if (s.outcome === "LIKELY_KNOWLEDGE_GAP") return "knowledge";
-  if (s.outcome === "LIKELY_COMMUNICATION_DIFFICULTY") return "communication";
+  const result = resultOf(s);
+  if (result === "STRONG") return "strong";
+  if (result === "LIKELY_KNOWLEDGE_GAP") return "knowledge";
+  if (result === "LIKELY_COMMUNICATION_DIFFICULTY") return "communication";
   return "mixed";
 }
 
-/** A participant's sessions: resume the active ones, open the reports of finished ones. */
+/**
+ * A student's own vivas (resume the active ones, open the reports of finished ones), or, with
+ * `staff`, every student's vivas for a lecturer, who can search by code and open reports.
+ */
 export default function History({
   auth,
+  staff = false,
   onResume,
   onReport,
   onError,
 }: {
   auth: Auth;
+  staff?: boolean;
   onResume: (s: Session) => void;
-  onReport: (r: Report) => void;
+  onReport: (r: Report, participant?: string) => void;
   onError: (s: string) => void;
 }) {
   const [items, setItems] = useState<Summary[]>([]),
     [busy, setBusy] = useState(true),
     [opening, setOpening] = useState(""),
-    [filter, setFilter] = useState<Filter>("all");
+    [filter, setFilter] = useState<Filter>("all"),
+    [search, setSearch] = useState("");
   useEffect(() => {
     api<{ items: Summary[] }>("/sessions", auth.token)
       .then((r) => setItems(r.items))
@@ -50,7 +49,7 @@ export default function History({
     setOpening(s.id);
     try {
       if (s.status === "completed")
-        onReport(await api<Report>(`/sessions/${s.id}/report`, auth.token));
+        onReport(await api<Report>(`/sessions/${s.id}/report`, auth.token), s.participant_code ?? undefined);
       else onResume(await api<Session>(`/sessions/${s.id}`, auth.token));
     } catch (e) {
       onError((e as Error).message);
@@ -62,21 +61,26 @@ export default function History({
   const active = items.length - completed.length;
   const coverage = completed.map((s) => s.coverage).filter((c): c is number => c != null);
   const average = coverage.length ? coverage.reduce((a, b) => a + b, 0) / coverage.length : null;
-  const shown = filter === "all" ? items : items.filter((s) => (filter === "active" ? s.status === "active" : s.status === "completed"));
+  const query = search.trim().toLowerCase();
+  const shown = items.filter(
+    (s) =>
+      (filter === "all" || (filter === "active" ? s.status === "active" : s.status === "completed")) &&
+      (!query || (s.participant_code ?? "").toLowerCase().includes(query) || s.topic.toLowerCase().includes(query)),
+  );
   return (
     <>
-      <PageTitle
-        eyebrow="YOUR LEARNING JOURNEY"
-        title="Every conversation counts."
-        description="Pick up where you left off, or revisit the evidence behind a past session."
-      />
+      {staff ? (
+        <PageTitle eyebrow="STUDENT VIVAS" title="Student vivas" description="Every viva your students have taken. Open a report to see their answers, result and timing." />
+      ) : (
+        <PageTitle eyebrow="MY VIVAS" title="Your vivas" description="Continue a viva you started, or open the report of one you finished." />
+      )}
       {busy ? (
         <Skeleton rows={4} height={96} />
       ) : items.length ? (
         <>
           <div className="hx-stats">
             <div className="hx-stat">
-              <span>Sessions</span>
+              <span>Vivas</span>
               <strong><CountUp value={items.length} /></strong>
             </div>
             <div className="hx-stat">
@@ -92,18 +96,26 @@ export default function History({
               <strong>{average == null ? "n/a" : <CountUp value={average} suffix="%" />}</strong>
             </div>
           </div>
-          <div className="segmented" role="tablist" aria-label="Filter sessions">
-            {(
-              [
-                ["all", "All", items.length],
-                ["active", "In progress", active],
-                ["completed", "Completed", completed.length],
-              ] as const
-            ).map(([key, name, count]) => (
-              <button key={key} role="tab" aria-selected={filter === key} className={filter === key ? "selected" : ""} onClick={() => setFilter(key)}>
-                {name} <span>{count}</span>
-              </button>
-            ))}
+          <div className="hx-tools">
+            <div className="segmented" role="tablist" aria-label="Filter vivas">
+              {(
+                [
+                  ["all", "All", items.length],
+                  ["active", "In progress", active],
+                  ["completed", "Completed", completed.length],
+                ] as const
+              ).map(([key, name, count]) => (
+                <button key={key} role="tab" aria-selected={filter === key} className={filter === key ? "selected" : ""} onClick={() => setFilter(key)}>
+                  {name} <span>{count}</span>
+                </button>
+              ))}
+            </div>
+            {staff && (
+              <label className="hx-search">
+                <Search size={16} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by participant code or topic" aria-label="Search vivas" />
+              </label>
+            )}
           </div>
           <div className="history-list hx-list">
             {shown.map((s, i) => {
@@ -116,9 +128,10 @@ export default function History({
                   <div className="history-info">
                     <div className="tag-row">
                       <h2>{s.topic}</h2>
-                      <span className={`hx-chip tone-${t}`}>{TONE_LABEL[t]}</span>
+                      <span className={`hx-chip tone-${t}`}>{t === "active" ? "In progress" : resultLabels[resultOf(s)] ?? "Finished"}</span>
                     </div>
                     <p className="small muted">
+                      {staff && <code className="hx-code">{s.participant_code ?? "unknown"}</code>}
                       <span title={date(s.created_at)}>{ago(s.created_at)}</span> ·{" "}
                       {s.questions_asked != null
                         ? `${s.questions_asked} question${s.questions_asked === 1 ? "" : "s"} asked · ${s.answered_count} answered`
@@ -133,19 +146,23 @@ export default function History({
                       </div>
                     )}
                   </div>
-                  <button className="button secondary" disabled={!!opening} onClick={() => open(s)}>
-                    {opening === s.id ? "Opening…" : s.status === "active" ? "Resume session" : "View report"}
-                    <ArrowRight size={16} />
-                  </button>
+                  {staff && s.status === "active" ? (
+                    <span className="small muted">Not finished yet</span>
+                  ) : (
+                    <button className="button secondary" disabled={!!opening} onClick={() => open(s)}>
+                      {opening === s.id ? "Opening…" : s.status === "active" ? "Continue" : "View report"}
+                      <ArrowRight size={16} />
+                    </button>
+                  )}
                 </article>
               );
             })}
-            {!shown.length && <p className="muted hx-none">No sessions in this view.</p>}
+            {!shown.length && <p className="muted hx-none">No vivas match.</p>}
           </div>
         </>
       ) : (
-        <Empty icon={<HistoryIcon size={30} />} title="Your first conversation is ahead">
-          Start a viva from the workspace. Your saved sessions and reports will appear here.
+        <Empty icon={<HistoryIcon size={30} />} title="No vivas yet">
+          {staff ? "Vivas appear here as soon as students start them." : "Start your first viva from the Viva tab. Your reports will appear here."}
         </Empty>
       )}
     </>

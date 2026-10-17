@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import type { RouteObject } from "react-router-dom";
 
-// The viva and its styles load only when /viva is opened, so other AdaptLearn pages
+// Each page and its styles load only when it is opened, so other AdaptLearn pages
 // never download them.
-const VivaApp = lazy(() => import("./pages/VivaApp"));
+const StudentApp = lazy(() => import("./pages/StudentApp"));
+const LecturerApp = lazy(() => import("./pages/LecturerApp"));
 
 const loading = (
   <div
@@ -18,24 +19,22 @@ const loading = (
       fontSize: 14,
     }}
   >
-    Loading the viva workspace…
+    Loading…
+  </div>
+);
+
+const page = (app: ReactNode) => (
+  <div className="viva-app">
+    <Suspense fallback={loading}>{app}</Suspense>
   </div>
 );
 
 /**
- * C4 Intelligent Viva System. Mounted by app/router.tsx at /viva.
- * The viva keeps its own participant and staff login for now, so it sits outside
- * RequireAuth and StudentLayout until it moves to the shared login.
+ * C4 Intelligent Viva System, mounted by app/router.tsx: students at /viva, lecturers at
+ * /viva/lecturer. The viva keeps its own participant and staff login for now, so it sits
+ * outside RequireAuth and StudentLayout until it moves to the shared login.
  */
 export const vivaRoutes: RouteObject[] = [
-  {
-    path: "viva/*",
-    element: (
-      <div className="viva-app">
-        <Suspense fallback={loading}>
-          <VivaApp />
-        </Suspense>
-      </div>
-    ),
-  },
+  { path: "viva/lecturer/*", element: page(<LecturerApp />) },
+  { path: "viva/*", element: page(<StudentApp />) },
 ];

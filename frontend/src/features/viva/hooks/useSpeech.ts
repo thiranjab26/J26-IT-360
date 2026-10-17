@@ -12,6 +12,32 @@ export function providerName(p?: string | null) {
   return `${name} ${model ?? ""}${live === "live" ? " (live)" : ""}`.trim();
 }
 
+/** Tells the examiner's face when the question voice starts (words and length) and stops. */
+export type VoiceEvent = { text: string; seconds: number; voiced?: [number, number][] } | null;
+/** A command the student said on its own ("Stop the viva", "Skip this question"), or null. */
+export type SpokenCommand = "stop" | "skip" | null;
+
+/** Stretches of a clip that have sound (seconds), from 20 ms loudness frames; gaps under 0.12 s are joined. */
+async function voicedStretches(ctx: BaseAudioContext, blob: Blob): Promise<[number, number][]> {
+  const audio = await ctx.decodeAudioData(await blob.arrayBuffer());
+  const data = audio.getChannelData(0), frame = Math.round(audio.sampleRate * 0.02);
+  const loud: number[] = [];
+  for (let i = 0; i + frame <= data.length; i += frame) {
+    let sum = 0;
+    for (let j = i; j < i + frame; j++) sum += data[j]! * data[j]!;
+    loud.push(Math.sqrt(sum / frame));
+  }
+  const sorted = [...loud].sort((a, b) => a - b);
+  const threshold = Math.max(0.01, 0.12 * (sorted[Math.floor(sorted.length * 0.95)] ?? 0));
+  const spans: [number, number][] = [];
+  loud.forEach((v, i) => {
+    if (v < threshold) return;
+    const t = i * 0.02, last = spans[spans.length - 1];
+    if (last && t - last[1] < 0.12) last[1] = t + 0.02;
+    else spans.push([t, t + 0.02]);
+  });
+  return spans;
+}
 export type Heard = { pauses: { char: number; ms: number }[]; fillers: { start_char: number; end_char: number }[] };
 
 /** Code and maths said as words ("2 + 3 * 4" -> "2 plus 3 times 4"). Keep in step with SPOKEN in speech.py. */
@@ -45,7 +71,7 @@ type Live = { ws: WebSocket; ready: boolean; complete: boolean; queue: Blob[]; f
 
 export function useSpeech(
   token: string,
-  onTranscript: (text: string, metrics: AudioMetrics, latency: number | null, provider: string, heard: Heard) => void,
+  onTranscript: (text: string, metrics: AudioMetrics, latency: number | null, provider: string, heard: Heard, command: SpokenCommand) => void,
   topicId = "",
 ) {
   const [recording, setRecording] = useState(false);
@@ -75,6 +101,7 @@ export function useSpeech(
   const recordingStart = useRef(0);
   // Live sound levels for the waveform and the examiner's mouth: the question audio and the mic.
   const meters = useRef<{ ctx: AudioContext | null; voice: AnalyserNode | null; mic: AnalyserNode | null }>({ ctx: null, voice: null, mic: null });
+  const voiceEvents = useRef<((e: VoiceEvent) => void) | null>(null);
   const micSource = useRef<MediaStreamAudioSourceNode | null>(null);
   const audioContext = useCallback(() => {
     const m = meters.current;
@@ -95,12 +122,17 @@ export function useSpeech(
     stream.current = null;
   }, []);
   const audio = useRef<HTMLAudioElement | null>(null);
+  // Chrome drops an utterance spoken straight after cancel(), and can stop one whose object was
+  // garbage collected, so keep a reference and speak a moment after the previous one was cancelled.
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   // One voice per session: once the cloud voice has played, the browser voice is never mixed in;
   // the browser voice is used throughout only when the server has no cloud voice at all.
   const voiceLock = useRef<"cloud" | "browser" | null>(null);
   // Question audio already fetched in this tab, so "Listen again" plays instantly.
-  const clips = useRef(new Map<string, { url: string; provider: string }>());
+  const clips = useRef(new Map<string, { url: string; provider: string; voiced?: [number, number][] }>());
   const stopSpeaking = useCallback(() => {
+    voiceEvents.current?.(null);
+    utteranceRef.current = null;
     window.speechSynthesis?.cancel();
     audio.current?.pause();
     audio.current = null;
@@ -138,19 +170,29 @@ export function useSpeech(
   const browserSpeak = useCallback((text: string, version: number, rate = 1) => {
     if (!window.speechSynthesis) { setSpeechError("Question audio is unavailable. Read the question on screen."); return; }
     const utterance = new SpeechSynthesisUtterance(speakable(text));
-    utterance.rate = 0.95 * rate;
+    utteranceRef.current = utterance;
+    utterance.rate = rate < 1 ? 0.7 : 0.95;
     // Prefer a natural female English voice; fall back to any female, then the default voice.
     const voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"));
     const female = /female|aria|jenny|zira|samantha|libby|sonia|natasha|michelle|emma|ava|clara|ana\b|susan|hazel|google uk english female/i;
     utterance.voice = voices.find(v => female.test(v.name) && /natural|neural|online/i.test(v.name)) || voices.find(v => female.test(v.name)) || voices.find(v => v.default) || null;
     setVoiceProvider("browser");
-    utterance.onstart = () => { if (alive.current && version === generation.current) setSpeaking(true); };
+    utterance.onstart = () => {
+      if (!alive.current || version !== generation.current) return;
+      setSpeaking(true);
+      // The browser voice gives no length; about 0.38 s a word at normal speed is close enough for the lips.
+      voiceEvents.current?.({ text, seconds: (text.split(/\s+/).length * 0.38) / (rate < 1 ? 0.74 : 1) });
+    };
     utterance.onend = () => {
       if (!alive.current || version !== generation.current) return;
       ttsEnd.current = performance.now(); setSpeaking(false);
+      voiceEvents.current?.(null);
     };
     utterance.onerror = () => { if (alive.current && version === generation.current) setSpeaking(false); };
-    window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.cancel();
+    setTimeout(() => {
+      if (alive.current && version === generation.current && utteranceRef.current === utterance) window.speechSynthesis.speak(utterance);
+    }, 150);
   }, []);
   const fetchClip = useCallback(async (text: string) => {
     const cached = clips.current.get(text);
@@ -164,7 +206,17 @@ export function useSpeech(
       const detail = await response.text().catch(() => "");
       throw new Error(/not configured/i.test(detail) ? "not configured" : "cloud voice failed");
     }
-    const clip = { url: URL.createObjectURL(await response.blob()), provider: response.headers.get("X-Voice-Provider") || "cloud" };
+    const blob = await response.blob();
+    const clip: { url: string; provider: string; voiced?: [number, number][] } = {
+      url: URL.createObjectURL(blob),
+      provider: response.headers.get("X-Voice-Provider") || "cloud",
+    };
+    try {
+      // Decoding needs no sound output, so a small offline context is enough.
+      clip.voiced = await voicedStretches(new OfflineAudioContext(1, 1, 24000), blob);
+    } catch {
+      clip.voiced = undefined; // the lips then spread the words evenly
+    }
     if (clips.current.size >= 20) {
       const [oldest, old] = clips.current.entries().next().value!;
       URL.revokeObjectURL(old.url); clips.current.delete(oldest);
@@ -178,7 +230,7 @@ export function useSpeech(
     const version = generation.current;
     const current = () => alive.current && version === generation.current;
     if (voiceLock.current !== "browser") {
-      let clip: { url: string; provider: string } | null = null;
+      let clip: { url: string; provider: string; voiced?: [number, number][] } | null = null;
       for (let attempt = 0; attempt < 2 && !clip; attempt++) {
         try {
           clip = await fetchClip(text);
@@ -207,9 +259,15 @@ export function useSpeech(
           } catch { meters.current.voice = null; }
         }
         player.onplay = () => { if (current()) setSpeaking(true); };
+        // "playing" (not "play") fires when sound starts, once the clip's length is known.
+        player.onplaying = () => {
+          if (current() && Number.isFinite(player.duration))
+            voiceEvents.current?.({ text, seconds: player.duration / rate, voiced: clip.voiced?.map(([a, b]) => [a / rate, b / rate]) });
+        };
         player.onended = () => {
           if (!current()) return;
           ttsEnd.current = performance.now(); setSpeaking(false);
+          voiceEvents.current?.(null);
         };
         player.onerror = () => setSpeaking(false);
         try { await player.play(); } catch {
@@ -278,6 +336,7 @@ export function useSpeech(
         transcript: string; metrics: AudioMetrics; provider: string;
         speech_intervals?: { start: number; end: number }[];
         pause_marks?: Heard["pauses"]; lexical_metrics?: { filler_events?: Heard["fillers"] };
+        command?: SpokenCommand;
       }>(
         "/speech/transcribe", token, form, "POST", controller.signal);
       if (!alive.current || version !== generation.current) return;
@@ -285,7 +344,7 @@ export function useSpeech(
       const latency = onset !== undefined ? Math.max(0, Math.round(onset * 1000)) : null;
       callback.current(result.transcript, result.metrics, latency, result.provider, {
         pauses: result.pause_marks ?? [], fillers: result.lexical_metrics?.filler_events ?? [],
-      });
+      }, result.command ?? null);
       saved.current = null; setHasRecording(false);
     } catch (error) {
       if (!alive.current || version !== generation.current) return;
@@ -360,5 +419,5 @@ export function useSpeech(
   function retry() { if (saved.current && !pending.current && recorder.current?.state !== 'recording') void transcribe(saved.current, generation.current); }
   // Call from a click (for example "Start the viva") so browsers allow the audio meters to run.
   const prime = useCallback(() => { audioContext(); }, [audioContext]);
-  return { recording, starting, transcribing, speaking, speechError, hasRecording, seconds, liveText, liveProvider, voiceProvider, meters, start, stop, retry, speak, reset, stopSpeaking, prime };
+  return { recording, starting, transcribing, speaking, speechError, hasRecording, seconds, liveText, liveProvider, voiceProvider, meters, voiceEvents, start, stop, retry, speak, reset, stopSpeaking, prime };
 }

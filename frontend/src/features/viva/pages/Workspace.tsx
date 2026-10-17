@@ -2,22 +2,70 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
+  Check,
+  CheckCircle2,
   Keyboard,
+  LogOut,
+  MessagesSquare,
   Mic,
   RotateCcw,
+  Search,
   Send,
   SkipForward,
   Snail,
-  Volume2,
   Square,
-} from "lucide-react";
-import { api, label } from "../api/client";
-import type { AudioMetrics, Auth, Context, Report, Session, Topic } from "../api/types";
-import { Busy, ErrorNotice, Integrations, integrationLabel } from "../components/components";
-import { providerName, useSpeech, type Heard } from "../hooks/useSpeech";
-import { Mascot } from "../components/Mascot";
+  Volume2,
+} from "../components/icons";
+import { api, ApiError, label } from "../api/client";
+import type { AudioMetrics, Auth, Report, Session, Topic } from "../api/types";
+import { Busy, ErrorNotice, Modal } from "../components/components";
+import { useSpeech, type SpokenCommand } from "../hooks/useSpeech";
+import { Examiner, ExaminerPortrait } from "../components/Examiner";
 import { MicCheck, VoiceWave } from "../components/voice";
+
+/** Topics under their module (IT1010 first, then IT2070), other courses last. */
+function groupTopics(topics: Topic[], query: string) {
+  const q = query.trim().toLowerCase();
+  const groups = new Map<string, Topic[]>();
+  for (const t of topics) {
+    const text = `${t.short_name ?? t.name} ${t.summary ?? t.description} ${t.code ?? ""} ${t.module ?? ""}`.toLowerCase();
+    if (q && !text.includes(q)) continue;
+    const group = t.code ? `${t.code} · ${t.module}` : "Other courses";
+    groups.set(group, [...(groups.get(group) ?? []), t]);
+  }
+  return [...groups].sort(([a], [b]) => (a === "Other courses" ? 1 : b === "Other courses" ? -1 : a.localeCompare(b)));
+}
 import "../styles/student.css";
+
+/** Students see a plain message when marking is busy; the answer stays in the box to resend. */
+function studentMessage(error: unknown) {
+  if (error instanceof ApiError && [429, 502, 503, 504].includes(error.status))
+    return "We could not mark your answer just now because the marking service is busy. Your answer is still here: wait a few seconds, then press Submit again.";
+  return (error as Error).message;
+}
+
+/** What a student can say at any time; the service recognises them only when said on their own. */
+const COMMANDS = [
+  ["I don't understand the question", "simpler words"],
+  ["Skip this question", "next question"],
+  ["Stop the viva", "finish"],
+] as const;
+
+function Commands() {
+  return (
+    <div className="st-commands" aria-label="Words you can say at any time">
+      <span className="st-commands-head">
+        <Mic size={14} /> You can say
+      </span>
+      {COMMANDS.map(([say, does]) => (
+        <span className="st-command" key={say} title={`Say it, then submit: ${does}`}>
+          <q>{say}</q>
+          <small>{does}</small>
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export default function Workspace({
   auth,
@@ -36,30 +84,13 @@ export default function Workspace({
 }) {
   // Students only see topics they can start: a topic needs at least one approved question.
   const topics = useMemo(() => allTopics.filter((t) => t.question_count > 0), [allTopics]);
-  const [topicId, setTopicId] = useState(topics[0]?.id || ""),
-    [context, setContext] = useState<Context | null>(null),
+  const [topicId, setTopicId] = useState(() => groupTopics(topics, "")[0]?.[1][0]?.id || ""),
     [mode, setMode] = useState<"text" | "speech">("speech"),
-    [loading, setLoading] = useState(false),
-    [contextError, setContextError] = useState("");
+    [query, setQuery] = useState(""),
+    [loading, setLoading] = useState(false);
   useEffect(() => {
-    if (!topicId && topics.length) setTopicId(topics[0]!.id);
+    if (!topicId && topics.length) setTopicId(groupTopics(topics, "")[0]![1][0]!.id);
   }, [topics, topicId]);
-  useEffect(() => {
-    if (!topicId) return;
-    let cancelled = false;
-    setContext(null);
-    setContextError("");
-    api<Context>(`/integrations/context?topic_id=${topicId}`, auth.token)
-      .then((c) => {
-        if (!cancelled) setContext(c);
-      })
-      .catch((e) => {
-        if (!cancelled) setContextError(e.message);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [topicId, auth.token]);
   async function start() {
     setLoading(true);
     try {
@@ -71,7 +102,7 @@ export default function Workspace({
         }),
       );
     } catch (e) {
-      onError((e as Error).message);
+      onError(studentMessage(e));
     } finally {
       setLoading(false);
     }
@@ -87,128 +118,122 @@ export default function Workspace({
         onError={onError}
       />
     );
+  const selected = topics.find((t) => t.id === topicId);
   return (
-    <div className="st">
-      <div className="st-hero">
-        <div className="st-eyebrow">Intelligent viva</div>
-        <h1>Explain what you know, out loud.</h1>
-        <p className="st-muted">
-          A short spoken conversation. Follow-up questions build on your own
-          answers, and you get a clear report with next steps.
-        </p>
-      </div>
-
-      <section className="st-card">
-        <div className="st-label">1. Choose a topic</div>
-        <div className="st-options" role="group" aria-label="Topic">
+    <div className="st st-fill st-start">
+      <section className="st-card st-topics">
+        <header className="st-card-head">
+          <div>
+            <div className="st-eyebrow">Hi {auth.user.participant_code} · Step 1</div>
+            <h2>Choose a topic</h2>
+          </div>
+          {topics.length > 4 && (
+            <label className="st-search">
+              <Search size={16} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search topics"
+                aria-label="Search topics"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
+          )}
+        </header>
+        <div className="st-topic-scroll" role="group" aria-label="Topic">
           {topics.length ? (
-            topics.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                className="st-option"
-                aria-pressed={topicId === t.id}
-                onClick={() => setTopicId(t.id)}
-              >
-                <span className="st-icon">
-                  <BookOpen size={19} />
-                </span>
-                <strong>{t.name}</strong>
-                <span className="st-muted st-small">{t.description}</span>
-                <span className="st-muted st-small">
-                  {t.question_count} {t.question_count === 1 ? "concept" : "concepts"}
-                </span>
-              </button>
+            groupTopics(topics, query).map(([group, items]) => (
+              <div className="st-topic-group" key={group}>
+                <div className="st-topic-group-head">
+                  <span>{group}</span>
+                  <small>
+                    {items.length} {items.length === 1 ? "topic" : "topics"}
+                  </small>
+                </div>
+                <div className="st-topic-grid">
+                  {items.map((t) => (
+                    <button key={t.id} type="button" className="st-topic" aria-pressed={topicId === t.id} onClick={() => setTopicId(t.id)}>
+                      <span className="st-icon">
+                        <BookOpen size={18} />
+                      </span>
+                      <span className="st-topic-text">
+                        <strong>{t.short_name ?? t.name}</strong>
+                        <span className="st-muted st-small">{t.summary ?? t.description}</span>
+                      </span>
+                      <span className="st-topic-count">
+                        {t.question_count} {t.question_count === 1 ? "question" : "questions"}
+                      </span>
+                      {topicId === t.id && <CheckCircle2 className="st-topic-check" size={18} aria-hidden="true" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))
           ) : (
-            <p className="st-muted">No topics are available yet.</p>
+            <p className="st-muted">No topics are open yet. Please check back later.</p>
           )}
+          {topics.length > 0 && !groupTopics(topics, query).length && <p className="st-muted st-small">No topics match "{query}".</p>}
         </div>
+      </section>
 
-        <div className="st-label" style={{ marginTop: 24 }}>
-          2. How will you answer?
-        </div>
-        <div className="st-options" role="group" aria-label="Answer mode">
-          <button
-            type="button"
-            className="st-option"
-            aria-pressed={mode === "speech"}
-            onClick={() => setMode("speech")}
-          >
-            <span className="st-icon">
-              <Mic size={19} />
-            </span>
-            <strong>Speak (recommended)</strong>
-            <span className="st-muted st-small">
-              Questions are read aloud. You answer with your microphone.
-            </span>
-          </button>
-          <button
-            type="button"
-            className="st-option"
-            aria-pressed={mode === "text"}
-            onClick={() => setMode("text")}
-          >
-            <span className="st-icon">
-              <Keyboard size={19} />
-            </span>
-            <strong>Type</strong>
-            <span className="st-muted st-small">
-              Use this if you cannot use a microphone.
-            </span>
-          </button>
-        </div>
-
-        <div className="st-row st-between" style={{ marginTop: 24 }}>
-          <span className="st-muted st-small">
-            About 5–10 minutes · up to 2 follow-ups per concept
-          </span>
-          <button className="st-btn st-btn-primary" onClick={start} disabled={loading || !topicId}>
-            {loading ? (
-              <Busy text="Starting…" />
-            ) : (
-              <>
-                Start viva <ArrowRight size={18} />
-              </>
+      <aside className="st-card st-plan-card">
+        <div className="st-plan-head">
+          <ExaminerPortrait />
+          <div>
+            <div className="st-eyebrow">Your viva</div>
+            <h2>{selected ? (selected.short_name ?? selected.name) : "Pick a topic"}</h2>
+            {selected && (
+              <p className="st-muted st-small">
+                {selected.code ? `${selected.code} · ` : ""}
+                {selected.question_count} {selected.question_count === 1 ? "question" : "questions"} · about 5–10 minutes
+              </p>
             )}
-          </button>
+          </div>
         </div>
-      </section>
-
-      <section className="st-card st-steps">
         <div>
-          <span>1</span>
-          <p>
-            <strong>Hear the question</strong>
-            <br />
-            <span className="st-muted st-small">Your viva guide asks each question out loud. It also stays on screen, and you can replay it.</span>
+          <div className="st-label">Step 2 · How will you answer?</div>
+          <div className="st-segment" role="group" aria-label="Answer mode">
+            <button type="button" aria-pressed={mode === "speech"} onClick={() => setMode("speech")}>
+              <Mic size={17} /> Speak
+            </button>
+            <button type="button" aria-pressed={mode === "text"} onClick={() => setMode("text")}>
+              <Keyboard size={17} /> Type
+            </button>
+          </div>
+          <p className="st-muted st-small st-segment-note">
+            {mode === "speech" ? "Recommended. Each question is read aloud and you answer with your microphone." : "For when you cannot use a microphone."}
           </p>
         </div>
         <div>
-          <span>2</span>
-          <p>
-            <strong>Answer in your own words</strong>
-            <br />
-            <span className="st-muted st-small">Tap the microphone and explain in your own words. Check the transcript, then submit.</span>
-          </p>
+          <div className="st-label">Before you start</div>
+          <ul className="st-checklist">
+            <li>
+              <Check size={15} strokeWidth={3} /> A quiet room, with no one else talking
+            </li>
+            {mode === "speech" && (
+              <li>
+                <Check size={15} strokeWidth={3} /> Allow the microphone when the browser asks
+              </li>
+            )}
+            <li>
+              <Check size={15} strokeWidth={3} /> Headphones, if you have them
+            </li>
+            <li>
+              <Check size={15} strokeWidth={3} /> About 10 minutes without interruptions
+            </li>
+          </ul>
         </div>
-        <div>
-          <span>3</span>
-          <p>
-            <strong>Get your report</strong>
-            <br />
-            <span className="st-muted st-small">See what you explained well, what to revisit, and a plan to improve.</span>
-          </p>
-        </div>
-      </section>
-
-      <details className="st-card">
-        <summary>Learning context from AdaptLearn · {integrationLabel(context)}</summary>
-        <div style={{ marginTop: 14 }}>
-          <ErrorNotice message={contextError} />
-          <Integrations context={context} />
-        </div>
-      </details>
+        <button className="st-btn st-btn-primary st-block" onClick={start} disabled={loading || !topicId}>
+          {loading ? (
+            <Busy text="Starting…" />
+          ) : (
+            <>
+              Start viva <ArrowRight size={18} />
+            </>
+          )}
+        </button>
+      </aside>
     </div>
   );
 }
@@ -229,16 +254,18 @@ function LiveSession({
   const [answer, setAnswer] = useState(""),
     [busy, setBusy] = useState(false),
     [mode, setMode] = useState<"text" | "speech">(session.input_mode),
-    [audioEvidence, setAudioEvidence] = useState<{ metrics: AudioMetrics; latency: number | null; provider: string; text: string; heard: Heard } | null>(null),
+    [audioEvidence, setAudioEvidence] = useState<{ metrics: AudioMetrics; latency: number | null; provider: string; text: string; command: SpokenCommand } | null>(null),
     [autoRead, setAutoRead] = useState(true),
     [finishConfirm, setFinishConfirm] = useState(false),
     [nodding, setNodding] = useState(false),
+    [slow, setSlow] = useState(false),
+    [showTurns, setShowTurns] = useState(false),
     [ready, setReady] = useState(session.turns.length > 0);
   const speech = useSpeech(
     auth.token,
-    (text, metrics, latency, provider, heard) => {
+    (text, metrics, latency, provider, _heard, command) => {
       setAnswer(text);
-      setAudioEvidence({ metrics, latency, provider, text, heard });
+      setAudioEvidence({ metrics, latency, provider, text, command });
     },
     session.topic_id,
   );
@@ -262,7 +289,7 @@ function LiveSession({
       if (result.session.status === "completed")
         onReport(result.session.report || (await api<Report>(`/sessions/${session.id}/report`, auth.token)));
     } catch (e) {
-      onError((e as Error).message);
+      onError(studentMessage(e));
     } finally {
       setBusy(false);
     }
@@ -273,6 +300,7 @@ function LiveSession({
     if (submission.current?.key !== key) submission.current = { key, id: crypto.randomUUID() };
     setBusy(true);
     speech.stopSpeaking();
+    const slowTimer = setTimeout(() => setSlow(true), 12000);
     try {
       const result = await api<{ session: Session }>(`/sessions/${session.id}/answers`, auth.token, {
         question_id: q.id,
@@ -288,8 +316,10 @@ function LiveSession({
       if (result.session.status === "completed")
         onReport(result.session.report || (await api<Report>(`/sessions/${session.id}/report`, auth.token)));
     } catch (e) {
-      onError((e as Error).message);
+      onError(studentMessage(e));
     } finally {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setBusy(false);
     }
   }
@@ -301,7 +331,7 @@ function LiveSession({
       setSession(null);
       onReport(report);
     } catch (e) {
-      onError((e as Error).message);
+      onError(studentMessage(e));
     } finally {
       setBusy(false);
     }
@@ -330,7 +360,9 @@ function LiveSession({
   });
   const mascot = busy || speech.transcribing ? "thinking" : speech.recording ? "listening" : nodding ? "nodding" : speech.speaking ? "speaking" : "idle";
   const status = busy
-    ? "Thinking about your answer…"
+    ? slow
+      ? "Still marking your answer. This is taking longer than usual…"
+      : "Thinking about your answer…"
     : speech.transcribing
       ? "Turning your recording into text…"
       : speech.recording
@@ -344,242 +376,276 @@ function LiveSession({
           : speech.starting
             ? "Opening microphone…"
             : mode === "speech" && !answer
-              ? "Tap the microphone and answer when ready"
+              ? "Take your time. Tap the microphone when you are ready"
               : "";
+  const heardCommand = audioEvidence?.command && answer.trim() === audioEvidence.text.trim() ? audioEvidence.command : null;
   const { completed_concepts: done, total_concepts: total } = session.progress;
+  const answered = session.turns.filter((t) => !t.depth).map((t) => t.concept);
+  // A concept counts as skipped when every turn on it was skipped.
+  const skipped = new Set(
+    answered.filter((c) => session.turns.filter((t) => t.concept === c).every((t) => t.transcript === "[skipped by student]")),
+  );
+  const modeSwitch = (
+    <button
+      className="st-link"
+      disabled={locked}
+      onClick={() => {
+        if (mode === "speech") {
+          setMode("text");
+          setAudioEvidence(null);
+        } else setMode("speech");
+      }}
+    >
+      {mode === "speech" ? "Type instead" : "Use microphone instead"}
+    </button>
+  );
   return (
-    <div className="st">
-      <div className="st-topbar">
-        <div>
+    <div className="st st-fill st-session">
+      <aside className="st-card st-rail">
+        <div className="st-rail-head">
           <div className="st-eyebrow">Live viva</div>
           <h2>{session.topic}</h2>
-        </div>
-        {finishConfirm ? (
-          <div className="st-row">
-            <span className="st-small st-muted">End now? Unanswered concepts count as insufficient evidence.</span>
-            <button className="st-btn st-btn-ghost" onClick={() => setFinishConfirm(false)}>
-              Keep going
-            </button>
-            <button className="st-btn st-btn-danger" disabled={busy} onClick={finish}>
-              Finish now
-            </button>
-          </div>
-        ) : (
-          <div className="st-row">
-            <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setSession(null)}>
-              Save &amp; leave
-            </button>
-            <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setFinishConfirm(true)}>
-              Finish session
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="st-row st-between">
-        <div className="st-row">
-          <span className="st-chip st-chip-accent">
-            Question {q?.ordinal || done} of {total}
-          </span>
-          {q && <span className="st-chip">{q.depth ? `Follow-up ${q.depth} of ${session.max_depth}` : "Main question"}</span>}
-        </div>
-        {q && <span className="st-chip">{q.concept}</span>}
-      </div>
-      <div className="st-dots" aria-hidden="true">
-        {Array.from({ length: total }, (_, i) => (
-          <span key={i} className={i < done ? "is-done" : i === done ? "is-current" : ""} />
-        ))}
-      </div>
-
-      {q && !ready ? (
-        <section className="st-card st-stage">
-          <Mascot state="idle" />
-          <p className="st-question">Ready when you are.</p>
-          <p className="st-muted" style={{ maxWidth: 520 }}>
-            Your viva guide will ask each question out loud. Find a quiet place, then allow microphone access when asked.
-            You can skip a question, or say "stop the session" at any time.
+          <p className="st-small st-muted">
+            Question {Math.min(q?.ordinal || done, total)} of {total}
           </p>
-          {mode === "speech" && <MicCheck />}
-          <button
-            className="st-btn st-btn-primary"
-            onClick={() => {
-              speech.prime();
-              setReady(true);
-            }}
-          >
-            Start the viva
-          </button>
-        </section>
-      ) : q ? (
-        <section className="st-card st-stage" aria-live="polite">
-          <Mascot state={mascot} />
-          <p className="st-question" key={q.id}>
-            {q.question}
-          </p>
-          <div className="st-row" style={{ justifyContent: "center" }}>
-            <button
-              className="st-btn st-btn-ghost"
-              disabled={speech.recording}
-              onClick={() => (speech.speaking ? speech.stopSpeaking() : speech.speak(q.question))}
-            >
-              {speech.speaking ? <><Square size={15} /> Stop</> : <><Volume2 size={16} /> Listen again</>}
-            </button>
-            <button
-              className="st-btn st-btn-ghost"
-              disabled={speech.recording}
-              title="Hear the question again, more slowly"
-              onClick={() => speech.speak(q.question, 0.8)}
-            >
-              <Snail size={16} /> Slower
-            </button>
-            <label className="st-small st-muted st-row" style={{ gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={autoRead}
-                onChange={(e) => {
-                  setAutoRead(e.target.checked);
-                  if (!e.target.checked) speech.stopSpeaking();
-                }}
-              />
-              Read questions aloud
-            </label>
-            {speech.voiceProvider && (
-              <span className="st-chip" title="Service that speaks the question">
-                Voice: {providerName(speech.voiceProvider)}
-              </span>
-            )}
-          </div>
-
-          {mode === "speech" && (
-            <>
-              <button
-                className={`st-mic ${speech.recording ? "is-recording" : ""}`}
-                aria-label={speech.recording ? "Stop recording" : "Start recording your answer"}
-                disabled={busy || speech.starting || speech.transcribing}
-                onClick={speech.recording ? speech.stop : speech.start}
-              >
-                {speech.recording ? <Square size={28} /> : <Mic size={30} />}
-              </button>
-              {speech.recording && <VoiceWave className="st-mic-wave" source={() => speech.meters.current.mic} active />}
-              {speech.hasRecording && !speech.transcribing && (
-                <button className="st-btn st-btn-ghost" disabled={speech.starting || speech.recording} onClick={speech.retry}>
-                  <RotateCcw size={16} /> Retry transcription
-                </button>
-              )}
-            </>
-          )}
-          <p className="st-status">{status}</p>
-          {mode === "speech" && !speech.recording && !speech.transcribing && !busy && (
-            <p className="st-hint">
-              <kbd>Space</kbd> starts or stops recording · <kbd>Ctrl</kbd> + <kbd>Enter</kbd> submits
-            </p>
-          )}
-          {speech.recording && speech.liveProvider && (
-            <div className="st-live" aria-live="polite">
-              <div className="st-label">Live transcript · {providerName(speech.liveProvider)}</div>
-              <p>{speech.liveText || "Listening…"}</p>
-            </div>
-          )}
-          <ErrorNotice message={speech.speechError} />
-
-          {(mode === "text" || answer || audioEvidence) && (
-            <div className="st-answer">
-              {audioEvidence && <HeardView text={audioEvidence.text} heard={audioEvidence.heard} />}
-              <label htmlFor="answer" className="st-label">
-                {audioEvidence ? "Your answer (check the transcript and fix any mistakes)" : "Your answer"}
-              </label>
-              <textarea
-                id="answer"
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Explain in your own words. An example can help…"
-                rows={5}
-                maxLength={10000}
-                disabled={locked}
-              />
-              <div className="st-row st-between">
-                <span className="st-small st-muted">
-                  {audioEvidence
-                    ? `Transcribed by ${providerName(audioEvidence.provider)}. Pauses and timing come from your recording.`
-                    : "Typed answers have no timing data. Ctrl + Enter submits."}
+        </div>
+        <ol className="st-rail-steps">
+          {Array.from({ length: total }, (_, i) => {
+            const state = i < done ? "done" : i === done && q ? "current" : "todo";
+            return (
+              <li key={i} className={`is-${state}`} aria-current={state === "current" ? "step" : undefined}>
+                <span className="st-rail-dot">{state === "done" ? <Check size={13} strokeWidth={3} /> : i + 1}</span>
+                <span className="st-rail-text">
+                  <strong>{state === "done" ? answered[i] || `Question ${i + 1}` : state === "current" ? q!.concept : `Question ${i + 1}`}</strong>
+                  {state === "current" && <small>{q!.depth ? `Follow-up ${q!.depth} of ${session.max_depth}` : "Main question"}</small>}
+                  {state === "done" && <small>{skipped.has(answered[i] ?? "") ? "Skipped" : "Answered"}</small>}
                 </span>
-                <button className="st-btn st-btn-primary" disabled={locked || !answer.trim()} onClick={submit}>
-                  {busy ? <Busy text="Thinking…" /> : <>Submit answer <Send size={16} /></>}
+              </li>
+            );
+          })}
+        </ol>
+        <div className="st-rail-foot">
+          {session.turns.length > 0 && (
+            <button className="st-btn st-btn-ghost st-block" onClick={() => setShowTurns(true)}>
+              <MessagesSquare size={16} /> Previous answers ({session.turns.length})
+            </button>
+          )}
+          {finishConfirm ? (
+            <div className="st-confirm">
+              <p className="st-small">End now? Questions you have not answered will not count.</p>
+              <div className="st-row">
+                <button className="st-btn st-btn-ghost" onClick={() => setFinishConfirm(false)}>
+                  Keep going
+                </button>
+                <button className="st-btn st-btn-danger" disabled={busy} onClick={finish}>
+                  Finish now
                 </button>
               </div>
             </div>
+          ) : (
+            <div className="st-rail-actions">
+              <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setSession(null)}>
+                <LogOut size={15} /> Save &amp; leave
+              </button>
+              <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setFinishConfirm(true)}>
+                Finish
+              </button>
+            </div>
           )}
-          <button className="st-btn st-btn-ghost" disabled={locked} onClick={skip}>
-            <SkipForward size={16} /> Skip question
-          </button>
-          <button
-            className="st-link"
-            disabled={locked}
-            onClick={() => {
-              if (mode === "speech") {
-                setMode("text");
-                setAudioEvidence(null);
-              } else setMode("speech");
-            }}
-          >
-            {mode === "speech" ? "Type instead" : "Use microphone instead"}
-          </button>
-        </section>
-      ) : (
-        <section className="st-card st-stage">
-          <p className="st-question">Conversation complete.</p>
-          <p className="st-muted">Your report is ready.</p>
-        </section>
-      )}
+        </div>
+      </aside>
 
-      {session.turns.length > 0 && (
-        <details className="st-card">
-          <summary>Conversation so far · {session.turns.length} answers</summary>
-          <div className="st-history" style={{ marginTop: 14 }}>
+      <section className="st-card st-viva" aria-live="polite">
+        {q && !ready ? (
+          <div className="st-viva-ready">
+            <Examiner state="idle" voice={speech.voiceEvents} />
+            <h2>Ready when you are.</h2>
+            <p className="st-muted">
+              Your examiner will ask each question out loud. Find a quiet place, then allow microphone access when asked. The words on the
+              left work at any time, for example "Skip this question".
+            </p>
+            {mode === "speech" && <MicCheck />}
+            <button
+              className="st-btn st-btn-primary"
+              onClick={() => {
+                speech.prime();
+                setReady(true);
+              }}
+            >
+              Start the viva <ArrowRight size={18} />
+            </button>
+          </div>
+        ) : q ? (
+          <>
+            <div className="st-viva-q">
+              <Examiner state={mascot} voice={speech.voiceEvents} />
+              <div className="st-viva-qtext">
+                <div className="st-row" style={{ gap: 8 }}>
+                  <span className="st-chip st-chip-accent">{q.depth ? "Follow-up question" : "Main question"}</span>
+                  <span className="st-chip">{q.concept}</span>
+                </div>
+                <p className="st-question" key={q.id}>
+                  {q.question}
+                </p>
+                <div className="st-row st-q-tools">
+                  <button
+                    className="st-btn st-btn-ghost st-btn-sm"
+                    disabled={speech.recording}
+                    onClick={() => (speech.speaking ? speech.stopSpeaking() : speech.speak(q.question))}
+                  >
+                    {speech.speaking ? (
+                      <>
+                        <Square size={14} /> Stop
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 size={15} /> Listen again
+                      </>
+                    )}
+                  </button>
+                  <button
+                    className="st-btn st-btn-ghost st-btn-sm"
+                    disabled={speech.recording}
+                    title="Hear the question again, more slowly"
+                    onClick={() => speech.speak(q.question, 0.8)}
+                  >
+                    <Snail size={15} /> Slower
+                  </button>
+                  <label className="st-small st-muted st-row" style={{ gap: 6 }}>
+                    <input
+                      type="checkbox"
+                      checked={autoRead}
+                      onChange={(e) => {
+                        setAutoRead(e.target.checked);
+                        if (!e.target.checked) speech.stopSpeaking();
+                      }}
+                    />
+                    Read questions aloud
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="st-viva-a">
+              <div className="st-a-head">
+                <div className="st-eyebrow">Your answer</div>
+                <Commands />
+              </div>
+              {mode === "speech" && (
+                <div className={`st-recorder ${speech.recording ? "is-recording" : ""}`}>
+                  <button
+                    className={`st-mic ${speech.recording ? "is-recording" : ""}`}
+                    aria-label={speech.recording ? "Stop recording" : "Start recording your answer"}
+                    title="Space starts or stops recording. Ctrl + Enter submits."
+                    disabled={busy || speech.starting || speech.transcribing}
+                    onClick={speech.recording ? speech.stop : speech.start}
+                  >
+                    {speech.recording ? <Square size={24} /> : <Mic size={26} />}
+                  </button>
+                  <div className="st-recorder-body">
+                    <p className="st-status">{status || "Ready"}</p>
+                    {speech.recording ? (
+                      <VoiceWave className="st-mic-wave" source={() => speech.meters.current.mic} active />
+                    ) : (
+                      speech.hasRecording &&
+                      !speech.transcribing && (
+                        <button className="st-link" disabled={speech.starting} onClick={speech.retry}>
+                          <RotateCcw size={14} /> Retry transcription
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+              {mode === "text" && status && <p className="st-status">{status}</p>}
+              {speech.recording && speech.liveProvider && (
+                <div className="st-live">
+                  <div className="st-label">Live transcript</div>
+                  <p>{speech.liveText || "Listening…"}</p>
+                </div>
+              )}
+              <ErrorNotice message={speech.speechError} />
+              {heardCommand && (
+                <p className="st-command-heard" role="status">
+                  <Mic size={16} />
+                  <span>
+                    Heard <q>{heardCommand === "stop" ? "Stop the viva" : "Skip this question"}</q>. Press{" "}
+                    <strong>{heardCommand === "stop" ? "Finish viva" : "Skip question"}</strong>, or edit the words if you meant something else.
+                  </span>
+                </p>
+              )}
+              {mode === "text" || answer || audioEvidence ? (
+                <>
+                  {!heardCommand && (
+                    <label htmlFor="answer" className="st-label">
+                      {audioEvidence ? "Check the words, and fix anything we misheard" : "Type your answer"}
+                    </label>
+                  )}
+                  <textarea
+                    id="answer"
+                    className="st-answer-box"
+                    value={answer}
+                    onChange={(e) => setAnswer(e.target.value)}
+                    placeholder="Explain in your own words. An example can help…"
+                    maxLength={10000}
+                    disabled={locked}
+                  />
+                </>
+              ) : (
+                <div className="st-answer-empty">
+                  <Mic size={20} />
+                  <span>Your words appear here after you record. You can check and fix them before you submit.</span>
+                </div>
+              )}
+              <div className="st-a-foot">
+                <div className="st-row">
+                  <button className="st-btn st-btn-ghost st-btn-sm" disabled={locked} onClick={skip}>
+                    <SkipForward size={15} /> Skip
+                  </button>
+                  {modeSwitch}
+                </div>
+                <button className="st-btn st-btn-primary" disabled={locked || !answer.trim()} onClick={submit}>
+                  {busy ? (
+                    <Busy text="Thinking…" />
+                  ) : heardCommand === "stop" ? (
+                    "Finish viva"
+                  ) : heardCommand === "skip" ? (
+                    "Skip question"
+                  ) : (
+                    <>
+                      Submit answer <Send size={16} />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="st-viva-ready">
+            <h2>Viva complete.</h2>
+            <p className="st-muted">Your report is ready.</p>
+          </div>
+        )}
+      </section>
+
+      {showTurns && (
+        <Modal title="Previous answers" onClose={() => setShowTurns(false)}>
+          <div className="st st-history">
             {session.turns.map((t) => (
               <div className="st-turn" key={t.id}>
                 <div className="st-row st-between">
-                  <strong className="st-small">{t.depth ? "Follow-up" : "Main question"}</strong>
+                  <strong className="st-small">
+                    {t.concept} · {t.depth ? "Follow-up" : "Main question"}
+                  </strong>
                   <span className="st-chip">{label(t.state)}</span>
                 </div>
                 <p>{t.question}</p>
-                <blockquote>“{t.transcript}”</blockquote>
+                <blockquote>{t.transcript ? `“${t.transcript}”` : "Skipped"}</blockquote>
               </div>
             ))}
           </div>
-        </details>
+        </Modal>
       )}
-    </div>
-  );
-}
-
-/** The recorded answer as heard: fillers highlighted and measured pauses shown where they happened. */
-function HeardView({ text, heard }: { text: string; heard: Heard }) {
-  const cuts = new Set([0, text.length]);
-  heard.pauses.forEach((p) => cuts.add(p.char));
-  heard.fillers.forEach((f) => { cuts.add(f.start_char); cuts.add(f.end_char); });
-  const points = [...cuts].filter((c) => c >= 0 && c <= text.length).sort((a, b) => a - b);
-  const pieces: React.ReactNode[] = [];
-  points.forEach((start, i) => {
-    heard.pauses.filter((p) => p.char === start).forEach((p, j) => pieces.push(
-      <span className="st-pause" key={`p${i}-${j}`} title="Pause measured in your recording">
-        pause {(p.ms / 1000).toFixed(1)}s
-      </span>,
-    ));
-    const end = points[i + 1];
-    if (end === undefined) return;
-    const piece = text.slice(start, end);
-    const filler = heard.fillers.some((f) => f.start_char === start && f.end_char === end);
-    pieces.push(filler ? <mark className="st-filler" key={`t${i}`} title="Filler word">{piece}</mark> : <span key={`t${i}`}>{piece}</span>);
-  });
-  return (
-    <div className="st-heard">
-      <div className="st-label">What we heard</div>
-      <p>{pieces}</p>
-      <div className="st-small st-muted">
-        {heard.fillers.length} filler {heard.fillers.length === 1 ? "word" : "words"} · {heard.pauses.length}{" "}
-        {heard.pauses.length === 1 ? "pause" : "pauses"} over 0.4s. These support the result; they never decide it alone.
-      </div>
     </div>
   );
 }
