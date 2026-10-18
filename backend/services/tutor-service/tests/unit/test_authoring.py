@@ -197,7 +197,8 @@ def test_approving_replaces_the_old_practical_for_every_student(world, course) -
     assert new.statement == STATEMENT
     with pytest.raises(SessionProblem) as gone:
         world.students.detail("anyone", old_id)
-    assert gone.value.code == "practical_not_found"
+    assert gone.value.code == "practical_replaced"
+    assert gone.value.details == {"replaced_by": approved.practical_id}
 
 
 def test_the_replaced_authored_practical_is_kept_in_full(world, course) -> None:
@@ -424,3 +425,36 @@ def test_only_lecturers_may_manage_practicals() -> None:
         with pytest.raises(ApiError) as caught:
             lecturer(CurrentUser(uuid.uuid4(), role))
         assert caught.value.code == "lecturers_only"
+
+
+def test_a_student_on_an_out_of_date_screen_is_told_what_replaced_the_practical(
+    world, course
+) -> None:
+    target = authored(course)[0]
+    old_id = practical_id(target.question.question_id)
+    draft = world.draft(target)
+    world.author.approve(LECTURER, draft.practical_id, None)
+
+    for call in (
+        lambda: world.students.run("s", old_id, "x", ""),
+        lambda: world.students.submit("s", old_id, "x"),
+    ):
+        with pytest.raises(SessionProblem) as caught:
+            call()
+        assert caught.value.code == "practical_replaced"
+        assert caught.value.details["replaced_by"] == draft.practical_id
+
+    with pytest.raises(SessionProblem) as unknown:
+        world.students.detail("s", "prog.loops~no-such-practical")
+    assert unknown.value.code == "practical_not_found", "a made-up id is still just not found"
+
+
+def test_the_leaderboard_is_open_to_a_lecturer_but_a_student_still_may_not_start_sessions() -> None:
+    import inspect
+
+    from app.api.v1.routes import sessions
+
+    leaderboard = inspect.signature(sessions.get_leaderboard).parameters["caller"].default
+    start = inspect.signature(sessions.start_session).parameters["caller"].default
+    assert leaderboard.dependency is sessions.current_user
+    assert start.dependency is sessions.student

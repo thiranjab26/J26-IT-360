@@ -1,13 +1,9 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
+import { useAuth } from '@/shared/auth/AuthProvider';
 import { Badge, Banner, Button, Card, cx } from '@/shared/components/ui';
-import {
-  useProgress,
-  useStartSession,
-  type ConceptProgress,
-  type Quest,
-} from '../api/sessionApi';
+import { useProgress, useStartSession, type ConceptProgress, type Quest } from '../api/sessionApi';
 import { useModuleConcepts, type Concept, type Topic } from '../api/tutorApi';
 import { fireConfetti, useCountUp } from '../components/fx';
 import { BoltIcon, CheckIcon, LockIcon, PlayIcon, TrophyIcon } from '../components/icons';
@@ -23,6 +19,8 @@ export function QuestMapPage() {
   const { data, isPending, error } = useModuleConcepts(moduleId);
   const { data: progress } = useProgress(moduleId);
   const start = useStartSession();
+  // Lecturers see the path their students follow, but do not learn it.
+  const lecturer = useAuth().user?.role === 'lecturer';
 
   if (isPending) return <MapSkeleton />;
 
@@ -63,7 +61,9 @@ export function QuestMapPage() {
     ? Math.round((masteredCount / module.concept_count) * 100)
     : 0;
 
-  const nextId = progress?.next_concept_id ?? topics[0]?.concepts[0]?.concept_id ?? null;
+  const nextId = lecturer
+    ? null
+    : (progress?.next_concept_id ?? topics[0]?.concepts[0]?.concept_id ?? null);
   const activeId = progress?.active_session_id ?? null;
 
   function begin(conceptId: string) {
@@ -98,6 +98,24 @@ export function QuestMapPage() {
         />
       )}
 
+      {lecturer && (
+        <div className="flex flex-wrap items-center justify-between gap-[14px] rounded-[14px] border border-brand-soft bg-brand-wash px-[20px] py-[16px]">
+          <div>
+            <p className="font-mono text-[10.5px] tracking-wide text-brand uppercase">
+              Lecturer view
+            </p>
+            <p className="mt-[3px] text-[15.5px] font-semibold tracking-tight text-ink">
+              This is the path your students follow
+            </p>
+            <p className="mt-[2px] text-[12.5px] text-ink-muted">
+              Guided sessions are for students. To change what they practise, open the practical
+              studio.
+            </p>
+          </div>
+          <Button onClick={() => navigate('/studio')}>Open the practical studio</Button>
+        </div>
+      )}
+
       {nextId && (
         <div className="flex flex-wrap items-center justify-between gap-[14px] rounded-[14px] border border-brand-soft bg-brand-wash px-[20px] py-[16px]">
           <div>
@@ -127,9 +145,11 @@ export function QuestMapPage() {
         <section aria-label="Module path">
           <div className="mb-[14px] flex items-baseline justify-between">
             <h2 className="text-[14px] font-semibold text-ink">Module path</h2>
-            <span className="font-mono text-[10.5px] text-ink-faint">
-              {masteredCount} of {module.concept_count} concepts mastered
-            </span>
+            {!lecturer && (
+              <span className="font-mono text-[10.5px] text-ink-faint">
+                {masteredCount} of {module.concept_count} concepts mastered
+              </span>
+            )}
           </div>
 
           <ol>
@@ -158,44 +178,48 @@ export function QuestMapPage() {
             <dl className="mt-[10px] flex flex-col gap-[8px] text-[12.5px]">
               <Row label="Topics" value={String(module.topic_count)} />
               <Row label="Concepts" value={String(module.concept_count)} />
-              <Row label="Mastered" value={`${masteredPercent}%`} />
+              {!lecturer && <Row label="Mastered" value={`${masteredPercent}%`} />}
             </dl>
-            <div className="mt-[12px] h-[6px] overflow-hidden rounded-full bg-surface-sunken">
-              <div
-                className="h-full rounded-full bg-brand transition-[width] duration-500"
-                style={{ width: `${masteredPercent}%` }}
-              />
-            </div>
+            {!lecturer && (
+              <div className="mt-[12px] h-[6px] overflow-hidden rounded-full bg-surface-sunken">
+                <div
+                  className="h-full rounded-full bg-brand transition-[width] duration-500"
+                  style={{ width: `${masteredPercent}%` }}
+                />
+              </div>
+            )}
           </Card>
 
           <Leaderboard />
 
-          <Card className="px-[18px] py-[16px]">
-            <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
-              How progress works
-            </p>
-            <ul className="mt-[10px] flex flex-col gap-[9px]">
-              {[
-                'You earn XP for each checkpoint you pass.',
-                progress?.policy === 'points_only'
-                  ? 'Topics unlock as your XP grows.'
-                  : 'Topics unlock on demonstrated mastery, not on points.',
-                'Quick multiple-choice checks never unlock anything.',
-              ].map((line) => (
-                <li key={line} className="flex gap-[8px]">
-                  <span className="mt-[7px] size-[4px] shrink-0 rounded-full bg-brand" />
-                  <span className="text-[12px] leading-[1.55] text-ink-muted">{line}</span>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          {!lecturer && (
+            <Card className="px-[18px] py-[16px]">
+              <p className="font-mono text-[10px] tracking-wide text-ink-faint uppercase">
+                How progress works
+              </p>
+              <ul className="mt-[10px] flex flex-col gap-[9px]">
+                {[
+                  'You earn XP for each checkpoint you pass.',
+                  progress?.policy === 'points_only'
+                    ? 'Topics unlock as your XP grows.'
+                    : 'Topics unlock on demonstrated mastery, not on points.',
+                  'Quick multiple-choice checks never unlock anything.',
+                ].map((line) => (
+                  <li key={line} className="flex gap-[8px]">
+                    <span className="mt-[7px] size-[4px] shrink-0 rounded-full bg-brand" />
+                    <span className="text-[12px] leading-[1.55] text-ink-muted">{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           <div className="flex items-start gap-[8px] px-[4px]">
             <Shield />
             <p className="text-[11.5px] leading-[1.5] text-ink-faint">
-              Explanations are written from this module's course material, and each one is
-              checked against it before you see it. If a check fails you get the original course
-              text instead.
+              Explanations are written from this module's course material, and each one is checked
+              against it before you see it. If a check fails you get the original course text
+              instead.
             </p>
           </div>
         </aside>
@@ -236,7 +260,8 @@ function TopicStep({
   onStart: (conceptId: string) => void;
 }) {
   const total = topic.concepts.length;
-  const mastered = quest?.mastered ?? topic.concepts.filter((c) => status.get(c.concept_id)?.mastered).length;
+  const mastered =
+    quest?.mastered ?? topic.concepts.filter((c) => status.get(c.concept_id)?.mastered).length;
   const complete = quest?.complete ?? mastered === total;
   const open = topic.concepts.some((c) => c.concept_id === current);
   const locked =
@@ -426,7 +451,10 @@ function ConceptItem({
       {progress && !locked && (
         <Button
           variant={isNext ? 'primary' : 'secondary'}
-          className={cx('shrink-0 px-[14px] py-[7px] text-[12.5px]', isNext && 'animate-pulse-ring')}
+          className={cx(
+            'shrink-0 px-[14px] py-[7px] text-[12.5px]',
+            isNext && 'animate-pulse-ring',
+          )}
           onClick={() => {
             if (isNext) fireConfetti('small', { x: 0.5, y: 0.5 });
             onStart(concept.concept_id);
@@ -441,7 +469,15 @@ function ConceptItem({
 }
 
 /** Where a concept stands at a glance: mastered, locked, next up, or just open. */
-function StatusDot({ mastered, locked, next }: { mastered: boolean; locked: boolean; next: boolean }) {
+function StatusDot({
+  mastered,
+  locked,
+  next,
+}: {
+  mastered: boolean;
+  locked: boolean;
+  next: boolean;
+}) {
   return (
     <span
       aria-hidden="true"
@@ -480,7 +516,11 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function Shield() {
   return (
-    <svg viewBox="0 0 16 16" aria-hidden="true" className="mt-[2px] size-[13px] shrink-0 text-verified">
+    <svg
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className="mt-[2px] size-[13px] shrink-0 text-verified"
+    >
       <path
         d="M8 1.5 2.5 3.4v4.2c0 3.1 2.2 5.4 5.5 6.9 3.3-1.5 5.5-3.8 5.5-6.9V3.4L8 1.5Z"
         fill="currentColor"

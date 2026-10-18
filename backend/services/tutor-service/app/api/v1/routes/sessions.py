@@ -154,7 +154,8 @@ def get_profile(
 @router.get("/leaderboard", response_model=LeaderboardOut, summary="Top students by XP")
 def get_leaderboard(
     limit: int = Query(default=10, ge=1, le=50),
-    caller: CurrentUser = Depends(student),
+    # Anyone signed in may look: a lecturer sees the same board, with no row of their own.
+    caller: CurrentUser = Depends(current_user),
     service: SessionService = Depends(get_service),
 ) -> LeaderboardOut:
     return _run(lambda: service.leaderboard(str(caller.user_id), limit))

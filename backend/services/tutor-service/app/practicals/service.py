@@ -227,8 +227,19 @@ class PracticalService:
         return _Guarded(self.runner)
 
     def _entry(self, pid: str):
-        entry = self.catalog.entry(pid.replace("~", "#"))
+        question_id = pid.replace("~", "#")
+        entry = self.catalog.entry(question_id)
         if entry is None:
+            # A practical a lecturer has just replaced: say what took its place, so a student
+            # whose screen is out of date is taken there instead of meeting a dead end.
+            successor = self.catalog.current_in(self.catalog.slot_of(question_id))
+            if successor is not None:
+                raise SessionProblem(
+                    "not_found",
+                    "practical_replaced",
+                    "Your lecturer has just updated this practical.",
+                    {"replaced_by": practical_id(successor.question.question_id)},
+                )
             raise SessionProblem("not_found", "practical_not_found", "No such practical.")
         return entry
 

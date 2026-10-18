@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { Link, Navigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Banner, Card, cx } from '@/shared/components/ui';
@@ -30,6 +31,18 @@ import { playCue } from '../components/sound';
 export function PracticalPage() {
   const { practicalId } = useParams<{ practicalId: string }>();
   const { data, isPending, error } = usePractical(practicalId);
+  const client = useQueryClient();
+
+  // A lecturer may have replaced this practical since the list was loaded. The service says what
+  // took its place, so the student is moved there instead of meeting a dead end.
+  const replacedBy =
+    error instanceof ApiError && error.code === 'practical_replaced'
+      ? String(error.details.replaced_by ?? '')
+      : '';
+  useEffect(() => {
+    if (error) void client.invalidateQueries({ queryKey: ['tutor', 'practicals'] });
+  }, [error, client]);
+  if (replacedBy) return <Navigate to={`/practicals/${replacedBy}`} replace />;
 
   if (isPending) return <p className="text-[13px] text-ink-muted">Loading the practical...</p>;
 
@@ -145,13 +158,7 @@ function Workspace({ practical }: { practical: Practical }) {
 
       <Companion
         mood={
-          submitted
-            ? submitted.passed
-              ? 'cheer'
-              : 'oops'
-            : ran && !ran.compiled
-              ? 'oops'
-              : 'idle'
+          submitted ? (submitted.passed ? 'cheer' : 'oops') : ran && !ran.compiled ? 'oops' : 'idle'
         }
         text={
           submitted
@@ -173,10 +180,21 @@ function Workspace({ practical }: { practical: Practical }) {
           code={failure instanceof ApiError ? failure.code : undefined}
         />
       )}
+      {failure instanceof ApiError && failure.code === 'practical_replaced' && (
+        <Link
+          to={`/practicals/${String(failure.details.replaced_by ?? '')}`}
+          replace
+          className="self-start rounded-full border border-brand bg-brand-wash px-[14px] py-[6px] text-[12.5px] font-semibold text-brand"
+        >
+          Open the updated practical
+        </Link>
+      )}
 
       <div className="grid items-start gap-[18px] lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
         <Card className="neon-edge px-[20px] py-[18px]">
-          <p className="font-mono text-[10.5px] tracking-wide text-brand uppercase">Mission briefing</p>
+          <p className="font-mono text-[10.5px] tracking-wide text-brand uppercase">
+            Mission briefing
+          </p>
           <Markdown className="mt-[10px]">{practical.statement}</Markdown>
           <p className="mt-[14px] text-[12px] text-ink-muted">
             {practical.tests_total > 0
@@ -232,9 +250,7 @@ function Workspace({ practical }: { practical: Practical }) {
         </div>
       </div>
 
-      {celebrate && (
-        <RewardCelebration rewards={celebrate} onDone={() => setCelebrate(null)} />
-      )}
+      {celebrate && <RewardCelebration rewards={celebrate} onDone={() => setCelebrate(null)} />}
     </div>
   );
 }
@@ -348,9 +364,7 @@ function SubmitPanel({ result }: { result: SubmitResult }) {
             style={{ animationDelay: `${i * 90}ms` }}
             className={cx(
               'h-[12px] flex-1 animate-rise rounded-full',
-              r.passed
-                ? 'bg-verified shadow-[0_0_10px_oklch(0.68_0.17_155/0.7)]'
-                : 'bg-caution/35',
+              r.passed ? 'bg-verified shadow-[0_0_10px_oklch(0.68_0.17_155/0.7)]' : 'bg-caution/35',
             )}
           />
         ))}
@@ -379,7 +393,9 @@ function Difficulty({ level }: { level: number }) {
           key={i}
           className={cx(
             'size-[16px]',
-            i < filled ? 'text-gold drop-shadow-[0_0_5px_oklch(0.8_0.15_85/0.8)]' : 'text-line-strong',
+            i < filled
+              ? 'text-gold drop-shadow-[0_0_5px_oklch(0.8_0.15_85/0.8)]'
+              : 'text-line-strong',
           )}
         />
       ))}

@@ -75,6 +75,8 @@ export function usePracticals() {
     queryKey: ['tutor', 'practicals'],
     queryFn: () => request<{ practicals: PracticalSummary[] }>('/v1/tutor/practicals'),
     staleTime: 0,
+    // A lecturer can replace a practical at any moment, so an open list checks now and then.
+    refetchInterval: 30_000,
   });
 }
 
@@ -110,7 +112,9 @@ export function useSubmitPractical(practicalId: string) {
       // Standing, XP, level and badges may all have moved.
       void queryClient.invalidateQueries({ queryKey: ['tutor', 'practicals'] });
       void queryClient.invalidateQueries({ queryKey: ['tutor', 'profile'] });
-      void queryClient.invalidateQueries({ queryKey: ['tutor', 'leaderboard'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['tutor', 'leaderboard'],
+      });
     },
   });
 }
