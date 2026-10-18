@@ -109,6 +109,9 @@ export type Report = {
     turn_count: number;
     no_weakness?: boolean;
     signal_details?: { signal: string; value: string; threshold: string; counted: boolean }[];
+    /** Points the last answer covered and missed (reports from 18 Oct 2026). */
+    covered?: string[];
+    missing?: string[];
   }[];
   strong_answers?: boolean;
   hesitation: {
@@ -287,6 +290,14 @@ export type FluencyMeasures = {
   syllables?: number;
   words?: number;
 };
+export type LabProfile = {
+  name: string;
+  min_flags: number;
+  flags: number;
+  flagged: boolean | null;
+  flagged_measures: string[];
+  rules: { measure: string; direction: "below" | "above"; threshold: number }[];
+};
 export type LabResult = {
   file: string;
   examiner_file: string | null;
@@ -301,7 +312,8 @@ export type LabResult = {
   };
   answers: (FluencyMeasures & { answer: number; start_s: number; end_s: number })[];
   windows: (FluencyMeasures & { answer: number; window_start_s: number; window_end_s: number })[];
-  profile: { name: string; min_flags: number; rules: { measure: string; direction: "below" | "above"; threshold: number }[] };
+  /** The pilot profile (used by the live viva), then the literature profile. */
+  profiles: [LabProfile, LabProfile];
   words: { start: number; end: number; word: string; filler: boolean }[];
   pauses: { start: number; end: number; ms: number }[];
   speech_span: [number, number] | null;

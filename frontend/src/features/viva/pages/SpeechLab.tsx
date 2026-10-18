@@ -134,33 +134,43 @@ function DropZone({ label, hint, file, onFile, accept = ACCEPT }: { label: strin
 
 function LabResults({ result }: { result: LabResult }) {
   const s = result.session;
-  const rules = Object.fromEntries(result.profile.rules.map((r) => [r.measure, r]));
-  const flagged = new Set(s.flagged_measures ? s.flagged_measures.split(" ") : []);
+  const [pilot, literature] = result.profiles;
+  const rules = Object.fromEntries(pilot.rules.map((r) => [r.measure, r]));
+  const published = Object.fromEntries(literature.rules.map((r) => [r.measure, r]));
+  const flagged = new Set(pilot.flagged_measures);
   const rate = rules.speech_rate_syll_s;
   return (
     <div className="lab-results">
-      <section className={`lab-verdict ${s.literature_flagged ? "is-flagged" : ""}`}>
-        <div>
-          <span className="eyebrow">LITERATURE PROFILE · {result.profile.name}</span>
-          <h2>
-            {s.literature_flagged == null
-              ? "Not enough speech to measure"
-              : s.literature_flagged
-                ? "Matches the communication-difficulty pattern"
-                : "Within the typical range"}
-          </h2>
-          <p className="small">
-            {s.literature_flags} of {result.profile.rules.length} core measures are beyond the published thresholds; {result.profile.min_flags} or more
-            match the pattern. Provisional: the thresholds come from intermediate L2 English monologues, not technical vivas.
-          </p>
-        </div>
-        <div className="lab-chips">
-          <span>{clock(result.duration_s)} recording</span>
-          <span>{s.answers} {s.answers === 1 ? "answer" : "answers"}</span>
-          <span>Words: {result.transcript_source === "none" ? "none" : result.transcript_source}</span>
-          <span>Syllables: {result.syllable_source}</span>
-        </div>
-      </section>
+      <div className="lab-verdicts">
+        {result.profiles.map((p, i) => (
+          <section className={`lab-verdict ${p.flagged ? "is-flagged" : ""}`} key={p.name}>
+            <div>
+              <span className="eyebrow">
+                {i === 0 ? "PILOT THRESHOLDS · USED BY THE VIVA" : "LITERATURE THRESHOLDS · FOR COMPARISON"}
+              </span>
+              <h2>
+                {p.flagged == null
+                  ? "Not enough speech to measure"
+                  : p.flagged
+                    ? "Matches the communication-difficulty pattern"
+                    : "Within the typical range"}
+              </h2>
+              <p className="small">
+                {p.flags} of {p.rules.length} core measures are beyond the thresholds; {p.min_flags} or more match the pattern.{" "}
+                {i === 0
+                  ? "Set from 10 pilot students (5 who find English vivas hard, 5 comfortable); to be tested on new students."
+                  : "From intermediate L2 English monologues, not technical vivas."}
+              </p>
+            </div>
+          </section>
+        ))}
+      </div>
+      <div className="lab-chips">
+        <span>{clock(result.duration_s)} recording</span>
+        <span>{s.answers} {s.answers === 1 ? "answer" : "answers"}</span>
+        <span>Words: {result.transcript_source === "none" ? "none" : result.transcript_source}</span>
+        <span>Syllables: {result.syllable_source}</span>
+      </div>
 
       <section className="lab-core">
         {Object.entries(CORE).map(([key, info]) => {
@@ -172,7 +182,7 @@ function LabResults({ result }: { result: LabResult }) {
               <strong>{value == null ? "n/a" : <CountUp value={value} decimals={info.decimals} />}<small> {info.unit}</small></strong>
               {rule && <Meter value={value} threshold={rule.threshold} direction={rule.direction} />}
               <small>
-                {rule ? `Flag when ${rule.direction} ${rule.threshold}` : ""} · {info.why}
+                {rule ? `Flag when ${rule.direction} ${rule.threshold} (literature ${published[key]?.threshold})` : ""} · {info.why}
               </small>
             </article>
           );

@@ -42,7 +42,6 @@ from app.integrations.llm import (
     assess,
     check_phrasing,
     clarification_request,
-    improvement_plan,
     phrase_follow_up,
 )
 from app.integrations.notifications import deliver_review_notifications
@@ -257,14 +256,6 @@ def complete(db, session, data):
     data["current_question"] = None
     report = build_report(session.id, data)
     report["plan_provider"] = "rule_based"
-    if llm_wording() and data["turns"]:
-        try:
-            plan, report["plan_provider"] = improvement_plan(report, data)
-            report["plan_summary"] = plan["summary"]
-            report["study_plan"], report["speaking_plan"] = plan["study"], plan["speaking"]
-            report["improvement_plan"] = [i["step"] for i in plan["study"] + plan["speaking"]]
-        except (ProviderUnavailable, ValueError, HTTPException) as exc:
-            report["plan_fallback_reason"] = str(getattr(exc, "detail", exc))[:300]
     data["report"] = report
     db.add(Result(session_id=session.id, data=report))
     for event in report["integration_events"]:
@@ -293,13 +284,25 @@ def start_session(
     if not selected:
         raise HTTPException(409, "No approved questions are available for this topic.")
     snapshots = deepcopy(list(selected.values())[:6])
-    context = course_context(db, body.topic_id, user.id)
-    # C02 can only reduce interrogation burden; never enters the gap classifier.
-    max_depth = (
-        min(body.max_depth, 1)
-        if context["c02"]["cognitive_load"].lower() == "high"
-        else body.max_depth
-    )
+    context = deepcopy(course_context(db, body.topic_id, user.id))
+    # Only the practice code P00 may simulate C1 and C2 (typed as P00, p00 or POO).
+    practice = (user.participant_code or "").upper().replace("O", "0") == "P00"
+    if body.simulated_load and practice:
+        context["c02"] |= {
+            "cognitive_load": body.simulated_load,
+            "source": "simulated on the start page; C2 not connected yet",
+        }
+    if body.simulated_mastery and practice:
+        context["c01"] |= {
+            "mastery": 35 if body.simulated_mastery == "below_50" else 80,
+            "source": "simulated on the start page; C1 not connected yet",
+        }
+    # C02 can only reduce interrogation burden; never enters the gap classifier. High load:
+    # a shorter viva, at most 2 questions with 1 follow-up each.
+    high_load = context["c02"]["cognitive_load"].lower() == "high"
+    max_depth = min(body.max_depth, 1) if high_load else body.max_depth
+    if high_load:
+        snapshots = snapshots[:2]
     data = {
         "topic_id": body.topic_id,
         "topic": catalog[body.topic_id][0],
@@ -320,6 +323,7 @@ def start_session(
             "method": "stable approved first question per concept",
             "question_ids": [q["id"] for q in snapshots],
             "c02_depth_reduced": max_depth != body.max_depth,
+            "c02_shortened": high_load,
         },
         "ended_early": False,
     }

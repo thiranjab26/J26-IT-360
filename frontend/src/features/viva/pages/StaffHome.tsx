@@ -25,6 +25,7 @@ const OUTCOME_COLORS: Record<string, string> = {
   STRONG: "#2f9e74",
   LIKELY_KNOWLEDGE_GAP: "#e0566f",
   LIKELY_COMMUNICATION_DIFFICULTY: "#e3a33f",
+  REACHED_WITH_HELP: "#4f7be0",
   MIXED_RESULTS: "#7d8fb3",
   NOT_ENOUGH_EVIDENCE: "#c3ccda",
 };

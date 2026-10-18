@@ -327,19 +327,30 @@ def synthesize(text):
             "Cloud voice is not configured; the browser voice is used instead."
         )
     try:
-        response = httpx.post(
-            cfg.speech_base_url.rstrip("/") + "/audio/speech",
-            timeout=30,
-            headers={"Authorization": f"Bearer {cfg.speech_api_key}"},
-            json={
-                "model": cfg.tts_model,
-                "voice": cfg.tts_voice,
-                "input": text,
-                "response_format": "wav",
-            },
-        )
-        response.raise_for_status()
-        return even_pitch(response.content, cfg.tts_pitch_hz), "audio/wav", "groq:" + cfg.tts_model
+        for attempt in range(3):
+            response = httpx.post(
+                cfg.speech_base_url.rstrip("/") + "/audio/speech",
+                timeout=30,
+                headers={"Authorization": f"Bearer {cfg.speech_api_key}"},
+                json={
+                    "model": cfg.tts_model,
+                    "voice": cfg.tts_voice,
+                    "input": text,
+                    "response_format": "wav",
+                },
+            )
+            # Groq's free voice allows 1,200 tokens a minute, so voicing two questions at once
+            # can hit it; that limit clears in seconds. The daily limit (hours) fails at once.
+            wait = float(response.headers.get("retry-after") or 2)
+            if response.status_code == 429 and attempt < 2 and wait <= 8:
+                time.sleep(wait)
+                continue
+            response.raise_for_status()
+            return (
+                even_pitch(response.content, cfg.tts_pitch_hz),
+                "audio/wav",
+                "groq:" + cfg.tts_model,
+            )
     except httpx.HTTPError as exc:
         raise ProviderUnavailable(
             f"Cloud voice failed ({type(exc).__name__}); the browser voice is used instead."

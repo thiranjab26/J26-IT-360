@@ -15,9 +15,7 @@ To tick a box, change `[ ]` to `[x]` in this file (the preview only shows the re
 - [x] **Google Form:** new Section 1 description pasted, incognito and P00 tests done.
 - **Recruit 10 students (5 + 5) and one observer** (message in Thu 8 Oct below). Send the form
   link and codes only after ethics approval. Book each viva as soon as a student qualifies.
-  - [ ] Sun 11 Oct: message students and the observer. Signed up: __ / 10
-  - [ ] Mon 12 Oct: follow up, ask friends to pass it on. Signed up: __ / 10
-  - [ ] Tue 13 Oct: last push. Signed up: __ / 10
+  - [x] Done: 10 students (P01 to P10, 5 + 5) and an observer; all 10 vivas recorded by 16 Oct.
 - [x] **Call set-up:** Zoom settings done. Study data lives in
       `Desktop/Research Project/Research Data/` (`Recordings/`, `Participants/participants.csv`,
       `Ethics/`, `Quiz/`); use these paths wherever this file says `Documents/viva-study`.
@@ -32,10 +30,10 @@ Claude, when you are back:
 
 ## While you wait for students (Tue 13, Wed 14)
 
-- [ ] Last recruiting push; send each student their code and the form; check answers as they
+- [x] Last recruiting push; send each student their code and the form; check answers as they
       come in (quiz 7 or more; statement average 3.5 or more, or 2.5 or less); fill their row.
-- [ ] Prepare the observer forms (one per student, printed or digital).
-- [ ] Read the script aloud once, with the lead-ins ("The first question is: ...", "Thank you.
+- [x] Prepare the observer forms (one per student, printed or digital).
+- [x] Read the script aloud once, with the lead-ins ("The first question is: ...", "Thank you.
       The next question is: ...") and the cards, so the real vivas run smoothly.
 - [ ] Start the slides that need no results: the problem, why fillers alone are not enough,
       research question and hypotheses, method, limitations, PP2 plan.
@@ -98,7 +96,7 @@ You:
 - [x] Read the files in `research/c4-viva/study/` (30 minutes). Tell me anything to change.
 - [x] Check the 5 viva questions (`study/viva-script.md`) and the MCQ (`study/mcq.md`) yourself:
       are they at the right level for your batch? Done 9 Oct: new IT1010 script, MCQ aligned.
-- [ ] Ask 10 students (5 who find explaining in English hard, 5 who are comfortable). Message:
+- [x] Ask 10 students (5 who find explaining in English hard, 5 who are comfortable). Message:
       > Hi! I'm doing a 25-minute study for my final-year research: a short online form and a
       > 10-minute practice viva on programming in an online call, in English. It does not affect
       > your course marks and there is nothing to prepare. Could you help on Mon 12, Tue 13 or
@@ -115,7 +113,7 @@ You:
       email addresses". Built 9 to 10 Oct; new Section 1 text and tests still to do (catch-up 2).
 - [x] Ethics form drafted and turned into a PDF (`study/ethics-preliminary-form.md`); signing and
       upload still to do (catch-up 1).
-- [ ] Give each student a code (P01 to P12) privately; send them the form after ethics approval;
+- [x] Give each student a code (P01 to P12) privately; send them the form after ethics approval;
       ask them to finish within a day.
 - [x] Zoom desktop app: turn on the two settings in `study/zoom-setup.md`.
 - [x] Create the recordings folder and `participants.csv` (in `Research Data/`, see the catch-up list).
@@ -152,12 +150,12 @@ Claude:
 
 You:
 
-- [ ] From the form answers: average the 3 statements per student; 3.5 or more = difficulty,
+- [x] From the form answers: average the 3 statements per student; 3.5 or more = difficulty,
       2.5 or less = comfortable; MCQ 7/10 or more. Pick 5 + 5 (+ spares). Fill
       `participants.csv` (code, group, mcq_score, self_report).
-- [ ] Book the sessions: 3 or 4 a day, Tue 13 to Wed 14 (Thu 15 morning at the latest). Send each student the Zoom link and the
+- [x] Book the sessions: 3 or 4 a day, Tue 13 to Wed 14 (Thu 15 morning at the latest). Send each student the Zoom link and the
       "Tell each student" part of `study/zoom-setup.md`.
-- [ ] Confirm the observer's times; prepare one observer form per student.
+- [x] Confirm the observer's times; prepare one observer form per student.
 
 Claude:
 
@@ -168,18 +166,20 @@ Claude:
 
 For **each** session (about 25 minutes):
 
-- [ ] 10 minutes before: Zoom open, earphones on, script and observer form ready.
-- [ ] Student and observer join; both click **Original sound**.
-- [ ] Opening lines (not recorded), then **Record on this computer**, say "Participant P0X".
-- [ ] Warm-up (always, first, recorded), then the 5 questions; follow-ups by the rule; only "Take your time" while the student answers; never pause the recording.
-- [ ] "That is the end of the viva. Thank you." Stop recording; optional self-rating questions.
-- [ ] End the meeting; rename the two files to `P0X_student.m4a` and `P0X_examiner.m4a`; move them
-      to the recordings folder; back up to a USB drive.
-- [ ] Add the observer's overall answer and any notes to `participants.csv`.
+All 10 sessions done (13 to 16 Oct); P04 re-placed with the proper recording on 17 Oct.
+
+- [x] 10 minutes before: Zoom open, earphones on, script and observer form ready.
+- [x] Student and observer join; both click **Original sound**.
+- [x] Opening lines (not recorded), then **Record on this computer**, say "Participant P0X".
+- [x] Warm-up (always, first, recorded), then the 5 questions; follow-ups by the rule; only "Take your time" while the student answers; never pause the recording.
+- [x] "That is the end of the viva. Thank you." Stop recording; optional self-rating questions.
+- [x] End the meeting; rename the two files to `P0X_student.m4a` and `P0X_examiner.m4a`; move them
+      to the recordings folder. Back up to a USB drive: **still to confirm**.
+- [x] Add the observer's overall answer and any notes to `participants.csv`.
 
 Each evening:
 
-- [ ] Tell me "sessions done" (or "P01 done"); I run a quick check on the day's files: both
+- [x] Tell me "sessions done" (or "P01 done"); I run a quick check on the day's files: both
       tracks there, the right number of answers, no voice bleed. Colab waits until Thu 15.
 
 ## Thu 15 Oct
@@ -201,37 +201,56 @@ You:
 
 Claude:
 
-- [ ] Compare CrisperWhisper with Groq/local transcripts (filler counts) for your report.
+- [x] Compare CrisperWhisper with Groq/local transcripts (filler counts) for your report. Done 17
+      Oct on P01 to P10 except P04: local Whisper (with the filler prompt) found 20 fillers,
+      CrisperWhisper 303, so ordinary Whisper keeps about 7%. Groq not tested on study audio
+      (consent does not cover sending it to Groq).
+- [x] Counting check result (17 Oct, your pauses = Audacity labels minus 1): fillers within 1 of
+      your count for 9 of 10 students (rho 0.98), repairs 8 of 10 (rho 0.75), pauses 8 of 10
+      (rho 0.99). Tool counts more pauses for the two slowest speakers (P04, P05).
 
 ## Fri 16 Oct
 
 - [x] Claude runs `run_stats.py`: `results/report.md`, `summary.csv` and charts.
 - [ ] You and Claude read the report together. I explain every number in plain words. We
-      write down the pilot cut-offs to show next to the literature ones.
+      write down the pilot cut-offs to show next to the literature ones. Half done 17 Oct: the
+      pilot cut-offs are recorded (speech rate 2.53, articulation 3.59, run 5.73, pause 682.5 ms;
+      `fluency.PILOT_PROFILE`); pilot rule 10 of 10, literature rule 3 of 5 difficulty and 0 of
+      5 comfortable. The plain-words walk-through of `report.md` is still to do.
 
 ## Sat 17 and Sun 18 Oct
 
 You:
 
-- [ ] Slides (outline in section 18 of the plan): the problem; why fillers alone are not enough;
+- [ ] Mon 19 Oct: show the system to your supervisor and collect ideas (system work finished first).
+- [ ] Slides (on hold until after the supervisor meeting) (outline in section 18 of the plan): the problem; why fillers alone are not enough;
       research question and hypotheses; method; system demo; measures; literature vs pilot
       thresholds; results; limitations; PP2 plan.
 - [ ] Any PP1 progress-report text your batch requires (method and preliminary results).
 
 Claude:
 
+- [x] Pilot thresholds in the system (17 Oct): gap rules `c04-gap-1.5-pilot-profile`; the Speech
+      lab shows the pilot and literature verdicts side by side; 115 tests pass.
 - [ ] Draft slide text and speaker notes from the real results; check every number.
 - [ ] Charts for the slides from `results/charts/`.
-- [ ] If time allows: a Colab notebook that trains a small filler detector on PodcastFillers'
-      76,689 labelled 1-second clips (non-commercial research licence), plus code to run it on
-      your recordings. You press "Run all" and wait about 3 to 4 hours. Its filler counts are
-      compared with your counting check and CrisperWhisper. If these days get tight, it moves
-      to PP2.
+- [x] Filler detector moved to PP2 (decided 17 Oct): a Colab notebook that trains a small
+      filler detector on PodcastFillers' 76,689 labelled 1-second clips, adapted with the
+      CrisperWhisper filler times from your recordings, then added to the live viva. Show it to
+      your supervisor as the PP2 plan.
+
+## PP2 list (from 17 Oct)
+
+- [ ] Filler detector (above), so the live viva counts fillers; dataset search prompt given 17 Oct.
+- [ ] Test the pilot cut-offs on new students (Speech lab or the analysis tool).
+- [ ] Live syllable counts: Groq transcripts drop repeats and cut-off words (5 to 15% fewer
+      syllables than CrisperWhisper on the pilot data), so live speech rates read slightly slow.
 
 ## Mon 19 Oct
 
-- [ ] Full dry run of the presentation with a timer, including the live demo.
-- [ ] Record a backup video of the demo in case the internet fails on the day.
+- [ ] Supervisor meeting (system shown, ideas collected).
+- [ ] Full dry run (Tue 20): give the whole presentation once with a timer, including the live
+      system, to check the timing and catch problems.
 - [ ] Code freeze: commit and push (I give you the commands).
 
 ## Tue 20 Oct
@@ -242,12 +261,13 @@ Claude:
 
 ## Definition of done for PP1
 
-- [ ] Ethics form submitted; consent given by every participant
-- [ ] At least 5 + 5 recorded vivas with results
-- [ ] Counting check filled in
-- [ ] `report.md` with group differences, literature vs pilot thresholds, leave-one-out accuracy
-- [ ] System demo: viva prototype, plus the "Analyse a recording" page using the thresholds
-- [ ] Slides rehearsed; backup video recorded; code committed and pushed
+- [x] Ethics form submitted (done 11 Oct); consent given by every participant (form consent, confirmed 17 Oct)
+- [x] At least 5 + 5 recorded vivas with results
+- [x] Counting check filled in
+- [x] `report.md` with group differences, literature vs pilot thresholds, leave-one-out accuracy
+- [x] System demo: viva prototype, plus the "Analyse a recording" page using the thresholds
+- [ ] Slides rehearsed; code committed and pushed (7e70eb9 pushed 17 Oct;
+      the pilot-threshold change after it is not committed yet)
 
 ## If something goes wrong
 

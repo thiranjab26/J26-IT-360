@@ -425,3 +425,15 @@
 .viva-app .st-command-heard svg { flex: none; margin-top: 2px; }
 .viva-app .st-command-heard q { font-weight: 700; quotes: "\201C" "\201D"; }
 .viva-app .st-rail-actions .st-btn { white-space: nowrap; font-size: 13px; padding: 9px 8px; }
+.viva-app .st-concept-points, .st-concept-points { margin: 12px 0 4px; gap: 12px; }
+.st-sim { display: grid; gap: 6px; }
+.st-sim-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.viva-app .st-segment.st-segment-sm { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 1fr; margin-top: 0; }
+.viva-app .st-segment.st-segment-sm button { padding: 5px 10px; font-size: 12px; }
+.st-modal { position: fixed; inset: 0; margin: auto; height: fit-content; width: min(380px, calc(100vw - 32px)); padding: 24px; border: 0; border-radius: 16px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25); }
+.st-modal::backdrop { background: rgba(0, 0, 0, 0.55); }
+.st-modal h3 { margin: 0 0 8px; font-size: 18px; }
+.st-modal-actions { justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.st-modal-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--st-muted); cursor: pointer; }
+.st-modal-close:hover { background: var(--st-soft); }
+.st-modal h3 { padding-right: 28px; }

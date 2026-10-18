@@ -11,8 +11,8 @@ Source of truth for the current behaviour: the standalone demo at
 Versions to record on every session: policy `c04-policy-1.6-misheard-viva` (1.6 also accepts the ways
 speech-to-text mishears "viva"; 1.5 `c04-policy-1.5-commands`: spoken stop and skip commands
 count only when said on their own, 12 words or fewer; 1.4 `c04-policy-1.4-clarify` until 16 Oct 2026,
-1.3 `c04-policy-1.3-skip-stop` until 9 Oct 2026), gap rules `c04-gap-1.4-literature-profile`
-(1.3 `c04-gap-1.3-verbal-signal` until 9 Oct 2026).
+1.3 `c04-policy-1.3-skip-stop` until 9 Oct 2026), gap rules `c04-gap-1.6-probed-low-coverage`
+(1.5 `c04-gap-1.5-pilot-profile` until 18 Oct 2026, 1.4 `c04-gap-1.4-literature-profile` until 17 Oct 2026, 1.3 `c04-gap-1.3-verbal-signal` until 9 Oct 2026).
 
 ## 1. Research purpose
 
@@ -174,14 +174,16 @@ Measured only on spoken answers. Typed answers never get acoustic values.
 
 | Signal | Counts when |
 |---|---|
-| `fluency` | 2 or more of the 4 literature-profile measures are beyond their thresholds: speech rate below 1.97 syllables/s, articulation rate below 2.83 syllables/s, mean length of run below 3.43 syllables, mean silent pause above 687 ms. Only with 10 s of speech or more |
+| `fluency` | 2 or more of the 4 pilot-profile measures are beyond their thresholds: speech rate below 2.53 syllables/s, articulation rate below 3.59 syllables/s, mean length of run below 5.73 syllables, mean silent pause above 682.5 ms. Only with 10 s of speech or more |
 | `fillers` | At least 8 per 100 words (`um`, `uh`, `erm`, `er`, `hmm`, `mmm`, `ahh`, with elongations) |
 | `restarts` | At least 2 ("I mean", "sorry", "let me start again") |
 | `hedges` | At least 2 ("maybe", "perhaps", "I think", "I guess", "I'm not sure") |
 
 - Gap rules 1.4 (9 Oct 2026): `fluency` replaces the prototype `latency` (3,000 ms) and `pauses` (average 1,500 ms) signals of 1.3, so the system and the research use the same measures and thresholds.
 - Fluency measures come from `fluency.answer_profile`, the code the research tool uses: silent pauses of 250 ms or more (Silero VAD, threshold 0.5), syllables counted from the transcript's words with fillers left out. The transcriber returns them as `metrics.fluency`. Without word timings, or under 10 s of speech, the signal stays off.
-- The thresholds are `GAP_PROFILE` in `logic.py`, now the literature profile. After the pilot statistics (16 Oct), point it at the pilot profile; the report text follows automatically.
+- Gap rules 1.6 (18 Oct 2026): a concept is a likely knowledge gap when every answer stayed below 50% of the points after a follow-up and at least one was a real attempt (all "I don't know" stays mixed). Explanations are written in plain English, the study plan is the rules' own wording (no AI rewording or summary), and a whole viva where every topic ended complete after help reads "Reached with help".
+- Simulated AdaptLearn context (18 Oct 2026): until C1 and C2 are connected, the start page sets C2 load (low, moderate, high: the team load-signal states) and C1 mastery (below or above 50%). High load gives a shorter viva (at most 2 questions, 1 follow-up each); mastery below 50% asks "revise first?" before starting. Marking never changes; the lecturer report shows the values marked "simulated".
+- Gap rules 1.5 (17 Oct 2026): the thresholds (`GAP_PROFILE` in `logic.py`) are `fluency.PILOT_PROFILE`, the cut-offs that best sorted the 10 PP1 students (Youden J; syllables from CrisperWhisper transcripts). The literature profile (1.97, 2.83, 3.43, 687 ms) stays in `fluency.py` for comparison; the Speech lab shows both verdicts. The pilot cut-offs are fitted on those 10 students, so PP2 tests them on new ones. The live viva counts syllables from Groq transcripts, which drop repeats and cut-off words (5 to 15% fewer syllables than CrisperWhisper on the pilot data), so live speech rates read slightly slow.
 - The report's pause figures still come from a 400 ms VAD pass: `pause_count`, `total_pause_ms`, `average_pause_ms`, `long_pause_count` (pauses of 2,000 ms or more) and `audio_duration_ms`. Response latency is recorded and shown but is no longer a signal.
 - "like", "so", "well" and "you know" are counted separately as ambiguous markers, not fillers.
 - `high_hesitation`: 2 or more signals. `fluency` is the only timing signal, so 2 signals always include one heard in the words: timing alone never decides.

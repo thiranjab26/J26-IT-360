@@ -61,7 +61,11 @@ def test_lab_analyses_a_recording_from_the_sound(client, monkeypatch):
     assert data["syllable_source"] == "acoustic" and data["transcript_source"] == "none"
     assert data["session"]["silent_pauses"] == 2 and data["session"]["speaking_time_s"] == 14
     assert [p["ms"] for p in data["pauses"]] == [1000, 1000]
-    assert {r["measure"] for r in data["profile"]["rules"]} >= {"speech_rate_syll_s"}
+    pilot, literature = data["profiles"]
+    assert (pilot["name"], literature["name"]) == ("pilot-2026-10", "literature-2026-10")
+    assert {r["measure"] for r in pilot["rules"]} >= {"speech_rate_syll_s"}
+    for p in data["profiles"]:
+        assert p["flags"] == len(p["flagged_measures"]) and p["flagged"] in (True, False)
     assert any("from the sound" in n for n in data["notes"])
 
 

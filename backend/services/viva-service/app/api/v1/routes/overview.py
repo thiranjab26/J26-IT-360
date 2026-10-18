@@ -111,6 +111,7 @@ def overview(user: User = Depends(admin), db: Session = Depends(get_db)):
                 "STRONG",
                 "LIKELY_KNOWLEDGE_GAP",
                 "LIKELY_COMMUNICATION_DIFFICULTY",
+                "REACHED_WITH_HELP",
                 "MIXED_RESULTS",
                 "NOT_ENOUGH_EVIDENCE",
             )

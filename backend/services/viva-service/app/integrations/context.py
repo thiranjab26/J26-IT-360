@@ -147,7 +147,7 @@ class C01Context(BaseModel):
 
 
 class C02Context(BaseModel):
-    cognitive_load: Literal["low", "medium", "high"]
+    cognitive_load: Literal["low", "medium", "moderate", "high"]
     frustration: str
     engagement: str
     source: str

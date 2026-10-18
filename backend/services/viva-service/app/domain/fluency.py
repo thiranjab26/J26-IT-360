@@ -274,6 +274,20 @@ LITERATURE_PROFILE = {
     },
 }
 
+# Pilot profile: the cut-offs that best sorted the 10 PP1 students (5 who find English vivas
+# hard, 5 comfortable; Youden J in results/summary.csv, 17 Oct 2026), syllables from
+# CrisperWhisper transcripts. Fitted on those 10 students: PP2 tests it on new ones.
+PILOT_PROFILE = {
+    "name": "pilot-2026-10",
+    "min_flags": 2,
+    "rules": {
+        "speech_rate_syll_s": ("below", 2.53),
+        "articulation_rate_syll_s": ("below", 3.59),
+        "mean_length_of_run_syll": ("below", 5.73),
+        "mean_silent_pause_ms": ("above", 682.5),
+    },
+}
+
 
 def flags(measured, profile=LITERATURE_PROFILE):
     """Names of the profile's measures that are beyond their threshold."""

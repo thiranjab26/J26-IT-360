@@ -115,7 +115,7 @@ Roles: `student` takes vivas; `lecturer` does what the demo's admin and evaluato
 | `GET /evaluation/cases?condition=`, `POST /evaluation/ratings`, `GET /evaluation/metrics`, `GET /evaluation/export` | lecturer | Blinded A/B/C cases |
 | `GET /usage` | lecturer | Budget counters |
 | `GET /overview` | admin only (evaluators get 403, so they stay blinded) | Read-only dashboard totals: participants, sessions, answers (spoken or typed), coverage, bank status, ratings, outcomes, answer states, 14 days of activity, topics and the 8 newest sessions |
-| `POST /lab/analyse` | admin only | Multipart `audio` (the student's track), optional `examiner` (splits the track per question), `transcriber` = `auto`, `groq` or `none`. M4A, MP3, WAV, WebM, MP4, OGG or FLAC, max 20 MB and 30 min. Returns the fluency measures (session, per answer, 15 s windows), the literature profile, words, pauses and notes. Audio is analysed in memory and not stored. Shares `app/integrations/recording.py` with `scripts/analyze_recordings.py`; 503 when the `speech` extra is missing |
+| `POST /lab/analyse` | admin only | Multipart `audio` (the student's track), optional `examiner` (splits the track per question), `transcriber` = `auto`, `groq` or `none`. M4A, MP3, WAV, WebM, MP4, OGG or FLAC, max 20 MB and 30 min. Returns the fluency measures (session, per answer, 15 s windows), `profiles` (the pilot verdict used by the viva, then the literature verdict for comparison), words, pauses and notes. Audio is analysed in memory and not stored. Shares `app/integrations/recording.py` with `scripts/analyze_recordings.py`; 503 when the `speech` extra is missing |
 
 Request rate limiting is the gateway's job. viva-service keeps only the LLM and speech budgets.
 

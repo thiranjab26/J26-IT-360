@@ -255,6 +255,7 @@
 .viva-app .lab-verdict.is-flagged { border-color: #f6d9a8; background: linear-gradient(135deg, #fff, #fff7e9); }
 .viva-app .lab-verdict h2 { font-size: 22px; margin: 4px 0 6px; letter-spacing: -0.4px; }
 .viva-app .lab-verdict .eyebrow { margin-bottom: 0; }
+.viva-app .lab-verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
 .viva-app .lab-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .viva-app .lab-chips span { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid #e3e9f2; color: #5f7392; }
 .viva-app .lab-core { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }

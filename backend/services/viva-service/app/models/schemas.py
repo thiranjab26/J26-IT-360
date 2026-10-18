@@ -29,6 +29,10 @@ class SessionIn(StrictModel):
     topic_id: str = Field(max_length=64)
     input_mode: Literal["text", "speech"] = "text"
     max_depth: int = Field(default=2, ge=0, le=3)
+    # C1 and C2 are not connected yet: the start page can simulate their values (C2 uses the
+    # team load-signal contract's states).
+    simulated_load: Literal["low", "moderate", "high"] | None = None
+    simulated_mastery: Literal["below_50", "above_50"] | None = None
 
 
 class FluencyMetrics(StrictModel):

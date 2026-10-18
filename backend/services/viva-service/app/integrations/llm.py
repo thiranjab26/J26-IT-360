@@ -142,7 +142,7 @@ def positive_match(text, phrase):
 
 
 CLARIFY_REQUEST = re.compile(
-    r"\b(i )?(do not|don t|did not|didn t|can not|cannot|can t) (understand|get|follow|catch)\b"
+    r"\b(i )?(do not|don t|dont|did not|didn t|didnt|can not|cannot|can t|cant) (understand|get|follow|catch)\b"
     r"|\b(can|could|would) you (please )?(repeat|rephrase|explain|say)\b"
     r"|\bwhat do you mean\b|\bsay (that|it) again\b|\bpardon\b|\brepeat the question\b"
     r"|\bwhat does (that|this|it|the question) mean\b"
@@ -563,9 +563,8 @@ def assess(question, current_prompt, transcript, prior_turns, plans=None):
             )[: 4000 - len(result["reason"])]
         for hit in result["rubric_hits"]:
             hit["point"] = points[hit["id"]]
-            # Same rule as the demo assessor: earlier evidence counts unless the current answer
-            # contradicts it, and a point keeps the best level it reached.
-            if not misconceptions and previous.get(hit["id"], 0.0) > credit(hit):
+            # A point keeps the best level any answer reached.
+            if previous.get(hit["id"], 0.0) > credit(hit):
                 hit["level"] = "full" if previous[hit["id"]] == 1.0 else "partial"
                 hit["covered"] = hit["level"] == "full"
         result["coverage"] = round(
@@ -667,7 +666,7 @@ def generate(topic_id, count, context):
 
 # The deterministic policy picks the action and target; the model only words a question for that purpose.
 PURPOSES = {
-    "PROBE_MISSING_RUBRIC": "The answer is partly right. Build on something specific the student said and ask them to explain the missing idea described in target. Do not state, define or hint at the missing idea itself.",
+    "PROBE_MISSING_RUBRIC": "The answer is partly right. Ask them to explain the missing idea described in target, keeping the reviewed probe's meaning. Quote the student only if what they said is about that missing idea; otherwise ask the probe directly, with no quote. Do not state, define or hint at the missing idea itself.",
     "ASK_REASONING_OR_EXAMPLE": "The answer stayed at surface level. Quote or refer to what the student said and ask why it works that way, or ask them to describe in words a concrete example of it.",
     "PROBE_MISCONCEPTION": "The answer contains the belief described in target. Refer to the student's own claim, describe one small concrete case in words, and ask what their claim predicts would happen in that case. Do not say it is wrong and do not give the correct rule.",
     "ASK_SIMPLER_OR_PREREQUISITE": "The answer was incorrect. Ask one simpler, more basic question about the same concept that the student can reason about from first principles. Do not give the answer.",
@@ -772,17 +771,23 @@ def check_phrasing(text, bank, action, target, said, seen, latest=""):
     """Return why a drafted follow-up is unusable, or None."""
     if (
         latest
-        and action not in ("REPHRASE", "SIMPLIFY", "CLARIFY")
+        and action not in ("REPHRASE", "SIMPLIFY", "CLARIFY", "PROBE_MISSING_RUBRIC")
         and not clear_non_answer(latest)
         and not content_words(text) & content_words(latest)
     ):
         return "it does not refer to anything the student just said; quote a few of the student's own words"
-    if not text.endswith("?") or text.count("?") > 1:
+    if "\ufffd" in text:
+        return "it contains an unreadable character; write maths in plain characters such as *"
+    if not text.endswith("?") or (text.count("?") > 1 and action != "CLARIFY"):
         return "it must be exactly one question ending with a question mark"
     if len(text.split()) > 35:
         return "it is longer than 25 words"
-    if text.lower() in seen:
-        return "it repeats an earlier question"
+    words = content_words(text)
+    if text.lower() in seen or (
+        action not in ("REPHRASE", "SIMPLIFY", "CLARIFY")
+        and any(len(words & content_words(q)) >= 0.7 * len(words) > 0 for q in seen)
+    ):
+        return "it repeats an earlier question; ask about something different"
     if IMPOSSIBLE_TASK.search(text.lower()):
         return "it asks for something the student cannot do in a short spoken or typed answer; ask them to explain in words"
     leaks = leaked_terms(text, bank, target if action == "PROBE_MISSING_RUBRIC" else None, said)
@@ -839,77 +844,3 @@ def phrase_follow_up(bank, action, target, assessment, transcript, history, seen
             return text, _last_call.get() or cfg.assessment_provider
         note = f" Your previous draft was rejected because {problem}. Write a different question."
     raise ValueError(f"Phrased follow-up rejected: {problem}.")
-
-
-class Plan(BaseModel):
-    summary: str = Field(min_length=10, max_length=600)
-    study_steps: list[str] = Field(min_length=1, max_length=4)
-    speaking_steps: list[str] = Field(min_length=1, max_length=4)
-
-
-@bounded_operation
-def improvement_plan(report, data):
-    """Personalised wording of guidance for a fixed, already-decided outcome."""
-    cfg = settings()
-    concepts = [
-        {
-            "concept": c["concept"],
-            "outcome": c["outcome"],
-            "explanation": c["explanation"],
-            "initial_state": c["initial_state"],
-            "final_state": c["final_state"],
-            "rubric_coverage": c["rubric_coverage"],
-        }
-        for c in report["concepts"]
-    ]
-    misconceptions = sorted({m for t in data["turns"] for m in t["assessment"]["misconceptions"]})
-    h = report["hesitation"]
-    payload = {
-        "overall_outcome": report["outcome"],
-        "concepts": concepts,
-        "missing_points": report["missing_concepts"][:12],
-        "misconceptions": misconceptions[:8],
-        "strengths": report["strengths"][:12],
-        "hesitation": {
-            k: h.get(k)
-            for k in (
-                "available",
-                "response_latency_ms",
-                "pause_count",
-                "fillers_per_100_words",
-                "hedge_count",
-                "restart_count",
-            )
-        },
-        "review_resources": [r["title"] for r in report["review_resources"]],
-        # The rules already chose these steps from the evidence; the model only words them.
-        "study_items": report["study_plan"],
-        "speaking_items": report["speaking_plan"],
-    }
-    raw = call_llm(
-        cfg.assessment_provider,
-        "Personalise a plan for a student after a technical viva, in plain English for a second-language speaker. "
-        "Do not change or question the outcome. summary: two sentences on what went well and what to work on, based only on the payload. "
-        "study_steps: rewrite each study_items step in the same order, one for one, as a short personal instruction; keep its meaning, "
-        "name the same point or resource, and add no new advice. speaking_steps: do the same for speaking_items. "
-        "Each step is one sentence of at most 30 words. Never diagnose anxiety, confidence, accent or personality. Address the student as you.",
-        payload,
-        Plan.model_json_schema(),
-        max_tokens=1536,
-    )
-    plan = Plan.model_validate(raw)
-
-    def reword(items, steps):
-        # Same count and order, or the rules' own wording stays; the reasons never change.
-        steps = [" ".join(t.split()) for t in steps if t.strip()]
-        return (
-            [{**i, "step": t} for i, t in zip(items, steps, strict=True)]
-            if len(steps) == len(items)
-            else items
-        )
-
-    return {
-        "summary": " ".join(plan.summary.split()),
-        "study": reword(report["study_plan"], plan.study_steps),
-        "speaking": reword(report["speaking_plan"], plan.speaking_steps),
-    }, _last_call.get() or cfg.assessment_provider

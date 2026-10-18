@@ -116,18 +116,6 @@ def test_session_uses_llm_follow_up_and_plan_with_audit(client, monkeypatch):
         )
 
     monkeypatch.setattr(api_main, "phrase_follow_up", phrase)
-    monkeypatch.setattr(
-        api_main,
-        "improvement_plan",
-        lambda report, data: (
-            {
-                "summary": "Personal summary for you.",
-                "study": [{"step": "Step one.", "reason": "Why one."}],
-                "speaking": [{"step": "Step two.", "reason": "Why two."}],
-            },
-            "openai:test-model:json_schema",
-        ),
-    )
     headers = auth(client)
     session = start(client, headers, max_depth=1)
     response = answer(client, headers, session, "It is last in first out")
@@ -135,11 +123,9 @@ def test_session_uses_llm_follow_up_and_plan_with_audit(client, monkeypatch):
     assert question["question"].startswith('You said "It is last in first')
     assert asked == [("PROBE_MISSING_RUBRIC", "It is last in first out")]
     finished = client.post(f"/api/v1/viva/sessions/{session['id']}/finish", headers=headers).json()
-    assert finished["improvement_plan"] == ["Step one.", "Step two."] and finished[
-        "plan_provider"
-    ].startswith("openai")
-    assert finished["study_plan"][0] == {"step": "Step one.", "reason": "Why one."}
-    assert finished["speaking_plan"][0]["reason"] == "Why two."
+    # The plan is the rules' own wording, never reworded by the model.
+    assert finished["plan_provider"] == "rule_based" and "plan_summary" not in finished
+    assert finished["study_plan"][0]["step"] and finished["study_plan"][0]["reason"]
     exported = client.get(f"/api/v1/viva/sessions/{session['id']}/export", headers=headers).json()
     turn = exported["session"]["turns"][0]
     assert (
@@ -390,6 +376,41 @@ def test_timing_alone_never_gives_communication_for_complete_answer():
     }
     assert differentiate([turn], "C")[0] == "MIXED_INSUFFICIENT_EVIDENCE"
     rows = {r["signal"].split(" ")[0]: r for r in signal_details(turn)}
-    assert rows["Speech"]["counted"] and not rows["Fillers"]["counted"]
-    assert "4 of 4 beyond" in rows["Speech"]["value"]
-    assert "speech rate < 1.97 syll/s" in rows["Speech"]["threshold"]
+    assert rows["Speed"]["counted"] and not rows["Filler"]["counted"]
+    assert rows["Speed"]["value"].startswith("slower or more paused than typical on 4 of 4")
+    assert "2 of the 4 speed and pause measures" in rows["Speed"]["threshold"]
+
+
+def test_clarify_keeps_two_part_questions_and_repeats_are_rejected():
+    bank = seed_questions()[0]
+    two_parts = "When do you use a for loop? And when do you use a while loop?"
+    assert providers.check_phrasing(two_parts, bank, "CLARIFY", None, "", set(), "") is None
+    seen = {
+        'you said "a while loop always runs once." what happens if the condition is false at the start?'
+    }
+    again = 'You said "a while loop always runs once." If the condition is false at the start, what happens?'
+    problem = providers.check_phrasing(
+        again, bank, "PROBE_MISCONCEPTION", None, "while loop", seen, ""
+    )
+    assert problem and "repeats" in problem
+
+
+def test_dont_without_apostrophe_asks_for_clarification():
+    assert providers.clarification_request("I dont understand the question.")
+
+
+def test_simulated_high_load_and_low_mastery_shape_the_session(client):
+    # Other students cannot simulate: the values are ignored and the viva is normal.
+    other = start(
+        client, auth(client, code="P07"), simulated_load="high", simulated_mastery="below_50"
+    )
+    assert (
+        other["max_depth"] == 2 and "simulated" not in other["integration_context"]["c02"]["source"]
+    )
+    headers = auth(client, code="p00")
+    easy = start(client, headers, simulated_load="high", simulated_mastery="below_50")
+    assert easy["max_depth"] == 1 and easy["current_question"]["total_concepts"] <= 2
+    context = easy["integration_context"]
+    assert context["c02"]["cognitive_load"] == "high" and context["c01"]["mastery"] == 35
+    normal = start(client, headers, simulated_load="moderate", simulated_mastery="above_50")
+    assert normal["max_depth"] == 2 and normal["integration_context"]["c01"]["mastery"] == 80

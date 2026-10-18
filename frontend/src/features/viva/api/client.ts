@@ -95,6 +95,7 @@ export const resultLabels: Record<string, string> = {
   STRONG: "No gap identified",
   LIKELY_KNOWLEDGE_GAP: "Likely knowledge gap",
   LIKELY_COMMUNICATION_DIFFICULTY: "Likely communication difficulty",
+  REACHED_WITH_HELP: "Reached with help",
   MIXED_RESULTS: "Mixed results",
   NOT_ENOUGH_EVIDENCE: "Not enough evidence yet",
 };
@@ -102,7 +103,9 @@ export const resultLabels: Record<string, string> = {
 export function resultOf(r: { result?: string | null; strong?: boolean; strong_answers?: boolean; outcome?: string | null }) {
   return r.result || (r.strong || r.strong_answers ? "STRONG" : r.outcome === "MIXED_INSUFFICIENT_EVIDENCE" ? "MIXED_RESULTS" : r.outcome || "");
 }
-/** One concept's result: a mixed concept is always "not enough evidence". */
-export function conceptLabel(c: { outcome: string; no_weakness?: boolean }) {
-  return c.no_weakness ? "No gap identified" : c.outcome === "MIXED_INSUFFICIENT_EVIDENCE" ? "Not enough evidence" : gapLabels[c.outcome] || label(c.outcome);
+/** One concept's result: a mixed concept that ended complete was "reached with help". */
+export function conceptLabel(c: { outcome: string; no_weakness?: boolean; final_state?: string | null }) {
+  if (c.no_weakness) return "No gap identified";
+  if (c.outcome !== "MIXED_INSUFFICIENT_EVIDENCE") return gapLabels[c.outcome] || label(c.outcome);
+  return c.final_state === "complete" ? "Reached with help" : "Not enough evidence";
 }

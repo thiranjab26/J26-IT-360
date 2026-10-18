@@ -1,8 +1,9 @@
 """C4 speech lab: analyse an uploaded viva recording, mounted under /api/v1/viva.
 
 Admin only. Runs the same analysis as scripts/analyze_recordings.py on one recording and
-returns the measures with the literature thresholds, so the research and the system use
-one implementation. Audio is processed in memory and not stored.
+returns the measures with the verdicts of the pilot thresholds (the ones the viva uses) and the
+literature thresholds, so the research and the system use one implementation. Audio is
+processed in memory and not stored.
 """
 
 import json
@@ -14,7 +15,13 @@ from app.config import settings
 from app.core import limits
 from app.core.auth import admin
 from app.db.tables import User
-from app.domain.fluency import LITERATURE_PROFILE, SILENT_PAUSE_S, is_filler
+from app.domain.fluency import (
+    LITERATURE_PROFILE,
+    PILOT_PROFILE,
+    SILENT_PAUSE_S,
+    flags,
+    is_filler,
+)
 from app.integrations import recording
 from app.integrations.llm import ProviderUnavailable
 
@@ -62,6 +69,23 @@ def blank_syllable_measures(row):
         if key in row:
             row[key] = None
     return row
+
+
+def verdict(session, profile):
+    """One profile's verdict on the whole recording; flagged is None when nothing was measured."""
+    beyond = flags(session, profile)
+    measured = session.get("literature_flagged") is not None
+    return {
+        "name": profile["name"],
+        "min_flags": profile["min_flags"],
+        "flags": len(beyond),
+        "flagged": len(beyond) >= profile["min_flags"] if measured else None,
+        "flagged_measures": beyond,
+        "rules": [
+            {"measure": name, "direction": direction, "threshold": cut}
+            for name, (direction, cut) in profile["rules"].items()
+        ],
+    }
 
 
 @router.post("/lab/analyse")
@@ -169,14 +193,11 @@ async def analyse_recording(
         "session": result["session"],
         "answers": result["answers"],
         "windows": result["windows"],
-        "profile": {
-            "name": LITERATURE_PROFILE["name"],
-            "min_flags": LITERATURE_PROFILE["min_flags"],
-            "rules": [
-                {"measure": name, "direction": direction, "threshold": cut}
-                for name, (direction, cut) in LITERATURE_PROFILE["rules"].items()
-            ],
-        },
+        # The pilot profile first: it is the one the live viva uses.
+        "profiles": [
+            verdict(result["session"], PILOT_PROFILE),
+            verdict(result["session"], LITERATURE_PROFILE),
+        ],
         "words": [
             {
                 "start": round(w.start, 2),

@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, CheckCircle2, Download, Info, ListChecks, Mic, PartyPopper, Printer, Target } from "../components/icons";
+import { ArrowLeft, BookOpen, Download, Info, ListChecks, Mic, PartyPopper, Printer } from "../components/icons";
 import type { CSSProperties, ReactNode } from "react";
 import type { Context, PlanItem, Report } from "../api/types";
 import { api, conceptLabel, date, downloadJson, label, resultLabels, resultOf } from "../api/client";
@@ -15,6 +15,10 @@ const RESULT: Record<string, { tone: string; meaning: string }> = {
   LIKELY_COMMUNICATION_DIFFICULTY: {
     tone: "tone-communication",
     meaning: "You showed the knowledge once prompted, but found it harder to explain at first. Your speaking plan shows how to practise.",
+  },
+  REACHED_WITH_HELP: {
+    tone: "tone-mixed",
+    meaning: "You reached the expected points, but only after follow-up questions. Practise giving the full answer the first time.",
   },
   MIXED_RESULTS: { tone: "tone-mixed", meaning: "Some topics came through well and some need more work. See each topic below." },
   NOT_ENOUGH_EVIDENCE: {
@@ -34,6 +38,7 @@ const COLOR: Record<string, string> = {
   "No gap identified": "var(--st-green)",
   "Likely knowledge gap": "var(--st-rose)",
   "Likely communication difficulty": "var(--st-amber)",
+  "Reached with help": "var(--st-indigo, #4f7be0)",
 };
 
 /** A numbered plan: each step, and under it the evidence it was chosen from. */
@@ -154,7 +159,11 @@ export default function ReportView({
             {report.topic} · {date(report.created_at)}
           </div>
           <h1>{resultLabels[result] ?? label(report.outcome)}</h1>
-          <p className="st-muted">{shown.meaning}</p>
+          <p className="st-muted">
+            {result === "MIXED_RESULTS"
+              ? report.concepts.map((c) => `${c.concept}: ${conceptLabel(c).toLowerCase()}.`).join(" ")
+              : shown.meaning}
+          </p>
           <div className="st-facts">
             <span>
               {report.concepts.length} {report.concepts.length === 1 ? "question" : "questions"}
@@ -181,13 +190,6 @@ export default function ReportView({
         </div>
       </section>
 
-      {report.plan_summary && (
-        <p className="st-card st-summary">
-          <Target size={18} />
-          <span>{report.plan_summary}</span>
-        </p>
-      )}
-
       <div className="st-grid-2 st-plans">
         <Section icon={<BookOpen size={18} />} title="Study plan" sub="What to learn or revise">
           <Plan items={study} />
@@ -205,31 +207,6 @@ export default function ReportView({
             <Plan items={speaking} />
           </Section>
         )}
-      </div>
-
-      <div className="st-grid-2">
-        <Section icon={<CheckCircle2 size={18} />} title="What came through" sub="Points your answers covered">
-          {report.strengths.length ? (
-            <ul className="st-points good">
-              {report.strengths.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="st-muted st-small">Not enough evidence yet to name a clear strength.</p>
-          )}
-        </Section>
-        <Section icon={<ListChecks size={18} />} title="Worth revisiting" sub="Points that were missing">
-          {report.missing_concepts.length ? (
-            <ul className="st-points warn">
-              {report.missing_concepts.map((s, i) => (
-                <li key={i}>{s}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="st-muted st-small">Nothing missing in the answers collected.</p>
-          )}
-        </Section>
       </div>
 
       <Section icon={<ListChecks size={18} />} title="Topic by topic" sub="The result for each question, and how your answer changed after follow-ups">
@@ -265,18 +242,42 @@ export default function ReportView({
                     {c.turn_count} {c.turn_count === 1 ? "answer" : "answers"}
                   </span>
                 </div>
+                {(c.covered?.length || c.missing?.length) ? (
+                  <div className="st-grid-2 st-concept-points">
+                    {c.covered && c.covered.length > 0 && (
+                      <div>
+                        <div className="st-label">You covered</div>
+                        <ul className="st-points good">
+                          {c.covered.map((p, j) => (
+                            <li key={j}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {c.missing && c.missing.length > 0 && (
+                      <div>
+                        <div className="st-label">Missing</div>
+                        <ul className="st-points warn">
+                          {c.missing.map((p, j) => (
+                            <li key={j}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
                 <details>
                   <summary className="st-small">Why this result</summary>
                   <p className="st-small" style={{ marginTop: 8 }}>
                     {c.explanation}
                   </p>
-                  {c.signal_details && c.signal_details.length > 0 ? (
+                  {staff && c.signal_details && c.signal_details.length > 0 && (
                     <div style={{ overflowX: "auto", marginTop: 8 }}>
                       <table className="st-signals">
                         <thead>
                           <tr>
-                            <th>Hesitation signal (first answer)</th>
-                            <th>Your value</th>
+                            <th>Speech sign (first answer)</th>
+                            <th>Value</th>
                             <th>Counts when</th>
                             <th>Counted</th>
                           </tr>
@@ -293,14 +294,10 @@ export default function ReportView({
                         </tbody>
                       </table>
                       <p className="st-small st-muted" style={{ marginTop: 6 }}>
-                        A complete answer only counts as a communication difficulty with 2 or more signals, at least one of them fillers, restarts
-                        or hedges. Timing alone never decides it.
+                        Speech signs only matter when the knowledge was shown. A communication difficulty needs 2 signs, one of them heard in
+                        the words (fillers, restarts or hedges): slow speech alone never decides it.
                       </p>
                     </div>
-                  ) : (
-                    <p className="st-small st-muted" style={{ marginTop: 6 }}>
-                      Typed first answer: no hesitation signals were measured.
-                    </p>
                   )}
                 </details>
               </article>

@@ -15,6 +15,7 @@ import {
   Snail,
   Square,
   Volume2,
+  X,
 } from "../components/icons";
 import { api, ApiError, label } from "../api/client";
 import type { AudioMetrics, Auth, Report, Session, Topic } from "../api/types";
@@ -87,11 +88,29 @@ export default function Workspace({
   const [topicId, setTopicId] = useState(() => groupTopics(topics, "")[0]?.[1][0]?.id || ""),
     [mode, setMode] = useState<"text" | "speech">("speech"),
     [query, setQuery] = useState(""),
-    [loading, setLoading] = useState(false);
+    [loading, setLoading] = useState(false),
+    // C1 mastery and C2 load are simulated here until those components are connected.
+    [load, setLoad] = useState<"low" | "moderate" | "high">("moderate"),
+    [mastery, setMastery] = useState<"below_50" | "above_50">("above_50"),
+    [askRevise, setAskRevise] = useState(false);
+  // Only the practice code P00 sees the simulation (the server checks it too).
+  const practice = auth.user.participant_code.toUpperCase().replace(/O/g, "0") === "P00";
+  // The native dialog dims the page behind it, traps focus and closes on Escape.
+  const reviseRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = reviseRef.current;
+    if (askRevise && d && !d.open) d.showModal();
+    if (!askRevise && d?.open) d.close();
+  }, [askRevise]);
   useEffect(() => {
     if (!topicId && topics.length) setTopicId(groupTopics(topics, "")[0]![1][0]!.id);
   }, [topics, topicId]);
-  async function start() {
+  async function start(confirmed = false) {
+    if (practice && mastery === "below_50" && !confirmed) {
+      setAskRevise(true);
+      return;
+    }
+    setAskRevise(false);
     setLoading(true);
     try {
       setSession(
@@ -99,6 +118,7 @@ export default function Workspace({
           topic_id: topicId,
           input_mode: mode,
           max_depth: 2,
+          ...(practice && { simulated_load: load, simulated_mastery: mastery }),
         }),
       );
     } catch (e) {
@@ -205,6 +225,38 @@ export default function Workspace({
             {mode === "speech" ? "Recommended. Each question is read aloud and you answer with your microphone." : "For when you cannot use a microphone."}
           </p>
         </div>
+        {practice && (
+        <div className="st-sim">
+          <div className="st-label">AdaptLearn context · simulated</div>
+          <div className="st-sim-row">
+            <span className="st-small">Cognitive load (C2)</span>
+            <div className="st-segment st-segment-sm" role="group" aria-label="Simulated cognitive load">
+              {(["low", "moderate", "high"] as const).map((v) => (
+                <button key={v} type="button" aria-pressed={load === v} onClick={() => setLoad(v)}>
+                  {v[0]!.toUpperCase() + v.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="st-sim-row">
+            <span className="st-small">Topic mastery (C1)</span>
+            <div className="st-segment st-segment-sm" role="group" aria-label="Simulated topic mastery">
+              <button type="button" aria-pressed={mastery === "below_50"} onClick={() => setMastery("below_50")}>
+                Below 50%
+              </button>
+              <button type="button" aria-pressed={mastery === "above_50"} onClick={() => setMastery("above_50")}>
+                50% or above
+              </button>
+            </div>
+          </div>
+          <p className="st-muted st-small">
+            {load === "high"
+              ? "High load: a shorter, easier viva with at most 2 questions and 1 follow-up each. Take your time."
+              : "Normal viva."}{" "}
+            C1 and C2 are not connected yet, so these values are chosen here.
+          </p>
+        </div>
+        )}
         <div>
           <div className="st-label">Before you start</div>
           <ul className="st-checklist">
@@ -224,7 +276,24 @@ export default function Workspace({
             </li>
           </ul>
         </div>
-        <button className="st-btn st-btn-primary st-block" onClick={start} disabled={loading || !topicId}>
+        {practice && (
+          <dialog ref={reviseRef} className="st-modal" aria-labelledby="revise-title" onClose={() => setAskRevise(false)}>
+            <button type="button" className="st-modal-close" aria-label="Close" onClick={() => setAskRevise(false)}>
+              <X size={18} />
+            </button>
+            <h3 id="revise-title">Your mastery for this topic is below 50%</h3>
+            <p className="st-small st-muted">Revising the topic first may help. You can still start the viva now.</p>
+            <div className="st-row st-modal-actions">
+              <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => setAskRevise(false)}>
+                Revise first
+              </button>
+              <button type="button" className="st-btn st-btn-primary st-btn-sm" onClick={() => start(true)}>
+                Start anyway
+              </button>
+            </div>
+          </dialog>
+        )}
+        <button className="st-btn st-btn-primary st-block" onClick={() => start()} disabled={loading || !topicId}>
           {loading ? (
             <Busy text="Starting…" />
           ) : (

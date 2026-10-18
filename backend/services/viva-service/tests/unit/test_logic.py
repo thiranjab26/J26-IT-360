@@ -82,7 +82,7 @@ def test_repeat_prompt_bounded_and_issued_ids_unique():
     assert action == "REPEATED_PROMPT_NEXT_CONCEPT"
 
 
-# Slow, pause-heavy speech: all four literature-profile measures beyond their thresholds.
+# Slow, pause-heavy speech: all four pilot-profile measures beyond their thresholds.
 SLOW = {
     "speaking_time_s": 20.0,
     "speech_rate_syll_s": 1.5,
@@ -94,9 +94,9 @@ SLOW = {
 }
 FLUENT = {
     "speaking_time_s": 20.0,
-    "speech_rate_syll_s": 2.6,
-    "articulation_rate_syll_s": 3.4,
-    "mean_length_of_run_syll": 6.0,
+    "speech_rate_syll_s": 2.9,
+    "articulation_rate_syll_s": 3.9,
+    "mean_length_of_run_syll": 6.5,
     "mean_silent_pause_ms": 450,
     "silent_pauses": 4,
     "syllables": 52,
@@ -153,10 +153,14 @@ def test_complete_initial_answer_explains_absence_of_weakness():
     assert "No weakness" in reason
 
 
-def test_fluency_signal_uses_the_literature_profile():
-    from app.domain.logic import GAP_VERSION, hesitation_signals
+def test_fluency_signal_uses_the_pilot_profile():
+    from app.domain.logic import GAP_PROFILE, GAP_VERSION, hesitation_signals
 
-    assert GAP_VERSION == "c04-gap-1.4-literature-profile"
+    assert GAP_VERSION == "c04-gap-1.6-probed-low-coverage"
+    assert GAP_PROFILE["name"] == "pilot-2026-10"
+    # Fluent by the literature (2.2 is above its 1.97) but slow by the pilot (below 2.53).
+    between = dict(FLUENT, speech_rate_syll_s=2.2, articulation_rate_syll_s=3.3)
+    assert hesitation_signals(evidence("partial", 50, fluency=between)) == ["fluency", "fillers"]
     assert hesitation_signals(evidence("partial", 50)) == ["fluency", "fillers"]
     assert hesitation_signals(evidence("partial", 50, fluency=FLUENT)) == ["fillers"]
     # One measure beyond its threshold is not enough: the profile needs two of four.
@@ -214,7 +218,7 @@ def test_plans_come_from_the_evidence_and_say_why():
             "final_state": "complete",
             "signal_details": [
                 {
-                    "signal": "Hedges (maybe, I think, I guess)",
+                    "signal": "Hedges (maybe, I think)",
                     "value": "3",
                     "threshold": "2 or more",
                     "counted": True,
@@ -230,15 +234,13 @@ def test_plans_come_from_the_evidence_and_say_why():
         }
     }
     study = study_plan(concepts, needs, [{"title": "IT1010 Control flow notes"}])
-    assert (
-        study[0]["step"] == "Revise Loops. Make sure you can explain: An infinite loop never stops."
-    )
-    assert "25%" in study[0]["reason"] and "1 more point" in study[0]["reason"]
+    assert study[0]["step"].startswith("Loops: revise the 2 points listed as missing")
+    assert "25%" in study[0]["reason"]
     assert "IT1010 Control flow notes" in study[1]["step"]
     skipped = study_plan(
         concepts[:1], {"Loops": {"missing": [], "misconceptions": [], "skipped": True}}, []
     )
-    assert skipped[0]["reason"] == "You skipped the Loops question, so it was not marked."
+    assert skipped[0]["reason"] == "You skipped this question."
     assert (
         study_plan(concepts[1:], {}, [])[0]["reason"]
         == "You covered every expected point in the question."
@@ -248,7 +250,7 @@ def test_plans_come_from_the_evidence_and_say_why():
     )
     reasons = " ".join(i["reason"] for i in spoken)
     assert "about 9 filler words per 100 words" in reasons and "8 or more" in reasons
-    assert "hedges 3 (the viva counts 2 or more)" in reasons and "5.2 seconds" in reasons
+    assert '"I think" 3 times' in reasons and "5.2 seconds" in reasons
     assert (
         len(spoken) == 4
     )  # fillers, hedges, the slow start, then the follow-up help (capped at 4)
@@ -262,3 +264,14 @@ def test_plans_come_from_the_evidence_and_say_why():
     assert (
         resource_title("C3 IT1010 Programming basics notes.md") == "IT1010 Programming basics notes"
     )
+
+
+def test_low_answers_after_a_follow_up_are_a_knowledge_gap():
+    from app.domain.logic import result_label
+
+    # Gap rules 1.6: too brief, then "I don't know" twice is a knowledge gap, not mixed.
+    probed = [evidence("superficial", 17), evidence("non_answer", 0), evidence("non_answer", 0)]
+    assert differentiate(probed, "B")[0] == KNOWLEDGE
+    assert differentiate([evidence("non_answer", 0)] * 3, "B")[0] == MIXED
+    helped = {"outcome": MIXED, "concepts": [{"outcome": MIXED, "final_state": "complete"}]}
+    assert result_label(helped) == "REACHED_WITH_HELP"

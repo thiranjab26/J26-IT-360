@@ -9,9 +9,11 @@ from app.domain import fluency
 # 1.5: stop and skip are spoken commands only when said on their own (12 words or fewer).
 # 1.6: the stop command also accepts the ways speech-to-text mishears "viva" (diva, river, ...).
 POLICY_VERSION = "c04-policy-1.6-misheard-viva"
-GAP_VERSION = "c04-gap-1.4-literature-profile"
-# The research's fluency thresholds; switch to the pilot profile after the 16 Oct statistics.
-GAP_PROFILE = fluency.LITERATURE_PROFILE
+# 1.5: the fluency thresholds are the pilot profile (from the 10 PP1 students), not the literature.
+# 1.6: answers that stay below half the points after a follow-up are a knowledge gap, even when
+# the later answers are "I don't know".
+GAP_VERSION = "c04-gap-1.6-probed-low-coverage"
+GAP_PROFILE = fluency.PILOT_PROFILE
 MIXED = "MIXED_INSUFFICIENT_EVIDENCE"
 KNOWLEDGE = "LIKELY_KNOWLEDGE_GAP"
 COMMUNICATION = "LIKELY_COMMUNICATION_DIFFICULTY"
@@ -129,7 +131,7 @@ def next_question(data, current, assessment, action):
         prompt = (
             f"Let me ask that another way. {target['probe']}"
             if target and target.get("probe")
-            else bank["follow_ups"]["non_answer"]
+            else f"Let me ask that again. {current['question']}"
         )
         issued = issue_question(data, index, current["depth"], prompt, action)
         issued["_target_rubric_id"] = current.get("_target_rubric_id")
@@ -185,7 +187,7 @@ def fluency_flags(h):
 
 
 HESITATION_SIGNALS = {
-    # Speed and pausing, judged by the published thresholds the research uses (gap rules 1.4).
+    # Speed and pausing, judged by the pilot thresholds (gap rules 1.5; 1.4 used the literature).
     # It replaces the prototype delay and pause thresholds of 1.3, which had no research basis.
     "fluency": lambda h: len(fluency_flags(h) or []) >= GAP_PROFILE["min_flags"],
     # Prototype thresholds for the words; calibrate on pilot data before the main study.
@@ -222,19 +224,17 @@ MEASURES = {  # report wording for the profile measures: label, unit, number for
     "mean_silent_pause_ms": ("mean pause", "ms", ".0f"),
 }
 FLUENCY_THRESHOLD = (
-    f"{GAP_PROFILE['min_flags']} or more of: "
-    + ", ".join(
-        f"{MEASURES[m][0]} {'<' if d == 'below' else '>'} {cut:g} {MEASURES[m][1]}"
-        for m, (d, cut) in GAP_PROFILE["rules"].items()
-    )
-    + f"; needs {fluency.MIN_PROFILE_SPEECH_S:g} s of speech"
+    f"Slower or more paused than typical on {GAP_PROFILE['min_flags']} of the "
+    f"{len(GAP_PROFILE['rules'])} speed and pause measures (needs "
+    f"{fluency.MIN_PROFILE_SPEECH_S:g} s of speech)"
 )
 SIGNAL_INFO = [  # report labels and thresholds, kept beside the tests they describe
-    ("fluency", "Speech fluency (literature profile)", FLUENCY_THRESHOLD),
-    ("fillers", "Fillers (um, uh, erm, hmm)", "8 or more per 100 words"),
-    ("restarts", "Restarts (I mean, sorry, let me start again)", "2 or more"),
-    ("hedges", "Hedges (maybe, I think, I guess)", "2 or more"),
+    ("fluency", "Speed and pauses", FLUENCY_THRESHOLD),
+    ("fillers", "Filler words (um, uh)", "8 or more per 100 words"),
+    ("restarts", "Restarts (I mean, sorry)", "2 or more"),
+    ("hedges", "Hedges (maybe, I think)", "2 or more"),
 ]
+SIGNAL_NAMES = {key: label for key, label, _ in SIGNAL_INFO}
 
 
 def fluency_value(h):
@@ -243,13 +243,13 @@ def fluency_value(h):
         return "not measured"
     beyond = fluency_flags(h)
     if beyond is None:
-        return f"not enough speech ({f.get('speaking_time_s') or 0:.0f} s)"
-    parts = [
-        f"{label} {f[m]:{fmt}} {unit}"
-        for m, (label, unit, fmt) in MEASURES.items()
-        if m in GAP_PROFILE["rules"] and f.get(m) is not None
-    ]
-    return ", ".join(parts) + f" ({len(beyond)} of {len(GAP_PROFILE['rules'])} beyond)"
+        return f"too short to measure ({f.get('speaking_time_s') or 0:.0f} s of speech)"
+    if not beyond:
+        return "typical"
+    return (
+        f"slower or more paused than typical on {len(beyond)} of {len(GAP_PROFILE['rules'])}: "
+        + ", ".join(MEASURES[m][0] for m in beyond)
+    )
 
 
 def signal_details(turn):
@@ -275,9 +275,9 @@ def differentiate(turns, condition="C"):
     evidence = answered[:1] if condition == "A" else answered
     if not evidence:
         return MIXED, (
-            "The student skipped this concept; no answer evidence was recorded."
+            "This question was skipped, so it was not marked."
             if turns
-            else "No answer evidence was recorded for this concept."
+            else "This question was not reached."
         )
     first, last = evidence[0]["assessment"], evidence[-1]["assessment"]
     shown = (
@@ -292,30 +292,30 @@ def differentiate(turns, condition="C"):
         and audible_hesitation(evidence[0])
     ):
         return COMMUNICATION, (
-            "The answer covered the rubric without teaching prompts, but the spoken delivery showed several hesitation signals ("
-            + ", ".join(hesitation_signals(evidence[0]))
-            + "); knowledge appears present while expressing it was difficult."
+            "The answer covered the expected points, but the speech showed signs of difficulty ("
+            + ", ".join(SIGNAL_NAMES[s].lower() for s in hesitation_signals(evidence[0]))
+            + "): the knowledge is there; explaining it was the hard part."
         )
     if first["state"] == "complete":
         return (
             MIXED,
-            "The initial answer covers the assessed rubric. No weakness requiring knowledge-gap or communication attribution was observed.",
+            "The first answer covered the expected points. No weakness was found.",
         )
     if condition == "A":
         # Content-only baseline: judge the first answer alone.
         if first["state"] in ("incorrect", "misconception_bearing", "non_answer"):
             return (
                 KNOWLEDGE,
-                "The initial answer was incorrect, held a misconception, or gave no answer (initial answer content only).",
+                "The first answer was incorrect, held a misunderstanding, or gave no answer (first answer only).",
             )
         return (
             MIXED,
-            "The initial answer was partly correct; answer content alone cannot attribute the weakness.",
+            "The first answer was partly correct; the first answer alone cannot say why.",
         )
     if len(evidence) == 1:
         return (
             MIXED,
-            "Only one answer was recorded for this concept; no follow-up evidence is available.",
+            "Only one answer was given, so there is not enough to judge.",
         )
     substantive = [t for t in evidence if t["assessment"]["state"] != "non_answer"]
     misconceptions = [set(t["assessment"]["misconceptions"]) for t in substantive]
@@ -326,19 +326,22 @@ def differentiate(turns, condition="C"):
         in ("incorrect", "misconception_bearing", "partial", "superficial")
         for t in substantive[-2:]
     )
+    # 1.6: still below half the points after a follow-up, with at least one real attempt;
+    # answers that are all "I don't know" stay mixed.
+    probed_low = bool(substantive) and all(t["assessment"]["coverage"] < 50 for t in evidence)
     if persistent:
-        return KNOWLEDGE, "A misconception persisted across substantive responses."
-    if low_repeated:
+        return KNOWLEDGE, "The same misunderstanding came back after the follow-up question."
+    if low_repeated or probed_low:
         return (
             KNOWLEDGE,
-            "Rubric coverage remained below 50% across two substantive responses after probing.",
+            "The answers stayed below half of the expected points, even after follow-up questions.",
         )
     recovered = last["state"] == "complete" and last["coverage"] >= 80
     scaffolded = any(t.get("scaffolded", False) for t in evidence[1:])
     if recovered and scaffolded:
         return (
             MIXED,
-            "The answer improved after simplification or potentially teaching prompts; this cannot establish pre-existing knowledge.",
+            "The full answer came only after the question was made simpler, so it cannot show the knowledge was there before.",
         )
     if recovered:
         repeated_recovery = len(evidence) >= 3 and all(
@@ -349,20 +352,20 @@ def differentiate(turns, condition="C"):
         if repeated_recovery:
             return (
                 COMMUNICATION,
-                "After a weak initial answer, two non-teaching follow-up responses showed substantial then complete rubric knowledge.",
+                "The first answer was weak, but two follow-up questions that taught nothing brought out the full answer: the knowledge is there; explaining it was the hard part.",
             )
         if condition == "C" and high_hesitation(evidence[0]):
             return (
                 COMMUNICATION,
-                "A weak initial spoken answer became complete after one non-teaching follow-up, and supplementary hesitation evidence supports difficulty expressing the answer.",
+                "The first spoken answer was weak but became complete after one follow-up, and the speech showed signs of difficulty.",
             )
         return (
             MIXED,
-            "One non-teaching follow-up revealed the knowledge, but this evidence condition does not establish a communication-specific difficulty.",
+            "A follow-up question brought out the full answer, but that alone does not show a communication difficulty.",
         )
     return (
         MIXED,
-        "Evidence is incomplete, conflicting, or insufficient to attribute the difficulty reliably.",
+        "The answers were mixed, so the viva cannot say whether the problem was knowledge or explaining.",
     )
 
 
@@ -429,7 +432,11 @@ def result_label(report):
         return "STRONG"
     if report["outcome"] != MIXED:
         return report["outcome"]
-    clear = any(c["outcome"] != MIXED or c.get("no_weakness") for c in report.get("concepts", []))
+    concepts = report.get("concepts", [])
+    # Every point reached, but only after follow-ups: not "not enough evidence".
+    if concepts and all(c.get("final_state") == "complete" for c in concepts):
+        return "REACHED_WITH_HELP"
+    clear = any(c["outcome"] != MIXED or c.get("no_weakness") for c in concepts)
     return "MIXED_RESULTS" if clear else "NOT_ENOUGH_EVIDENCE"
 
 
@@ -465,38 +472,33 @@ def study_plan(concepts, needs, resources):
         if info["skipped"]:
             items.append(
                 plan_item(
-                    f"Learn {name} from the start, then explain it in your own words.",
-                    f"You skipped the {name} question, so it was not marked.",
+                    f"{name}: learn it from the start, then explain it in your own words.",
+                    "You skipped this question.",
                 )
             )
             continue
         if info["misconceptions"]:
             items.append(
                 plan_item(
-                    f"Fix this idea about {name}: {info['misconceptions'][0].rstrip('.')}.",
-                    f"Your answer to the {name} question showed this misunderstanding.",
+                    f"{name}: correct this idea: {info['misconceptions'][0].rstrip('.')}.",
+                    "Your answer showed this misunderstanding.",
                 )
             )
         if info["missing"]:
-            more = len(info["missing"]) - 1
+            n = len(info["missing"])
             items.append(
                 plan_item(
-                    f"Revise {name}. Make sure you can explain: {info['missing'][0].rstrip('.')}.",
-                    f"Your answers to the {name} question covered {round(c['rubric_coverage'])}% of the expected "
-                    f"points, and this point was missing"
-                    + (
-                        f" ({more} more {'point' if more == 1 else 'points'} also missing)."
-                        if more
-                        else "."
-                    ),
+                    f"{name}: revise the {'point' if n == 1 else f'{n} points'} listed as missing "
+                    "under this topic, then explain them out loud in your own words.",
+                    f"Your answers covered {round(c['rubric_coverage'])}% of the expected points.",
                 )
             )
     items = items[:3]
     if items and resources:
         items.append(
             plan_item(
-                f"Read {resources[0]['title']}, then close it and explain these points from memory.",
-                "The viva questions were written from this course material.",
+                f"Read {resources[0]['title']}, then explain the missing points from memory.",
+                "The questions came from this material.",
             )
         )
     if not items:
@@ -510,6 +512,12 @@ def study_plan(concepts, needs, resources):
     return items
 
 
+SPEAKING_REASONS = {  # why each speaking step was chosen, in words a student follows
+    "fluency": "In your first answer about {concept}, you spoke more slowly and paused for longer "
+    "than students who find English vivas easy.",
+    "hedges": 'In your first answer about {concept}, you said words like "maybe" or "I think" {n} times.',
+    "restarts": 'In your first answer about {concept}, you started again {n} times ("I mean", "sorry").',
+}
 SPEAKING_STEPS = {
     "restarts": "Plan your first sentence before you speak, so you do not need to start again.",
     "hedges": 'When you know the answer, say it directly, without "maybe" or "I think".',
@@ -546,8 +554,7 @@ def speaking_plan(concepts, hesitation):
                 items.append(
                     plan_item(
                         SPEAKING_STEPS[key],
-                        f"In your first answer to the {c['concept']} question: {signal['signal'].split(' (')[0].lower()} "
-                        f"{signal['value']} (the viva counts {signal['threshold']}).",
+                        SPEAKING_REASONS[key].format(concept=c["concept"], n=signal["value"]),
                     )
                 )
     latency = hesitation.get("response_latency_ms") or 0
@@ -606,6 +613,10 @@ def build_report(session_id, data):
                         "final_state": last["state"] if last else None,
                         "rubric_coverage": last["coverage"] if last else 0,
                         "turn_count": len(turns),
+                        "covered": [h["point"] for h in last["rubric_hits"] if h["covered"]]
+                        if last
+                        else [],
+                        "missing": list(last["missing_points"]) if last else [],
                     }
                 )
                 if last:
