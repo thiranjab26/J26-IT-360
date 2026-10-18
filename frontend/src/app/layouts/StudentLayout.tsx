@@ -12,7 +12,8 @@ import { cx } from '@/shared/components/ui';
  * disabled tabs rather than links to nowhere.
  */
 export function StudentLayout() {
-  const { signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const lecturer = user?.role === 'lecturer';
   const navigate = useNavigate();
   const { data: modules } = useModules();
 
@@ -41,8 +42,14 @@ export function StudentLayout() {
             <nav aria-label="Sections" className="hidden items-center gap-[4px] sm:flex">
               {current && <Tab to={`/modules/${current.module_id}`}>Quest Map</Tab>}
               <Tab to="/dashboard">Modules</Tab>
-              <Tab to="/profile">Profile</Tab>
-              <Tab to="/practicals">Practicals</Tab>
+              {lecturer ? (
+                <Tab to="/studio">Practical studio</Tab>
+              ) : (
+                <>
+                  <Tab to="/profile">Profile</Tab>
+                  <Tab to="/practicals">Practicals</Tab>
+                </>
+              )}
               <DisabledTab>Course material</DisabledTab>
             </nav>
           </div>

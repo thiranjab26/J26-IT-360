@@ -6,6 +6,7 @@ import { PracticalsPage } from './pages/PracticalsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { QuestMapPage } from './pages/QuestMapPage';
 import { SessionPage } from './pages/SessionPage';
+import { StudioPage } from './pages/StudioPage';
 
 /** Mounted by app/router.tsx inside the authenticated student layout. */
 export const tutorRoutes: RouteObject[] = [
@@ -15,4 +16,5 @@ export const tutorRoutes: RouteObject[] = [
   { path: 'practicals', element: <PracticalsPage /> },
   { path: 'practicals/:practicalId', element: <PracticalPage /> },
   { path: 'profile', element: <ProfilePage /> },
+  { path: 'studio', element: <StudioPage /> },
 ];
