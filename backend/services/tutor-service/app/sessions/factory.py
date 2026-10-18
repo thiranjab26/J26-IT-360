@@ -68,6 +68,11 @@ def _built() -> tuple[TutorWriter, DebertaNLI | None]:
     return build_writer(get_settings())
 
 
+def get_nli() -> DebertaNLI | None:
+    """The claim-checking model, or None when the gate is switched off. Shared with the tutor."""
+    return _built()[1]
+
+
 def build_retriever(settings: Settings) -> Retriever | None:
     """The hybrid retriever over the local vector index, or None if it cannot be opened."""
     try:

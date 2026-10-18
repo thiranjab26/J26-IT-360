@@ -16,6 +16,7 @@ from app.models.practicals import (
     SubmitIn,
     SubmitOut,
 )
+from app.practicals.items import SqlAssessmentStore
 from app.practicals.repository import SqlPracticalRepository
 from app.practicals.service import PracticalService
 from app.sessions.catalog import get_course
@@ -41,6 +42,7 @@ def get_practicals(
         get_course(MODULE),
         get_runner(),
         unlocked=unlocked,
+        items=SqlAssessmentStore(db),
     )
 
 

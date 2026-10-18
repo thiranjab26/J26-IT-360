@@ -34,6 +34,10 @@ class PracticalRepository(Protocol):
         """Question ids that have tests, so the list can say which practicals are ready."""
         ...
 
+    def test_counts(self) -> dict[str, int]:
+        """How many tests each question has."""
+        ...
+
     def record_attempt(
         self,
         user_id: str,
@@ -82,6 +86,14 @@ class SqlPracticalRepository:
 
     def tested(self) -> set[str]:
         return {r[0] for r in self.db.execute(select(practical_tests.c.question_id).distinct())}
+
+    def test_counts(self) -> dict[str, int]:
+        rows = self.db.execute(
+            select(practical_tests.c.question_id, func.count()).group_by(
+                practical_tests.c.question_id
+            )
+        )
+        return {q: int(n) for q, n in rows}
 
     def record_attempt(
         self,

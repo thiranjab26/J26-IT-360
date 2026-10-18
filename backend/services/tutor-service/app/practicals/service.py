@@ -23,7 +23,9 @@ from app.models.practicals import (
     VisibleTestOut,
 )
 from app.models.sessions import BonusOut, LevelUpOut, RewardsOut
-from app.practicals.repository import PracticalRepository
+from app.practicals.catalog import AssessmentCatalog
+from app.practicals.items import AssessmentStore, NoAssessmentStore
+from app.practicals.repository import PracticalRepository, Standing
 from app.practicals.runner import CodeRunner, RunnerUnavailable
 from app.practicals.tests_builder import same_output, starter_for
 from app.sessions.catalog import Course
@@ -47,12 +49,22 @@ class PracticalService:
         runner: CodeRunner | None,
         *,
         unlocked: Callable[[str], set[str]] | None = None,
+        items: AssessmentStore | None = None,
     ) -> None:
         self.repo = repo
         self.game = game  # the XP ledger and badges, shared with the guided sessions
         self.course = course
         self.runner = runner
         self._unlocked = unlocked
+        self._items = items if items is not None else NoAssessmentStore()
+        self._catalog: AssessmentCatalog | None = None
+
+    @property
+    def catalog(self) -> AssessmentCatalog:
+        """The authored practicals with lecturer changes laid over, read once per request."""
+        if self._catalog is None:
+            self._catalog = AssessmentCatalog(self.course, self._items.all())
+        return self._catalog
 
     # ---------------------------------------------------------------- reading
     def listing(self, user_id: str) -> PracticalListOut:
@@ -60,9 +72,10 @@ class PracticalService:
         standing = self.repo.standings(user_id)
         open_concepts = self._open(user_id)
         items = []
-        for entry in self._ordered():
+        for entry in self.catalog.entries():
             q = entry.question
             s = standing.get(q.question_id)
+            credited = self._credited(standing, q.question_id)
             items.append(
                 PracticalSummaryOut(
                     practical_id=practical_id(q.question_id),
@@ -72,7 +85,7 @@ class PracticalService:
                     title=self._title(entry),
                     unlocked=open_concepts is None or q.concept_id in open_concepts,
                     ready=q.question_id in ready,
-                    passed=bool(s and s.passed),
+                    passed=credited,
                     best=f"{s.best_passed} of {s.total}" if s else None,
                 )
             )
@@ -83,7 +96,7 @@ class PracticalService:
         q = entry.question
         self._require_open(user_id, q.concept_id)
         tests = self.repo.tests(q.question_id)
-        s = self.repo.standings(user_id).get(q.question_id)
+        credited = self._credited(self.repo.standings(user_id), q.question_id)
         return PracticalOut(
             practical_id=pid,
             concept_id=q.concept_id,
@@ -97,7 +110,7 @@ class PracticalService:
                 VisibleTestOut(stdin=t.stdin, expected=t.expected) for t in tests if t.visible
             ],
             tests_total=len(tests),
-            passed=bool(s and s.passed),
+            passed=credited,
         )
 
     # ---------------------------------------------------------------- running
@@ -177,11 +190,16 @@ class PracticalService:
         q = entry.question
         amount = BONUSES.practical_hard if q.level >= 5 else BONUSES.practical
         before = self.game.total_xp(user_id)
-        if not self.game.add_xp_event(user_id, None, "practical", q.question_id, amount):
+        # Paid once per SLOT, not per question: a student who cleared a practical that a lecturer
+        # later replaced does not earn its bonus again by clearing the new one.
+        slot = self.catalog.slot_of(q.question_id)
+        if not self.game.add_xp_event(user_id, None, "practical", slot, amount):
             return None
 
         total = before + amount
-        passed_count = sum(s.passed for s in self.repo.standings(user_id).values())
+        passed_count = len(
+            {self.catalog.slot_of(q) for q, s in self.repo.standings(user_id).items() if s.passed}
+        )
         owned = self.game.badges(user_id)
         facts = BadgeFacts(total_xp=total, practicals_passed=passed_count)
         earned = [b for b in badges_due(facts, owned) if self.game.award_badge(user_id, b.id, None)]
@@ -208,19 +226,19 @@ class PracticalService:
             )
         return _Guarded(self.runner)
 
-    def _ordered(self):
-        entries = [e for e in self.course.bank.values() if e.question.kind == CODE]
-        position = {c: i for i, c in enumerate(self.course.order)}
-        return sorted(entries, key=lambda e: (position[e.question.concept_id], e.question.number))
-
     def _entry(self, pid: str):
-        entry = self.course.bank.get(pid.replace("~", "#"))
-        if entry is None or entry.question.kind != CODE:
+        entry = self.catalog.entry(pid.replace("~", "#"))
+        if entry is None:
             raise SessionProblem("not_found", "practical_not_found", "No such practical.")
         return entry
 
     def _title(self, entry) -> str:
-        return f"{self.course.titles[entry.question.concept_id]}: practical {entry.question.number}"
+        return self.catalog.title(entry)
+
+    def _credited(self, standing: dict[str, Standing], question_id: str) -> bool:
+        """Passed this practical, or any earlier version that filled its slot."""
+        ids = self.catalog.question_ids_in(self.catalog.slot_of(question_id))
+        return any(standing[q].passed for q in ids if q in standing)
 
     def _open(self, user_id: str) -> set[str] | None:
         return self._unlocked(user_id) if self._unlocked else None

@@ -432,3 +432,82 @@ practical_attempts = Table(
     schema=TUTOR_SCHEMA,
 )
 Index("ix_practical_attempts_user", practical_attempts.c.user_id, practical_attempts.c.question_id)
+
+
+# ---------------------------------------------------------------------------
+# tutor.assessment_items: lecturer-made practicals, and the history of replaced ones
+#
+# The authored course (Markdown) stays the source of truth. A row here is either a practical a
+# lecturer drafted or approved, or a snapshot of an authored practical that was replaced, kept so
+# nothing is ever lost. A "slot" is one place in a concept's list of practicals: an authored
+# question's own id names its slot, and everything that later replaces it joins that slot.
+# At most one item per slot is `approved` at a time (the partial unique index below).
+# ---------------------------------------------------------------------------
+ASSESSMENT_ORIGINS = ("authored", "generated", "manual")
+ASSESSMENT_STATUSES = ("draft", "approved", "rejected", "retired")
+
+assessment_items = Table(
+    "assessment_items",
+    metadata,
+    Column("item_id", UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()),
+    Column("question_id", Text, nullable=False, unique=True),
+    Column("slot_id", Text, nullable=False),
+    Column("concept_id", Text, nullable=False),
+    Column("origin", Text, nullable=False),
+    Column("status", Text, nullable=False),
+    Column("number", SmallInteger, nullable=False),
+    Column("level", SmallInteger, nullable=False),
+    Column("statement", Text, nullable=False),
+    Column("reference_solution", Text, nullable=False),
+    Column("checks", JSONB),
+    Column("generation", JSONB),
+    Column("replaces_question_id", Text),
+    Column("replaced_by_question_id", Text),
+    Column("created_by", UUID(as_uuid=True)),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    Column("reviewed_by", UUID(as_uuid=True)),
+    Column("reviewed_at", TIMESTAMP(timezone=True)),
+    Column("review_note", Text),
+    Column("retired_at", TIMESTAMP(timezone=True)),
+    Column("retired_by", UUID(as_uuid=True)),
+    CheckConstraint(_in("origin", ASSESSMENT_ORIGINS), name="ck_assessment_items_origin"),
+    CheckConstraint(_in("status", ASSESSMENT_STATUSES), name="ck_assessment_items_status"),
+    schema=TUTOR_SCHEMA,
+)
+Index("ix_assessment_items_slot", assessment_items.c.slot_id)
+Index(
+    "uq_assessment_items_one_approved_per_slot",
+    assessment_items.c.slot_id,
+    unique=True,
+    postgresql_where=text("status = 'approved'"),
+)
+
+
+# ---------------------------------------------------------------------------
+# tutor.assessment_jobs: a lecturer's request for a batch of generated drafts
+#
+# Generating a draft takes tens of seconds, so a request is a job the lecturer can watch. The
+# drafts it makes are ordinary assessment_items; the job only counts them and names them.
+# ---------------------------------------------------------------------------
+JOB_STATUSES = ("queued", "running", "finished", "failed")
+
+assessment_jobs = Table(
+    "assessment_jobs",
+    metadata,
+    Column("job_id", UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()),
+    Column("concept_id", Text, nullable=False),
+    Column("requested", SmallInteger, nullable=False),
+    Column("done", SmallInteger, nullable=False, server_default="0"),
+    Column("failed", SmallInteger, nullable=False, server_default="0"),
+    Column("status", Text, nullable=False),
+    Column("hint", Text),
+    Column("targets", JSONB, nullable=False),
+    Column("item_ids", JSONB, nullable=False),
+    Column("message", Text),
+    Column("created_by", UUID(as_uuid=True)),
+    Column("created_at", TIMESTAMP(timezone=True), nullable=False, server_default=func.now()),
+    Column("finished_at", TIMESTAMP(timezone=True)),
+    CheckConstraint(_in("status", JOB_STATUSES), name="ck_assessment_jobs_status"),
+    schema=TUTOR_SCHEMA,
+)
+Index("ix_assessment_jobs_created", assessment_jobs.c.created_at)

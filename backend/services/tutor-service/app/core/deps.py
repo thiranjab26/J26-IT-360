@@ -24,6 +24,10 @@ class CurrentUser:
     def is_student(self) -> bool:
         return self.role == "student"
 
+    @property
+    def is_lecturer(self) -> bool:
+        return self.role == "lecturer"
+
 
 def current_user(
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),

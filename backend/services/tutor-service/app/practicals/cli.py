@@ -2,6 +2,7 @@
 
     uv run python -m app.practicals.cli build-tests [--concept prog.loops] [--force] [--no-llm]
     uv run python -m app.practicals.cli status
+    uv run python -m app.practicals.cli generate --concept prog.loops [--count 2] [--save]
 
 `build-tests` reads each program-writing question, runs the course's reference solution, and
 stores the sample test plus hidden tests made from model-proposed inputs (see tests_builder.py).
@@ -95,6 +96,65 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_generate(args: argparse.Namespace) -> int:
+    """Ask the model for draft practicals and show how they check out. Nothing is saved unless
+    --save is given, and then only as drafts: a lecturer still has to approve them."""
+    from app.practicals.authoring import AuthoringService
+    from app.practicals.generation import DraftGenerator
+    from app.practicals.items import SqlAssessmentStore
+    from app.sessions.factory import get_nli
+
+    if not args.concept:
+        print("Name the concept with --concept, for example --concept prog.loops.")
+        return 2
+    settings = get_settings()
+    runner = LocalJavaRunner()
+    provider = build_provider(settings)
+    if not runner.available() or provider is None:
+        print("A JDK and a configured model are both needed.")
+        return 2
+    generator = DraftGenerator(
+        get_course(args.module), runner, provider, get_nli(), settings.gate_threshold
+    )
+
+    with SessionFactory() as db:
+        author = AuthoringService(
+            SqlAssessmentStore(db), SqlPracticalRepository(db), get_course(args.module), runner
+        )
+        targets = author.plan_targets(args.concept, args.count)
+        avoid: list[str] = []
+        for number, target in enumerate(targets, 1):
+            print(f"\n=== draft {number} of {len(targets)}, replacing {target} ===")
+            if args.save:
+                out = author.generate_one(None, generator, args.concept, target, args.hint, avoid)
+                db.commit()
+                shown, tests = out.statement, out.tests_total
+                checks = [c.model_dump() for c in out.checks]
+                print(f"saved as a draft: {out.practical_id}")
+            else:
+                entry = author.catalog().entry(target.replace("~", "#"))
+                existing = [
+                    (practical_id(e.question.question_id), e.question.stem)
+                    for e in author.catalog().entries()
+                    if e.question.concept_id == args.concept
+                ]
+                draft = generator.generate(
+                    args.concept, entry.question.level, existing, args.hint, avoid
+                )
+                shown, tests, checks = draft.statement, len(draft.tests), draft.checks
+                print(draft.reference_solution)
+                for skill in draft.generation.get("skills", []):
+                    print("  skill:", skill)
+            avoid.append(shown.split("Sample input", 1)[0].strip())
+            print(shown)
+            print(f"\n{tests} tests")
+            for c in checks:
+                print(f"  [{c['status']:4}] {c['name']}: {c['detail']}")
+            if args.pause and number < len(targets):
+                time.sleep(args.pause)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="app.practicals.cli", description=__doc__.split("\n\n")[0]
@@ -105,8 +165,14 @@ def main(argv: list[str] | None = None) -> int:
     status = sub.add_parser("status")
     status.set_defaults(func=cmd_status)
     build = sub.add_parser("build-tests")
+    generate = sub.add_parser("generate", help="draft new practicals with the model")
+    generate.add_argument("--count", type=int, default=1)
+    generate.add_argument("--hint", help="what the lecturer wants, in a sentence")
+    generate.add_argument("--save", action="store_true", help="keep them as drafts for review")
+    generate.add_argument("--pause", type=float, default=2.0)
+    generate.set_defaults(func=cmd_generate)
     # The concept can be given before or after the command.
-    for command in (status, build):
+    for command in (status, build, generate):
         command.add_argument(
             "--concept", default=argparse.SUPPRESS, help="only this concept, e.g. prog.loops"
         )

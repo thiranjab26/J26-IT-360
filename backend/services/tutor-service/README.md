@@ -171,6 +171,36 @@ How it works:
 - Settings: `TUTOR_PRACTICALS_RUNNER` (`local` or `off`) and `TUTOR_PRACTICALS_RUN_TIMEOUT` (seconds per run). Tables: `tutor.practical_tests` and `tutor.practical_attempts` (migration 0008).
 - Not built yet: free-text (explain) grading, generated practicals, and feeding practical attempts into `tutor.v_attempt_outcomes`.
 
+## Lecturer-managed practicals
+
+Lecturers can replace the code practicals students see, without editing the course Markdown. This covers only the Practicals section: the questions inside guided sessions are untouched.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/v1/tutor/author/practicals?concept_id=` | What students see now, drafts waiting for a decision, and the history of replaced or rejected ones |
+| GET | `/api/v1/tutor/author/practicals/{id}` | One practical in full: statement, reference solution, every test, and its history |
+| POST | `/api/v1/tutor/author/drafts` | Add a draft (`replaces` names the practical it would take the place of) and check it |
+| POST | `/api/v1/tutor/author/drafts/{id}/edit` | Change a draft and check it again |
+| POST | `/api/v1/tutor/author/drafts/{id}/approve` | Replace the practical in that place with the draft |
+| POST | `/api/v1/tutor/author/drafts/{id}/reject` | Turn a draft down, with a note |
+| POST | `/api/v1/tutor/author/practicals/{id}/restore` | Bring a replaced practical back |
+| POST | `/api/v1/tutor/author/generate` | Ask the model for `count` (1 to 6) drafts of a concept, optionally aimed at named practicals and steered by a `hint`. Returns a job at once (202) |
+| GET | `/api/v1/tutor/author/jobs/{id}` | Progress of a generation job and the drafts it has made so far (`/jobs` lists recent ones) |
+| POST | `/api/v1/tutor/author/drafts/bulk-approve`, `bulk-reject` | Decide on many drafts at once; each is judged on its own, so one that cannot be approved does not stop the rest |
+
+Lecturers only (`403 lecturers_only`), and any lecturer may approve. These responses carry reference solutions and hidden tests, so no student route returns them.
+
+- **Replacing, not adding.** The authored course stays the source of truth. A row in `tutor.assessment_items` (migration 0009) overlays it, and `app/practicals/catalog.py` merges the two into the same `BankEntry` objects the student screens already use, so listing, running, marking and rewards needed no special case.
+- **Nothing is lost.** When an authored practical is replaced it is copied into the database first, with who replaced it and when. Its tests and every attempt stay where they were.
+- **Places ("slots").** Each practical fills a slot, named by the authored question's id, and replacements join that slot. A student who cleared a practical keeps that credit when it is replaced, and the practical bonus is paid once per slot, so nobody is paid twice. The database allows one approved item per slot.
+- **Checks before approval** (`app/practicals/authoring.py`): the solution is a runnable program; it uses no file, network, process or reflection APIs (such a solution is never run); it compiles; it prints exactly the sample shown in the statement; hidden tests exist; and it gives the same answers when run twice. A failed check blocks approval; a warning does not.
+- **Generating drafts** (`app/practicals/generator.py`, `generation.py`, `jobs.py`). The model is given the concept's course text, the practicals that already exist, and an optional lecturer hint, and returns a task description, one sample INPUT, a reference solution and the skills the task needs. It is never asked for the sample output: that is produced by running the solution, so a wrong number written by the model cannot reach a student. The draft then gets the checks above plus three more: `taught_scope` (each needed skill is checked by the faithfulness gate's NLI model against what the course teaches for this concept and what it builds on), `constructs` (Java features the course has not introduced yet, such as streams or collections) and `duplicate` (word overlap with the concept's other practicals). These three are warnings for the lecturer to weigh, except that a task whose skills are nearly all missing from the course fails. The NLI threshold is the gate's, which was measured on explanation text and not on task skills, so expect some false alarms.
+- **Background jobs.** A request becomes a job (`tutor.assessment_jobs`, migration 0010) that makes one draft at a time and saves each as soon as it is ready; a job lost in a restart is reported as failed after 45 minutes. One worker thread runs them in turn. A draft takes about half a minute and a few model requests, so a batch of six can use a noticeable share of a free daily quota. If the model cannot be reached the job keeps the drafts it already made and stops.
+- **Command line.** `uv run python -m app.practicals.cli generate --concept prog.loops --count 2` shows drafts and their checks without saving; add `--save` to keep them as drafts for a lecturer.
+- **Lecturer screens.** The Practical studio (`/studio`, lecturers only) generates drafts, shows each with its checks and a preview of the task, solution and tests, and approves or rejects one at a time or in bulk. It also lists what is live now, and the history with a Restore button.
+- **Safety.** The local runner is not a sandbox, so generated code is checked for dangerous APIs before it is run, only lecturers can start generation, and nothing reaches students until a lecturer approves it. The Piston runner should still come before wide use.
+- **Not built yet:** generated predict-the-output and multiple-choice questions, and checking generated tests against deliberately wrong solutions.
+
 ## Faithfulness gate
 
 Generated text is checked against the course passage it came from before a student sees it (`app/verification/`). The method, the numbers behind the settings and their limits are in `research/c3-RAG tutor/README.md`; this is how to run it.
