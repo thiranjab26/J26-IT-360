@@ -201,6 +201,30 @@ Lecturers only (`403 lecturers_only`), and any lecturer may approve. These respo
 - **Safety.** The local runner is not a sandbox, so generated code is checked for dangerous APIs before it is run, only lecturers can start generation, and nothing reaches students until a lecturer approves it. The Piston runner should still come before wide use.
 - **Not built yet:** generated predict-the-output and multiple-choice questions, and checking generated tests against deliberately wrong solutions.
 
+## Live and cached explanations
+
+`TUTOR_EXPLANATION_MODE` decides how a student's explanations are made. It is read when the service starts.
+
+| | `live` (default) | `cached` |
+|---|---|---|
+| Where text comes from | Written for that student, when they ask for the part or just before, while they read the part before | The shared, checked explanations that `prebuild` fills |
+| Shared between students | Never. A job and its text belong to one session | Yes, by passage |
+| Model calls per part | 3 to 9, per student | None when the cache has it |
+| Giving up | After the gate has blocked 3 texts or the model has failed 5 times | After 1 try and 1 rewrite |
+
+**Live mode.**
+- **Counting.** A round is one model call and its check, including the step that cuts the failing sentences and checks what is left. A round the gate rejects is a block (`TUTOR_GATE_MAX_BLOCKS`, 3). A failed model call, or an empty or over-long reply, is a failure (`TUTOR_LLM_MAX_FAILURES`, 5). The two are counted apart. Failures wait 1, 2, 4, 8 seconds between tries (`TUTOR_LLM_RETRY_BACKOFF_SECONDS`).
+- **Quota.** If the model says its daily quota is used up, trying again cannot help, so it stops at once and the course text is shown. A per-minute limit is retried like any other failure.
+- **When it gives up** the student sees the authored course text, kept for the rest of the session. It is labelled as rejected only when the gate was the reason, not when the model could not be reached.
+- **Prefetch.** While a student reads one part, the next is written for them and stored in their own session, so the click usually finds it ready. No other student can ever be shown it. Nothing is read from or written to the shared cache.
+- **Stubborn passages.** A passage the gate keeps rejecting is left alone for `TUTOR_FAILURE_MEMORY_SECONDS` (30 minutes) for every student, so each one does not wait through three rounds. An unreachable model is retried after 2 minutes and a used-up quota after 10.
+- **Waiting.** A click waits up to `TUTOR_FILL_WAIT_SECONDS` (240) and shows a progress card meanwhile.
+- **Cost.** Every student pays for every part, so a free daily quota (500 requests) is used up quickly. Plan for a paid key.
+
+**Cached mode** is the earlier behaviour, unchanged: the shared cache is read first, a miss is written once for everyone, and `prebuild` can fill it ahead of time. The cache table and `prebuild` stay in live mode so the two can be compared; `prebuild` always uses its own "so many tries" rule whatever the mode.
+
+The gate, its threshold and the retrieval of related passages are the same in both modes. Every verdict is logged to `tutor.gate_events` in both.
+
 ## Faithfulness gate
 
 Generated text is checked against the course passage it came from before a student sees it (`app/verification/`). The method, the numbers behind the settings and their limits are in `research/c3-RAG tutor/README.md`; this is how to run it.

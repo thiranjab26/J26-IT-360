@@ -19,10 +19,11 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from collections.abc import Collection, Sequence
+import time
+from collections.abc import Callable, Collection, Sequence
 from dataclasses import dataclass
 
-from app.llm.providers import LLMError, LLMProvider
+from app.llm.providers import LLMError, LLMProvider, LLMQuotaError
 from app.verification.claims import trim_unsupported
 from app.verification.gate import FaithfulnessGate, GateResult
 
@@ -88,6 +89,26 @@ class WriteResult:
     generated: Generated | None  # None means: show the authored passage
     audits: tuple[GateAudit, ...] = ()
     blocked: bool = False  # True when the gate rejected every text it was shown
+    # Why nothing was produced, when the retry policy was in force: blocked (the gate kept
+    # rejecting), failures (the model kept failing), quota (the day's allowance is used up) or
+    # gate_error (the checker itself broke). Empty when text was produced.
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class RetryPolicy:
+    """How hard to try before giving up and showing the authored text (live mode).
+
+    A ROUND is one model call and, if the text is gated, its check, including the step that
+    cuts the failing sentences and checks what is left. Rounds the gate rejects count as BLOCKS;
+    model calls that fail (an error, or an empty or over-long reply) count as FAILURES. The
+    two are counted apart, and reaching either limit stops the attempt.
+    """
+
+    max_blocks: int = 3
+    max_failures: int = 5
+    backoff: float = 1.0  # seconds before the first retry after a failure; doubles each time
+    sleep: Callable[[float], None] = time.sleep
 
 
 class TutorWriter:
@@ -98,11 +119,15 @@ class TutorWriter:
         *,
         max_regenerations: int = 1,
         gated_kinds: Collection[str] = (EXPLAIN, RETEACH, HINT),
+        policy: RetryPolicy | None = None,
     ) -> None:
         self._provider = provider
         self._gate = gate
         self._regenerations = max(0, max_regenerations)
         self._gated = frozenset(gated_kinds)
+        # With a policy the writer tries until it is satisfied or the policy says stop. Without
+        # one it makes 1 + max_regenerations tries, as it always did.
+        self._policy = policy
 
     @property
     def enabled(self) -> bool:
@@ -136,6 +161,90 @@ class TutorWriter:
             ]
         )
 
+    def _write_with_policy(
+        self,
+        kind: str,
+        base: str,
+        passage: str,
+        support: Sequence[tuple[str, str]],
+        gated: bool,
+        policy: RetryPolicy,
+    ) -> WriteResult:
+        """The live-mode loop: keep asking until a text passes, the gate has rejected
+        `policy.max_blocks` texts, or the model has failed `policy.max_failures` times."""
+        assert self._provider is not None
+        premises = [passage, *(t for _, t in support)]
+        audits: list[GateAudit] = []
+        blocks = failures = 0
+        prompt = base
+
+        while True:
+            try:
+                result = self._provider.generate(
+                    system=SYSTEM,
+                    prompt=prompt,
+                    max_tokens=300 if kind == HINT else 700,
+                    temperature=0.3,
+                )
+                text = result.text.strip()
+                if not text or len(text) > MAX_CHARS:
+                    raise LLMError("the reply was empty or too long")
+            except LLMQuotaError:
+                # The day's allowance is gone: another try cannot work, so stop at once.
+                log.warning(
+                    "tutor text fell back to the course: quota used up", extra={"kind": kind}
+                )
+                return WriteResult(None, tuple(audits), reason="quota")
+            except LLMError as exc:
+                failures += 1
+                log.warning(
+                    "tutor text: the model failed",
+                    extra={"kind": kind, "why": str(exc), "failures": failures},
+                )
+                if failures >= policy.max_failures:
+                    return WriteResult(None, tuple(audits), reason="failures")
+                policy.sleep(policy.backoff * 2 ** (failures - 1))
+                continue
+
+            if not gated:
+                return WriteResult(Generated(text, result.provider, result.model, None))
+
+            assert self._gate is not None
+            try:
+                verdict = self._gate.check(text, premises)
+            except Exception:
+                # The checker itself failed. Fail closed: unchecked text is never shown as if it
+                # had been checked, and asking the model again would not mend the checker.
+                log.exception("faithfulness gate failed to run")
+                return WriteResult(None, tuple(audits), blocked=True, reason="gate_error")
+
+            audits.append(GateAudit(len(audits) + 1, text, verdict))
+            if verdict.passed:
+                return WriteResult(
+                    Generated(text, result.provider, result.model, True), tuple(audits)
+                )
+
+            # Cut just the sentences that failed and check what is left with the same gate, before
+            # spending another model call. Part of the same round: it does not count as a block.
+            if all(v.kind == "claim" for v in verdict.unsupported):
+                trimmed = trim_unsupported(text, [v.text for v in verdict.unsupported])
+                if trimmed is not None:
+                    try:
+                        recheck = self._gate.check(trimmed, premises)
+                    except Exception:
+                        log.exception("faithfulness gate failed to run")
+                        return WriteResult(None, tuple(audits), blocked=True, reason="gate_error")
+                    audits.append(GateAudit(len(audits) + 1, trimmed, recheck))
+                    if recheck.passed:
+                        return WriteResult(
+                            Generated(trimmed, result.provider, result.model, True), tuple(audits)
+                        )
+
+            blocks += 1
+            if blocks >= policy.max_blocks:
+                return WriteResult(None, tuple(audits), blocked=True, reason="blocked")
+            prompt = base + _retry_note([v.text for v in verdict.unsupported])
+
     def write(
         self,
         kind: str,
@@ -164,6 +273,8 @@ class TutorWriter:
         base += _TASKS[kind]
 
         gated = self._gate is not None and kind in self._gated
+        if self._policy is not None:
+            return self._write_with_policy(kind, base, passage, support, gated, self._policy)
         tries = 1 + (self._regenerations if gated else 0)
         audits: list[GateAudit] = []
         prompt = base

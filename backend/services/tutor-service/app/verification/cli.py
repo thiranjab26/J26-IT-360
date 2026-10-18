@@ -44,6 +44,9 @@ def _open(args):
         # More tries per passage than a live request would make. This changes how hard we
         # try, not what counts as verified, so the cache key is unaffected.
         settings = settings.model_copy(update={"gate_max_regenerations": args.attempts - 1})
+    # Prebuilding is the cached way of working whatever mode the service runs in, so it keeps
+    # its own "so many tries" rule instead of the live retry policy.
+    settings = settings.model_copy(update={"explanation_mode": "cached"})
     writer, nli = build_writer(settings)
     fingerprint = writer.cache_fingerprint(EXPLAIN)
     if fingerprint is None:

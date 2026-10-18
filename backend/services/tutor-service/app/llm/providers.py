@@ -28,6 +28,11 @@ class LLMError(Exception):
     """The model could not produce usable text (network, quota, bad key, empty reply)."""
 
 
+class LLMQuotaError(LLMError):
+    """The model's quota for the whole day is used up. Asking again cannot help until it resets,
+    so a caller that retries should stop instead."""
+
+
 @dataclass(frozen=True)
 class Generation:
     text: str
@@ -79,6 +84,10 @@ class GeminiProvider:
             )
         except httpx.HTTPError as exc:
             raise LLMError(f"gemini unreachable: {type(exc).__name__}") from exc
+        if response.status_code == 429 and "PerDay" in response.text:
+            # A per-minute limit clears in seconds and is worth retrying; a daily one is not.
+            # The body is only searched, never reported, since it can echo request details.
+            raise LLMQuotaError("gemini daily quota is used up")
         if response.status_code != 200:
             # The body can echo request details, so report the status only.
             raise LLMError(f"gemini returned HTTP {response.status_code}")
@@ -165,9 +174,12 @@ class FallbackChain:
         self, *, system: str, prompt: str, max_tokens: int = 700, temperature: float = 0.3
     ) -> Generation:
         problems: list[str] = []
+        caught: list[LLMError] = []
+        skipped = False
         for provider in self.providers:
             if self._clock() < self._down_until.get(provider.name, 0.0):
                 problems.append(f"{provider.name} cooling down")
+                skipped = True
                 continue
             try:
                 return provider.generate(
@@ -179,6 +191,10 @@ class FallbackChain:
                 )
                 self._down_until[provider.name] = self._clock() + self._cooldown
                 problems.append(str(exc))
+                caught.append(exc)
+        # Out of quota everywhere that was tried: say so, so a caller does not keep asking.
+        if caught and not skipped and all(isinstance(e, LLMQuotaError) for e in caught):
+            raise LLMQuotaError("; ".join(problems))
         raise LLMError("; ".join(problems))
 
 
@@ -204,4 +220,7 @@ def build_provider(settings: Settings) -> LLMProvider | None:
     made = [make(n.strip().lower()) for n in names]
     # The same provider named twice is one provider.
     unique = list({p.name: p for p in made if p is not None}.values())
-    return FallbackChain(unique) if unique else None
+    # When explanations are written live a failed call is retried, so a provider must not be put
+    # aside for a minute after one failure or the retries would never reach it.
+    cooldown = 0.0 if settings.explanation_mode == "live" else 60.0
+    return FallbackChain(unique, cooldown=cooldown) if unique else None

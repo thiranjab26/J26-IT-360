@@ -210,6 +210,7 @@ class SessionService:
         grounding: Callable[[Course, str], Grounding] | None = None,
         filler: Filler | None = None,
         fill_wait: float = 150.0,
+        live: bool = False,
     ) -> None:
         self.repo = repo
         self._courses = courses
@@ -223,6 +224,9 @@ class SessionService:
         self._grounding = grounding
         self.filler = filler
         self.fill_wait = fill_wait
+        # Live: explanations are written for this student when they are wanted and are never
+        # taken from, or given to, another student. Otherwise the shared checked ones are used.
+        self.live = live
         self.rewards = RewardEngine(repo, self.unlock_rules, self._estimate, timezone)
 
     # ------------------------------------------------------------------ actions
@@ -778,7 +782,10 @@ class SessionService:
             return
         upcoming = next((st for st in state.steps[state.index + 1 :] if st.kind == "teach"), None)
         if upcoming is not None:
-            self.filler.prefetch(EXPLAIN, course.module_id, upcoming.ref)
+            # Live: the result is kept in this session's own text for that part, so the click
+            # finds it without anything being shared. Cached: it goes to the shared cache.
+            scope = (state.session_id, f"teach:{upcoming.ref}") if self.live else None
+            self.filler.prefetch(EXPLAIN, course.module_id, upcoming.ref, scope)
 
     def history(self, user_id: str, session_id: str) -> HistoryOut:
         """The parts already read, in order, exactly as the student saw them."""
@@ -839,7 +846,10 @@ class SessionService:
         digest = ground.digest
         sources = [s.as_json() for s in ground.sources] if kind != HINT else None
 
-        if fingerprint is not None:
+        if fingerprint is not None and self.live and self.filler is not None:
+            return self._live_words(state, key, kind, course, passage_id, fallback)
+
+        if fingerprint is not None and not self.live:
             # An explanation the gate already passed for this material, prompt, model and gate
             # setting is shared: no model call, no new check, and the student still gets text
             # that was verified.
@@ -895,7 +905,12 @@ class SessionService:
             # is False when the gate was the reason, so the screen can say so.
             saved = StoredText(fallback, "authored", verified=False if result.blocked else None)
         self.repo.put_text(state.session_id, key, saved)
-        if fingerprint is not None and saved.source == "generated" and saved.verified is True:
+        if (
+            fingerprint is not None
+            and not self.live
+            and saved.source == "generated"
+            and saved.verified is True
+        ):
             self.repo.put_verified(
                 passage_id,
                 digest,
@@ -904,6 +919,38 @@ class SessionService:
                     saved.text, saved.provider or "", saved.model or "", output_id, sources
                 ),
             )
+        return saved
+
+    def _live_words(
+        self,
+        state: SessionState,
+        key: str,
+        kind: str,
+        course: Course,
+        passage_id: str,
+        fallback: str,
+    ) -> StoredText:
+        """Live mode: write this part for this student, wait for it, and show it.
+
+        A job for (this session, this point) was usually started while the student read the
+        part before, and may be finished. If not, it is started now. Either way the text it
+        makes is stored as this session's own text, so it is read back here and nowhere else.
+        When the writer gave up (the gate kept rejecting, the model kept failing, the quota is
+        gone, or it took too long) the authored course text is shown instead, kept so it never
+        changes under the student, and marked as rejected if the checker was the reason.
+        """
+        self.repo.commit()  # hold no connection or lock while the model and checker run
+        self.filler.wait(  # type: ignore[union-attr]
+            kind, course.module_id, passage_id, self.fill_wait, (state.session_id, key)
+        )
+        made = self.repo.get_text(state.session_id, key)
+        if made is not None:
+            return made
+        why = self.filler.failure_reason(kind, course.module_id, passage_id)  # type: ignore[union-attr]
+        # Only the checker rejecting the wording is shown as "failed the check". A model that
+        # could not be reached, or a used-up quota, is not the text's fault.
+        saved = StoredText(fallback, "authored", verified=False if why == "blocked" else None)
+        self.repo.put_text(state.session_id, key, saved)
         return saved
 
     def _feedback(self, last: AttemptRecord, state: SessionState, course: Course) -> FeedbackOut:

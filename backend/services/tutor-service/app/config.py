@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -106,8 +107,38 @@ class Settings(BaseSettings):
     # Which kinds of text the gate checks: explain, reteach, hint.
     gate_kinds: str = Field(default="explain,reteach,hint", alias="TUTOR_GATE_KINDS")
 
+    # How explanations reach a student. live: written for that student, when they ask for it
+    # (or just before, while they read the part before), and never taken from another student.
+    # cached: the shared, prebuilt explanations (the earlier behaviour).
+    explanation_mode: Literal["live", "cached"] = Field(
+        default="live", alias="TUTOR_EXPLANATION_MODE"
+    )
+    # Live mode only. Give up and show the authored course text once the model has failed this
+    # many times for one text, or the gate has blocked this many generated texts.
+    llm_max_failures: int = Field(default=5, ge=1, alias="TUTOR_LLM_MAX_FAILURES")
+    gate_max_blocks: int = Field(default=3, ge=1, alias="TUTOR_GATE_MAX_BLOCKS")
+    # Seconds before the first retry after a model failure; it doubles each time.
+    llm_retry_backoff_seconds: float = Field(
+        default=1.0, ge=0.0, alias="TUTOR_LLM_RETRY_BACKOFF_SECONDS"
+    )
+    # How long a passage the gate kept blocking is left alone before it is tried again. Without
+    # this every student reaching it would wait through every attempt.
+    failure_memory_seconds: float = Field(
+        default=1800.0, ge=0.0, alias="TUTOR_FAILURE_MEMORY_SECONDS"
+    )
+    # How long a click waits for a live explanation before showing the course text.
+    fill_wait_seconds: float = Field(default=240.0, ge=1.0, alias="TUTOR_FILL_WAIT_SECONDS")
+    # Explanations written at once. More does not make the checker faster on one machine.
+    fill_workers: int = Field(default=2, ge=1, alias="TUTOR_FILL_WORKERS")
+
     ollama_base_url: str = Field(default="http://localhost:11434", alias="TUTOR_OLLAMA_BASE_URL")
     ollama_model: str = Field(default="qwen2.5-coder:7b", alias="TUTOR_OLLAMA_MODEL")
+
+    @field_validator("explanation_mode", mode="before")
+    @classmethod
+    def lowercase_mode(cls, value: object) -> object:
+        """Accept LIVE or " Cached " as readily as live or cached."""
+        return value.strip().lower() if isinstance(value, str) else value
 
     @field_validator("database_url", "migration_database_url")
     @classmethod

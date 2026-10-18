@@ -19,9 +19,9 @@ from app.practicals.runner import CodeRunner, LocalJavaRunner
 from app.retrieval.retriever import Retriever
 from app.sessions.catalog import Course, get_course
 from app.sessions.grounding import Grounding, build_grounding
-from app.sessions.writer import TutorWriter
+from app.sessions.writer import RetryPolicy, TutorWriter
 from app.verification.claims import Decomposer, LLMDecomposer, SentenceDecomposer
-from app.verification.fill import Filler, Outcome, ensure_verified
+from app.verification.fill import Filler, Outcome, ensure_live, ensure_verified
 from app.verification.gate import FaithfulnessGate
 from app.verification.nli import DebertaNLI
 
@@ -54,11 +54,23 @@ def build_writer(settings: Settings) -> tuple[TutorWriter, DebertaNLI | None]:
     built = build_gate(settings, provider)
     gate, nli = built if built else (None, None)
     kinds = {k.strip() for k in settings.gate_kinds.split(",") if k.strip()}
+    # Live mode tries until the gate has rejected N texts or the model has failed M times.
+    # Cached mode keeps the original rule: one try, and one rewrite if the gate rejects it.
+    policy = (
+        RetryPolicy(
+            max_blocks=settings.gate_max_blocks,
+            max_failures=settings.llm_max_failures,
+            backoff=settings.llm_retry_backoff_seconds,
+        )
+        if settings.explanation_mode == "live"
+        else None
+    )
     writer = TutorWriter(
         provider,
         gate,
         max_regenerations=settings.gate_max_regenerations,
         gated_kinds=kinds,
+        policy=policy,
     )
     return writer, nli
 
@@ -112,18 +124,45 @@ def get_grounder() -> Callable[[Course, str], Grounding]:
 def get_filler() -> Filler:
     """Prepares explanations in the background so a student never waits for one."""
 
-    def work(kind: str, module_id: str, passage_id: str) -> Outcome:
+    def work(
+        kind: str,
+        module_id: str,
+        passage_id: str,
+        session_id: str | None = None,
+        text_key: str | None = None,
+    ) -> Outcome:
         from app.db.session import SessionFactory
 
         course = get_course(module_id)
+        grounding = get_grounder()(course, passage_id)
+        if session_id is not None and text_key is not None:
+            # Live mode: written for one session, stored with that session only.
+            return ensure_live(
+                writer=get_writer(),
+                session_factory=SessionFactory,
+                course=course,
+                grounding=grounding,
+                kind=kind,
+                session_id=session_id,
+                text_key=text_key,
+            )
         return ensure_verified(
             writer=get_writer(),
             session_factory=SessionFactory,
             course=course,
-            grounding=get_grounder()(course, passage_id),
+            grounding=grounding,
             kind=kind,
         )
 
+    settings = get_settings()
+    if settings.explanation_mode == "live":
+        return Filler(
+            work,
+            workers=settings.fill_workers,
+            blocked_memory=settings.failure_memory_seconds,
+            failed_memory=120.0,  # a model that could not be reached is worth trying soon
+            quota_memory=600.0,
+        )
     return Filler(work)
 
 

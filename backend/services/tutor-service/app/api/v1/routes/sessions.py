@@ -57,6 +57,8 @@ def get_service(db: Session = Depends(get_session)) -> SessionService:
         grounding=get_grounder(),
         filler=get_filler(),
         timezone=settings.timezone,
+        live=settings.explanation_mode == "live",
+        fill_wait=settings.fill_wait_seconds if settings.explanation_mode == "live" else 150.0,
     )
 
 
