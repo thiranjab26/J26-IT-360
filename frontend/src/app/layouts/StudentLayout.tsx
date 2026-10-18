@@ -34,9 +34,9 @@ export function StudentLayout() {
                 aria-hidden="true"
                 className="flex size-[26px] items-center justify-center rounded-[8px] bg-gradient-to-br from-brand to-violet font-mono text-[12px] font-bold text-white shadow-[0_0_14px_oklch(0.68_0.19_275/0.6)]"
               >
-                V
+                A
               </span>
-              <span className="text-[14px] font-bold tracking-tight">VeriTutor</span>
+              <span className="text-[14px] font-bold tracking-tight">AdaptLearn</span>
             </Link>
 
             <nav aria-label="Sections" className="hidden items-center gap-[4px] sm:flex">
