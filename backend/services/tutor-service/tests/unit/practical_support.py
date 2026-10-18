@@ -23,6 +23,9 @@ class InMemoryPracticalRepository:
     def tested(self) -> set[str]:
         return {q for q, tests in self.by_question.items() if tests}
 
+    def test_counts(self) -> dict[str, int]:
+        return {q: len(tests) for q, tests in self.by_question.items() if tests}
+
     def record_attempt(
         self, user_id, question_id, source, compiled, passed, tests_passed, tests_total
     ) -> None:
@@ -69,3 +72,54 @@ class FakeRunner:
             else:
                 runs.append(RunResult("ok", self.program(stdin), "", 0, 12))
         return Batch(True, "", tuple(runs))
+
+
+class InMemoryAssessmentStore:
+    """The lecturer-made practicals, kept in a dict. Enforces the one rule the database does:
+    at most one approved item per slot."""
+
+    def __init__(self) -> None:
+        self.items: dict[str, object] = {}
+
+    def all(self):
+        return list(self.items.values())
+
+    def get(self, question_id):
+        return self.items.get(question_id)
+
+    def add(self, item) -> None:
+        assert item.question_id not in self.items, "question ids are unique"
+        self.items[item.question_id] = item
+        self._check_slots()
+
+    def change(self, question_id, **fields) -> None:
+        from dataclasses import replace
+
+        self.items[question_id] = replace(self.items[question_id], **fields)
+        self._check_slots()
+
+    def _check_slots(self) -> None:
+        approved = [i.slot_id for i in self.items.values() if i.status == "approved"]
+        assert len(approved) == len(set(approved)), "two approved items share a slot"
+
+
+class InMemoryJobStore:
+    def __init__(self) -> None:
+        self.jobs: dict[str, object] = {}
+
+    def create(self, job) -> None:
+        from dataclasses import replace
+        from datetime import UTC, datetime
+
+        self.jobs[job.job_id] = replace(job, created_at=datetime.now(UTC))
+
+    def get(self, job_id):
+        return self.jobs.get(job_id)
+
+    def recent(self, limit: int = 10):
+        return list(self.jobs.values())[-limit:]
+
+    def change(self, job_id, **fields) -> None:
+        from dataclasses import replace
+
+        self.jobs[job_id] = replace(self.jobs[job_id], **fields)
