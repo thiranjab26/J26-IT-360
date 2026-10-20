@@ -5,8 +5,8 @@
   "description": "AdaptLearn API gateway. The only entry point the browser talks to.",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "node src/server.ts",
+    "dev": "node api.js && tsx watch src/server.ts",
+    "start": "node api.js && node src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
