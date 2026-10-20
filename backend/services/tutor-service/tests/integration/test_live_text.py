@@ -135,3 +135,91 @@ def test_a_job_that_gives_up_stores_nothing_so_the_click_can_show_the_course_tex
     quota = live(db, course, Replies(LLMQuotaError("used up")), session_id, passage)
     assert quota.status == "quota"
     assert SqlSessionRepository(db).get_text(session_id, f"teach:{passage}") is None
+
+
+# --------------------------------------------------------------- why a wrong answer was wrong
+NOTE = "Option B is not correct because the loop condition is checked before each pass."
+
+
+def a_wrong_quick_check(db, course):
+    """A real session, taken to a multiple-choice quick check and answered wrongly."""
+    from app.sessions.writer import MISS  # noqa: F401  (named for the tests below)
+
+    user = str(uuid.uuid4())
+    service = SessionService(
+        SqlSessionRepository(db), lambda _: course, enforce_unlocks=False, live=True
+    )
+    view = service.start(user, "prog.loops")
+    while not (view.phase == "checkpoint" and not view.question.gating):
+        view = service.cont(user, view.session_id)
+    entry = course.bank[view.question.question_id]
+    _, key = SessionService._presented(view.session_id, entry)
+    wrong = next(o.letter for o in view.question.options if o.letter != key.correct_option)
+    service.answer(user, view.session_id, wrong)
+    db.commit()
+    return view.session_id, view.question.question_id, wrong, key
+
+
+def miss_writer(model) -> TutorWriter:
+    from app.sessions.writer import MISS
+
+    gate = FaithfulnessGate(ScriptedNLI(), threshold=0.3, decomposer=SentenceDecomposer())
+    return TutorWriter(model, gate, gated_kinds=(MISS,), policy=RetryPolicy(sleep=lambda _: None))
+
+
+def run_miss(db, course, model, session_id, question_id):
+    from app.verification.fill import ensure_miss
+
+    return ensure_miss(
+        writer=miss_writer(model),
+        session_factory=lambda: db,
+        course=course,
+        grounder=lambda c, passage: primary_only(c, passage),
+        session_id=session_id,
+        text_key=f"miss:{question_id}",
+    )
+
+
+def test_the_note_on_a_wrong_answer_is_stored_with_that_session_only(db, course) -> None:
+    session_id, question_id, wrong, key = a_wrong_quick_check(db, course)
+    model = Replies(NOTE)
+
+    outcome = run_miss(db, course, model, session_id, question_id)
+
+    assert outcome.status == "built"
+    saved = SqlSessionRepository(db).get_text(session_id, f"miss:{question_id}")
+    assert saved is not None and saved.text == NOTE and saved.verified is True
+    prompt = model.prompts[0]
+    assert f"The student chose option {wrong}." in prompt
+    assert f"The correct answer is option {key.correct_option}" in prompt
+    assert (
+        db.execute(
+            text("SELECT count(*) FROM tutor.verified_explanations WHERE passage_id LIKE :q"),
+            {"q": f"%{question_id}%"},
+        ).scalar()
+        == 0
+    )
+
+
+def test_a_note_is_not_written_twice_for_the_same_wrong_answer(db, course) -> None:
+    session_id, question_id, _, _ = a_wrong_quick_check(db, course)
+    run_miss(db, course, Replies(NOTE), session_id, question_id)
+    model = Replies("never used")
+
+    outcome = run_miss(db, course, model, session_id, question_id)
+
+    assert outcome.status == "cached" and model.prompts == []
+
+
+def test_no_note_is_written_for_a_question_that_was_not_answered_wrongly(db, course) -> None:
+    session_id, question_id, _, _ = a_wrong_quick_check(db, course)
+    other = next(
+        q.question.question_id
+        for q in course.bank.values()
+        if q.question.kind == "mcq" and q.question.question_id != question_id
+    )
+    model = Replies(NOTE)
+
+    outcome = run_miss(db, course, model, session_id, other)
+
+    assert outcome.status == "disabled" and model.prompts == []
