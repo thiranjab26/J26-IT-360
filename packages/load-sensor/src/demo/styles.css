@@ -79,6 +79,8 @@
   --mood-drowsy: #8b5cf6;
   --mood-distracted: #5b6578;
   --mood-no-face: #c3cad8;
+  --bored: #c2410c;
+  --bored-maybe: #b7791f;
 }
 
 /* Opt-in dark theme: midnight navy with a luminous blue signal colour. */
@@ -129,6 +131,8 @@
   --mood-drowsy: #b197fc;
   --mood-distracted: #7d879b;
   --mood-no-face: #3a4256;
+  --bored: #fb923c;
+  --bored-maybe: #facc15;
 }
 
 *,
@@ -3462,4 +3466,126 @@ body:has(dialog.consent[open]) {
 .stage[data-alarm] .calib-prompt,
 .camera-panel[data-active='false'] .calib-prompt {
   display: none;
+}
+
+/* ── Boredom (Signals tab, boredom-panel.ts); layout shared with the Mood card ── */
+.boredom-card[data-bored='bored'] {
+  --mood: var(--bored);
+}
+.boredom-card[data-bored='possibly_bored'] {
+  --mood: var(--bored-maybe);
+}
+.boredom-card[data-bored='not_bored'] {
+  --mood: var(--mood-focused);
+}
+.boredom-card[data-bored='tired'] {
+  --mood: var(--mood-drowsy);
+}
+
+.boredom-seg[data-bored='bored'],
+.boredom-swatch[data-bored='bored'] {
+  background: var(--bored);
+}
+.boredom-seg[data-bored='possibly_bored'],
+.boredom-swatch[data-bored='possibly_bored'] {
+  background: var(--bored-maybe);
+}
+.boredom-seg[data-bored='not_bored'],
+.boredom-swatch[data-bored='not_bored'] {
+  background: var(--mood-focused);
+}
+.boredom-seg[data-bored='tired'],
+.boredom-swatch[data-bored='tired'] {
+  background: var(--mood-drowsy);
+}
+.boredom-seg[data-bored='none'],
+.boredom-swatch[data-bored='none'] {
+  background: var(--mood-no-face);
+}
+
+/* Points track: ticks at "possibly" (2/4) and "bored" (3/4). */
+.boredom-points-track {
+  background:
+    linear-gradient(var(--border-strong), var(--border-strong)) 50% 0 / 1px 100% no-repeat,
+    linear-gradient(var(--border-strong), var(--border-strong)) 75% 0 / 1px 100% no-repeat,
+    var(--surface-3);
+}
+
+.boredom-ev-row {
+  grid-template-columns: 136px minmax(0, 1fr) 48px 38px;
+}
+
+@container (max-width: 420px) {
+  .boredom-ev-row {
+    grid-template-columns: 104px minmax(0, 1fr) 40px 44px;
+    gap: 8px;
+  }
+}
+
+/* Share rows only colour in when the cue is met; z rows keep the Mood look. */
+.boredom-ev-row[data-kind='share'] .mood-ev-fill {
+  background: color-mix(in srgb, var(--mood) 45%, var(--border-strong));
+}
+
+.boredom-ev-row[data-met='true'] .mood-ev-fill {
+  background: var(--mood);
+}
+
+.boredom-ev-row[data-met='true'] .mood-ev-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.boredom-chip {
+  justify-self: end;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.boredom-chip:empty {
+  visibility: hidden;
+}
+
+.boredom-ev-row[data-met='true'] .boredom-chip {
+  border-color: color-mix(in srgb, var(--mood) 45%, var(--border));
+  background: color-mix(in srgb, var(--mood) 14%, var(--surface));
+  color: var(--mood);
+  font-weight: 600;
+}
+
+.boredom-sub-gap {
+  margin-top: 8px;
+}
+
+/* ── Overload (Signals tab, overload-panel.ts); layout shared with Mood and Boredom ── */
+.overload-card[data-overload='overloaded'] {
+  --mood: var(--mood-frustrated);
+}
+.overload-card[data-overload='working_hard'] {
+  --mood: var(--mood-confused);
+}
+.overload-card[data-overload='manageable'] {
+  --mood: var(--mood-focused);
+}
+
+.overload-seg[data-overload='overloaded'],
+.overload-swatch[data-overload='overloaded'] {
+  background: var(--mood-frustrated);
+}
+.overload-seg[data-overload='working_hard'],
+.overload-swatch[data-overload='working_hard'] {
+  background: var(--mood-confused);
+}
+.overload-seg[data-overload='manageable'],
+.overload-swatch[data-overload='manageable'] {
+  background: var(--mood-focused);
+}
+.overload-seg[data-overload='none'],
+.overload-swatch[data-overload='none'] {
+  background: var(--mood-no-face);
 }

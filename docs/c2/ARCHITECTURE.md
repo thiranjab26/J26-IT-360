@@ -11,7 +11,7 @@ Design reference for the in-browser cognitive load module. Numbers marked **(tun
 
 ## 2. Pipeline overview
 
-```
+```text
 ┌────────┐   ┌─────────────┐   ┌──────────────┐   ┌───────────────┐   ┌────────────┐   ┌───────────┐
 │ Camera │ → │ Landmark    │ → │ Per-frame    │ → │ Per-second    │ → │ Classifier │ → │ Smoothing │ → events
 │ 30 fps │   │ provider    │   │ signals      │   │ feature vector│   │ 1D-CNN+GRU │   │ hysteresis│
@@ -23,11 +23,11 @@ Design reference for the in-browser cognitive load module. Numbers marked **(tun
 
 Three clocks run at different rates on purpose:
 
-| Stage | Rate | Why |
-|---|---|---|
+| Stage              | Rate                                          | Why                                                                               |
+| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------- |
 | Landmark inference | 15 fps target **(tune)**, adaptive down to 10 | Blinks last 100–400 ms; 15 fps catches them. 30 fps doubles cost for little gain. |
-| Feature vector | 1 Hz | Cognitive load changes over seconds, not frames. Keeps the model tiny. |
-| Classification | every 2 s **(tune)** on the last 30 s | Fresh enough for adaptation; cheap. |
+| Feature vector     | 1 Hz                                          | Cognitive load changes over seconds, not frames. Keeps the model tiny.            |
+| Classification     | every 2 s **(tune)** on the last 30 s         | Fresh enough for adaptation; cheap.                                               |
 
 ## 3. Landmark provider (FR1)
 
@@ -49,15 +49,15 @@ interface FaceResult {
 
 Two adapters behind this interface:
 
-| | A. `TfjsFaceMeshProvider` (default) | B. `TasksVisionProvider` (alternative) |
-|---|---|---|
-| Package | `@tensorflow-models/face-landmarks-detection`, `runtime: 'tfjs'` | `@mediapipe/tasks-vision` FaceLandmarker |
-| Matches proposal wording "MediaPipe FaceMesh via TensorFlow.js" | Yes, exactly | Same underlying model family, but runs on MediaPipe's WASM runtime, not TF.js |
-| Output | 478 keypoints (with iris refinement) | 478 landmarks + 52 blendshapes + facial transformation matrix |
-| Head pose | We compute it from landmarks | Comes free from the transformation matrix |
-| Expression signal (FR3) | We compute proxies from landmarks | Blendshapes (brow, blink, mouth) come free |
-| Maintenance | Release cadence has slowed | Actively documented by Google |
-| Self-hosting | Local `detectorModelUrl` / `landmarkModelUrl` (confirmed in the 1.0.6 types), files from `pnpm fetch-models`; the MediaPipe-runtime packages are aliased to a throwing stub in `vite.config.ts` | `FilesetResolver.forVisionTasks('/wasm')` + local `.task` file |
+|                                                                 | A. `TfjsFaceMeshProvider` (default)                                                                                                                                                             | B. `TasksVisionProvider` (alternative)                                        |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Package                                                         | `@tensorflow-models/face-landmarks-detection`, `runtime: 'tfjs'`                                                                                                                                | `@mediapipe/tasks-vision` FaceLandmarker                                      |
+| Matches proposal wording "MediaPipe FaceMesh via TensorFlow.js" | Yes, exactly                                                                                                                                                                                    | Same underlying model family, but runs on MediaPipe's WASM runtime, not TF.js |
+| Output                                                          | 478 keypoints (with iris refinement)                                                                                                                                                            | 478 landmarks + 52 blendshapes + facial transformation matrix                 |
+| Head pose                                                       | We compute it from landmarks                                                                                                                                                                    | Comes free from the transformation matrix                                     |
+| Expression signal (FR3)                                         | We compute proxies from landmarks                                                                                                                                                               | Blendshapes (brow, blink, mouth) come free                                    |
+| Maintenance                                                     | Release cadence has slowed                                                                                                                                                                      | Actively documented by Google                                                 |
+| Self-hosting                                                    | Local `detectorModelUrl` / `landmarkModelUrl` (confirmed in the 1.0.6 types), files from `pnpm fetch-models`; the MediaPipe-runtime packages are aliased to a throwing stub in `vite.config.ts` | `FilesetResolver.forVisionTasks('/wasm')` + local `.task` file                |
 
 **Decision rule:** build A first because it is what the approved proposal says. Build B as a thin adapter in week 2 and benchmark both on the same laptop (frame time p50/p95, landmark jitter, Firefox behaviour). If B is clearly better, the switch is a supervisor conversation, not a silent code change — the classifier still runs in TF.js either way. Record the benchmark in `docs/bench/`.
 
@@ -79,15 +79,15 @@ Two adapters behind this interface:
 
 All distances are divided by inter-ocular distance so they are scale-invariant.
 
-| Signal | How | Notes |
-|---|---|---|
-| `earL`, `earR` | Eye aspect ratio from six eyelid landmarks per eye, 3D distances | Subject's right eye `33,160,158,133,153,144`, left `362,385,387,263,373,380` (MediaPipe names sides from the subject's view; checked against the library's region sets in a unit test). 3D rather than the original 2D so a lowered head does not look like closing eyes. |
-| `irisDx`, `irisDy` | Iris centre offset from eye-corner midpoint, normalised by eye width | Iris landmarks are 468–477. This is a gaze *proxy*, not calibrated gaze. |
-| `yaw`, `pitch`, `roll` | Head pose from landmark geometry (or provider matrix) | Degrees. |
-| `browRaise` | Brow (105/334) to upper lid (159/386), mean of both sides | |
-| `browInnerGap` | Inner-brow separation (107–336) | Furrowing shows as a *decrease*. |
-| `mouthOpen`, `lipThickness` | Inner-lip gap (13–14); outer-to-inner lip thickness (0–13 + 14–17) | Expression proxies (FR3). Lip pressing shows as a *decrease* in thickness. |
-| `facePresent`, `score` | From provider | Drives FR8. |
+| Signal                      | How                                                                  | Notes                                                                                                                                                                                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `earL`, `earR`              | Eye aspect ratio from six eyelid landmarks per eye, 3D distances     | Subject's right eye `33,160,158,133,153,144`, left `362,385,387,263,373,380` (MediaPipe names sides from the subject's view; checked against the library's region sets in a unit test). 3D rather than the original 2D so a lowered head does not look like closing eyes. |
+| `irisDx`, `irisDy`          | Iris centre offset from eye-corner midpoint, normalised by eye width | Iris landmarks are 468–477. This is a gaze _proxy_, not calibrated gaze.                                                                                                                                                                                                  |
+| `yaw`, `pitch`, `roll`      | Head pose from landmark geometry (or provider matrix)                | Degrees.                                                                                                                                                                                                                                                                  |
+| `browRaise`                 | Brow (105/334) to upper lid (159/386), mean of both sides            |                                                                                                                                                                                                                                                                           |
+| `browInnerGap`              | Inner-brow separation (107–336)                                      | Furrowing shows as a _decrease_.                                                                                                                                                                                                                                          |
+| `mouthOpen`, `lipThickness` | Inner-lip gap (13–14); outer-to-inner lip thickness (0–13 + 14–17)   | Expression proxies (FR3). Lip pressing shows as a _decrease_ in thickness.                                                                                                                                                                                                |
+| `facePresent`, `score`      | From provider                                                        | Drives FR8.                                                                                                                                                                                                                                                               |
 
 ### 5.2 Blink detection
 
@@ -97,22 +97,22 @@ State machine on smoothed EAR: `open → closing → closed → opening`. A blin
 
 Proposed `F = 14` **(tune)**:
 
-| # | Feature | Group |
-|---|---|---|
-| 0 | blink count in this second | Blink |
-| 1 | mean blink duration (carried forward if none) | Blink |
-| 2 | mean EAR | Blink |
-| 3 | fraction of frames with eyes closed | Blink |
-| 4 | gaze dispersion x (std of `irisDx`) | Gaze |
-| 5 | gaze dispersion y | Gaze |
-| 6 | fraction of frames with gaze roughly centred | Gaze |
-| 7 | head yaw std | Head |
-| 8 | head pitch std | Head |
-| 9 | head angular speed (mean abs frame-to-frame change) | Head |
-| 10 | brow raise mean | Brow |
-| 11 | brow inner gap mean (furrow = decrease) | Brow |
-| 12 | mouth-open mean | Expression (FR3, ablatable) |
-| 13 | lip thickness mean (press = decrease) | Expression (FR3, ablatable) |
+| #   | Feature                                             | Group                       |
+| --- | --------------------------------------------------- | --------------------------- |
+| 0   | blink count in this second                          | Blink                       |
+| 1   | mean blink duration (carried forward if none)       | Blink                       |
+| 2   | mean EAR                                            | Blink                       |
+| 3   | fraction of frames with eyes closed                 | Blink                       |
+| 4   | gaze dispersion x (std of `irisDx`)                 | Gaze                        |
+| 5   | gaze dispersion y                                   | Gaze                        |
+| 6   | fraction of frames with gaze roughly centred        | Gaze                        |
+| 7   | head yaw std                                        | Head                        |
+| 8   | head pitch std                                      | Head                        |
+| 9   | head angular speed (mean abs frame-to-frame change) | Head                        |
+| 10  | brow raise mean                                     | Brow                        |
+| 11  | brow inner gap mean (furrow = decrease)             | Brow                        |
+| 12  | mouth-open mean                                     | Expression (FR3, ablatable) |
+| 13  | lip thickness mean (press = decrease)               | Expression (FR3, ablatable) |
 
 Plus a `validRatio` (fraction of frames with a face) kept alongside as a mask, not as a model input.
 
@@ -130,12 +130,12 @@ Individual differences (resting blink rate, brow position, glasses) are larger t
 
 ### 5.5 Face loss (FR8)
 
-| Situation | Behaviour |
-|---|---|
-| Face missing < 2 s | Features use only frames with a face (holding the last values was dropped: repeated values would shrink the dispersion and speed features); the second is still valid if `validRatio ≥ 0.5`. Presence stays unchanged. |
-| Second has `validRatio < 0.5` | Mark second invalid |
-| Window has > 30 % invalid seconds **(tune)** | Don't classify. Emit `status: "no_face"`, `load_state: null` |
-| Face returns | Resume immediately; window refills naturally. No recalibration unless absent > 5 min |
+| Situation                                    | Behaviour                                                                                                                                                                                                              |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Face missing < 2 s                           | Features use only frames with a face (holding the last values was dropped: repeated values would shrink the dispersion and speed features); the second is still valid if `validRatio ≥ 0.5`. Presence stays unchanged. |
+| Second has `validRatio < 0.5`                | Mark second invalid                                                                                                                                                                                                    |
+| Window has > 30 % invalid seconds **(tune)** | Don't classify. Emit `status: "no_face"`, `load_state: null`                                                                                                                                                           |
+| Face returns                                 | Resume immediately; window refills naturally. No recalibration unless absent > 5 min                                                                                                                                   |
 
 ## 6. One feature implementation, used everywhere
 
@@ -242,15 +242,71 @@ strain: 'Low' | 'Medium' | 'High' | null;
 suggest_break: boolean | null;
 ```
 
-| Field | Built from | Notes |
-|---|---|---|
-| `presence` | face present; head pose / gaze off-screen for > N s **(tune)**; no face > 2 s | `absent` matches `status: "no_face"`. |
-| `fatigue` | PERCLOS over 60 s (eyes ≥ 80 % closed), long blinks > 500 ms, blink-rate trend, yawns, head nods | Standard drowsiness indicators from driver-monitoring work; thresholds relative to the learner's own baseline. A webcam cannot prove sleep: say "drowsy", never "asleep". |
-| `affect` | brow furrow, brow raise, lip press, mouth open vs baseline | Coarse and weak; part of the FR3 ablation (`useExpressionFeatures`). A real emotion model stays in the parking lot. |
-| `strain` | time on task today, time at High load, fatigue trend, minutes since last break | Covers "many assignments and exams in one day". Day totals are derived numbers kept on the device only, never frames or landmarks. C01/C04 know the exam/assignment schedule and may combine it with this. |
-| `suggest_break` | `strain` High, or `fatigue` High for > N min **(tune)** | Advice for the consumer, not an action C02 takes. |
+| Field           | Built from                                                                                       | Notes                                                                                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `presence`      | face present; head pose / gaze off-screen for > N s **(tune)**; no face > 2 s                    | `absent` matches `status: "no_face"`.                                                                                                                                                                      |
+| `fatigue`       | PERCLOS over 60 s (eyes ≥ 80 % closed), long blinks > 500 ms, blink-rate trend, yawns, head nods | Standard drowsiness indicators from driver-monitoring work; thresholds relative to the learner's own baseline. A webcam cannot prove sleep: say "drowsy", never "asleep".                                  |
+| `affect`        | brow furrow, brow raise, lip press, mouth open vs baseline                                       | Coarse and weak; part of the FR3 ablation (`useExpressionFeatures`). A real emotion model stays in the parking lot.                                                                                        |
+| `strain`        | time on task today, time at High load, fatigue trend, minutes since last break                   | Covers "many assignments and exams in one day". Day totals are derived numbers kept on the device only, never frames or landmarks. C01/C04 know the exam/assignment schedule and may combine it with this. |
+| `suggest_break` | `strain` High, or `fatigue` High for > N min **(tune)**                                          | Advice for the consumer, not an action C02 takes.                                                                                                                                                          |
 
 Evaluation: the pilot NASA-TLX (B1) has Effort and Frustration subscales; add one self-report "how tired are you?" item after each block so `fatigue` can be checked against something. Without it, report these fields as unvalidated.
+
+### 8b. Boredom (display only, not in the contract)
+
+Answers the supervisor panel's "no clear idea how to determine whether a person is bored". Proposed by the C2 owner 2026-10-20; the definition still needs the supervisor's agreement.
+
+**Definition:** boredom = low demand + disengagement, with alert eyes. Load follows an inverted U: underload (boredom), workable load, overload (sustained High). Yawning, looking away and restless movement are the behaviours most often reported with boredom in learning. Evidence is scored in points, each cue against the learner's own baseline where possible:
+
+| Cue            | Measure                                          | Window | Points **(tune)**              |
+| -------------- | ------------------------------------------------ | ------ | ------------------------------ |
+| Yawn           | yawn events (mouth gap > 0.45 IOD for ≥ 1.5 s)   | 5 min  | 1 / 2 / 3 for 1 / 2 / 3+ yawns |
+| Underload      | share of seconds with published `load_state` Low | 60 s   | 1 if ≥ 0.5                     |
+| Low engagement | share of seconds with `engagement` Low           | 60 s   | 1 if ≥ 0.5                     |
+| Gaze wandering | mean z of the larger of `gaze_dispersion_x/y`    | 60 s   | 1 if ≥ 1                       |
+| Restless head  | mean z of `head_angular_speed`                   | 60 s   | 1 if ≥ 1                       |
+
+≥ 3 points → `bored`; ≥ 2 → `possibly_bored`; else `not_bored`. By yawning alone: one yawn is not enough, two in 5 min read as `possibly_bored`, three or more as `bored`. One yawn plus one other cue reads as `possibly_bored`; without yawning it takes three behavioural cues.
+
+**Why these yawn counts (design choice, not a validated threshold):** no study gives a yawn count for boredom, and the boredom–yawning link is described as not firmly established (Baenninger; Greco & Baenninger). Provine & Hamernik (1986) report about 5.8 yawns per 30 min for a dull, unchanging test pattern against 3.4 for music videos (figures taken from a secondary summary; check the original before citing, TODO E). People therefore yawn about once per 9 min even when interested and about once per 5 min when bored: one yawn is only supporting evidence, two in 5 min is about twice the bored rate, three about three times. The 5-min window is also longer than a yawning bout (yawns in a bout come about 68 s apart, Provine), so one bout does not read as a trend at once. The final counts come from the pilot: yawns per 5 min against the boredom self-report, cut-off by ROC (Youden's J).
+
+Two vetoes come first:
+
+- **Drowsy eyes → `tired`:** mean eyes-closed fraction ≥ 0.15 over 60 s (the PERCLOS cut-off used for `fatigue`), or a head nod in 5 min. Yawning is shared by boredom and sleepiness; the eyes separate them, and the two need different help (a break, not a harder task). The eyes squeeze shut during a yawn, so the seconds from 8 s before to 2 s after each yawn are left out of the eyes-closed measure (and of the gaze-wandering and head-restless measures, which a yawn also moves), and long closures are not used.
+- **Load mostly High (≥ 0.5 of 60 s) → `not_bored`:** the overload side of the U. **Only with a trained load model:** while `meta.model_version` is `heuristic-0` the veto is off (shown as "off" on the card), because the unvalidated placeholder would overrule direct behaviour. In live testing it read leaning back with the head low as 88 % High and vetoed four yawns. Load published while a yawn is still inside the classifier's 30 s window is also left out, because to `heuristic-0` a yawn reads as High (stretched lips look pressed, shut eyes look like suppressed blinking).
+
+The reading starts as soon as calibration ends (`null` only while calibrating or with no face); it does not wait for the first load estimate, which only adds the underload point and the busy veto. Gaze and head cues need 10 baseline-normalised seconds before they can earn a point, so the first reading is `not_bored` unless the learner yawns. 3 s confirm hysteresis. The cues are not independent: looking away lowers engagement and raises gaze dispersion.
+
+**Design change 2026-10-20:** the first version made Low load a hard gate (≥ 0.8 of 60 s) and let `fatigue` High veto. In use it never fired on yawning: the placeholder `heuristic-0` rarely publishes Low, and yawns raise `fatigue` themselves. Low load is now one point, and the veto reads the eyes directly. Revisit the weight of underload once the trained model ships.
+
+**Known limit:** a yawn covered by a hand can hide the face, and a yawn whose end is not seen is dropped rather than guessed (§5.5).
+
+Code: `src/core/heuristics/boredom.ts` (pure, unit-tested); thresholds in `HEURISTIC_CONFIG.boredom`. Shown on the demo's Signals tab, next to Mood, with the points behind it and a five-minute timeline. The Camera tab stays a calm study view. Not in `LoadStateEvent`: adding a `boredom` field is a contract change (invariant 5) that needs C01/C03/C04's agreement.
+
+Validation plan: an Underload block (a repetitive, very easy task) in the pilot, and a boredom self-report after every block (a single 0–100 item, or the short Multidimensional State Boredom Scale). Until then, report boredom as unvalidated.
+
+### 8c. Overload (display only, not in the contract)
+
+Answers the supervisor panel's "no clear methodology for measuring cognitive overload". Proposed by the C2 owner 2026-10-20; the definition still needs the supervisor's agreement. Overload is the right-hand end of the same inverted U whose left end is boredom (§8b): the learner's own face shows more strain than at baseline.
+
+| Cue                                   | Measure over the last 30 s (below the learner's baseline = towards overload) | Points **(tune)** |
+| ------------------------------------- | ---------------------------------------------------------------------------- | ----------------- |
+| Blink suppression                     | `blink_count`, ≥ 0.3 spreads below (≈ blink rate halved)                     | 1                 |
+| Brows drawn together                  | `brow_inner_gap_mean`, ≥ 1 spread below                                      | 1                 |
+| Lips pressed                          | `lip_thickness_mean`, ≥ 1 spread below (expression feature, FR3)             | 1                 |
+| Gaze fixed                            | larger of `gaze_dispersion_x/y`, ≥ 1 spread below                            | 1                 |
+| Load mostly High (trained model only) | share of seconds with `load_state` High ≥ 0.5                                | 1                 |
+
+≥ 3 points → `overloaded`; 2 → `working_hard` (effortful but manageable, the productive middle of the U); else `manageable`. These are design choices to be checked against NASA-TLX (Mental Demand, Effort, Frustration) in the pilot, not validated cut-offs.
+
+- **Own robust baseline.** Built from the raw calibration seconds: median and 1.4826·MAD for the face measures, mean and SD for per-second blink counts, each with a floor on the spread (0.02 IOD for brow gap and lips, 0.01 eye widths for gaze dispersion, 0.3 blinks/s). The pipeline's z-scores divide by the plain calibration SD, which after a very still calibration is near zero, so a sub-pixel shift reads as z ≈ 5: the failure the Mood card had (TODO A5, 2026-10-18).
+- **The load point needs a trained model.** `heuristic-0` is itself built from blinks, brow gap and lip thickness, so counting it would score the same evidence twice, and it reads posture changes as High.
+- **Left out:** seconds looking away from the screen (≥ 0.5 of a second's frames off-screen; mostly away → `manageable` with an "away" note) and seconds around a yawn (§8b mask), because both move the face for reasons other than effort.
+- `null` only while calibrating or with no face; face cues need 10 usable seconds before they score. 3 s confirm hysteresis.
+
+Code: `src/core/heuristics/overload.ts` (pure, unit-tested); thresholds in `HEURISTIC_CONFIG.overload`. Shown on the demo's Signals tab after Boredom, in the same layout. Not in `LoadStateEvent` (invariant 5).
+
+Validation plan: the Easy / Medium / Hard blocks of the pilot (Hard designed to overload) with NASA-TLX after each block; report how often `overloaded` falls in Hard blocks against Easy ones, and the correlation of points with Mental Demand, evaluated leave-one-participant-out. Until then, report overload as unvalidated.
 
 ### Single integration file
 
@@ -292,15 +348,15 @@ Study mode is behind a build flag and absent from the normal build.
 
 "Latency" needs a precise definition or the 300 ms target cannot be defended. Two numbers are reported:
 
-| Metric | Definition | Budget |
-|---|---|---|
-| **Frame latency** | camera frame timestamp → per-frame signals available | p95 ≤ 66 ms (keeps 15 fps) |
-| **Event latency (NFR1)** | timestamp of the newest frame in the window → `state` event emitted | p95 ≤ 300 ms |
-| Classifier inference | one forward pass | ≤ 20 ms |
-| Main-thread long tasks | tasks > 50 ms attributable to the sensor | none in steady state |
-| Memory | JS heap + `tf.memory().numTensors` over 60 min | flat (no upward trend) |
+| Metric                   | Definition                                                          | Budget                     |
+| ------------------------ | ------------------------------------------------------------------- | -------------------------- |
+| **Frame latency**        | camera frame timestamp → per-frame signals available                | p95 ≤ 66 ms (keeps 15 fps) |
+| **Event latency (NFR1)** | timestamp of the newest frame in the window → `state` event emitted | p95 ≤ 300 ms               |
+| Classifier inference     | one forward pass                                                    | ≤ 20 ms                    |
+| Main-thread long tasks   | tasks > 50 ms attributable to the sensor                            | none in steady state       |
+| Memory                   | JS heap + `tf.memory().numTensors` over 60 min                      | flat (no upward trend)     |
 
-The classifier looks at 30 s of history, so a *change* in the learner's state takes several seconds to appear by design. NFR1 is about processing delay, not that. Write this distinction into the report so the number isn't misread.
+The classifier looks at 30 s of history, so a _change_ in the learner's state takes several seconds to appear by design. NFR1 is about processing delay, not that. Write this distinction into the report so the number isn't misread.
 
 `pnpm bench` runs `bench.html`, which is the bare library with no demo UI. It runs in Chrome, Edge and/or Firefox and writes these numbers with device and browser info to `packages/load-sensor/docs/bench/`. The real measurement is `--camera=real` on the weakest laptop available, with a face in view. Fake-camera runs have no face, so the landmark model barely runs, and the report says so in `warnings`.
 
@@ -341,12 +397,12 @@ Request access early; approvals take time. If none arrive in time, the fallback 
 
 ## 13. Browser support (NFR7)
 
-| Concern | Chrome / Edge | Firefox |
-|---|---|---|
-| `requestVideoFrameCallback` | Yes | Check current support; fall back to rAF |
-| WebGL2 for TF.js | Yes | Yes; watch for slower shader compile on first run |
-| Service worker + large precache | Yes | Yes; not available in private windows |
-| Fake camera for tests | `--use-fake-device-for-media-stream --use-file-for-fake-video-capture=...` | `media.navigator.streams.fake` pref (no custom file) |
+| Concern                         | Chrome / Edge                                                              | Firefox                                              |
+| ------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `requestVideoFrameCallback`     | Yes                                                                        | Check current support; fall back to rAF              |
+| WebGL2 for TF.js                | Yes                                                                        | Yes; watch for slower shader compile on first run    |
+| Service worker + large precache | Yes                                                                        | Yes; not available in private windows                |
+| Fake camera for tests           | `--use-fake-device-for-media-stream --use-file-for-fake-video-capture=...` | `media.navigator.streams.fake` pref (no custom file) |
 
 Test all three on the same machine and record results in the bench output rather than assuming.
 
