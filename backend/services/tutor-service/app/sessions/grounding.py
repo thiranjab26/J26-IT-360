@@ -17,6 +17,7 @@ import logging
 from dataclasses import dataclass
 
 from app.retrieval.access import RetrievalMode
+from app.retrieval.hybrid import BM25, tokens
 from app.retrieval.retriever import Retriever
 from app.sessions.catalog import Course
 from app.sessions.writer import passage_hash
@@ -66,6 +67,15 @@ def primary_only(course: Course, passage_id: str) -> Grounding:
         primary=course.chunk_text[passage_id],
         sources=(Source(passage_id, heading_tail(heading), "main"),),
     )
+
+
+def closest_passage(course: Course, concept_id: str, question_id: str) -> str:
+    """The explanation part of a concept that is closest to a question about it."""
+    refs = course.theory[concept_id]
+    stem = course.bank[question_id].question.stem
+    scores = BM25([tokens(course.chunk_text[r]) for r in refs]).scores(tokens(stem))
+    best = max(scores, key=scores.__getitem__) if scores else 0
+    return refs[best]
 
 
 def heading_tail(heading_path: str) -> str:

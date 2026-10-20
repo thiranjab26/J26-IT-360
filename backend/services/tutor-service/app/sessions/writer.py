@@ -45,6 +45,20 @@ MAX_CHARS = 3000
 EXPLAIN = "explain"
 HINT = "hint"
 RETEACH = "reteach"
+MISS = "miss"  # why a wrong quick-check answer was wrong
+
+# The one text that is allowed to say which option is right: it explains a wrong choice, after
+# the student has already answered and been shown the answer.
+SYSTEM_MISS = SYSTEM.replace(
+    "- Never state the answer to a practice question.\n",
+    "- The answer key is given to you in the notes. You may use it, because the student has "
+    "already answered.\n",
+)
+
+
+def _system_for(kind: str) -> str:
+    return SYSTEM_MISS if kind == MISS else SYSTEM
+
 
 _TASKS = {
     EXPLAIN: (
@@ -57,6 +71,12 @@ _TASKS = {
         "The student is stuck on the question below. Write ONE short hint (at most 40 words) "
         "that points them to the idea in the passage they need. Do not give the answer, "
         "the program's output, or any final value."
+    ),
+    MISS: (
+        "The student chose a wrong option for the question above. Say, in at most two short "
+        "sentences and under 45 words, why the option they chose is not correct and what the "
+        "right answer is, using only the passages and the answer key. Do not repeat the "
+        "question. Do not add anything the passages and the key do not support."
     ),
     RETEACH: (
         "The student did not understand this passage the first time. Explain it again from a "
@@ -133,6 +153,11 @@ class TutorWriter:
     def enabled(self) -> bool:
         return self._provider is not None
 
+    def checks(self, kind: str) -> bool:
+        """True when a text of this kind is both written and checked here. Text that is not
+        checked is never shown for the kinds that need it."""
+        return self._provider is not None and self._gate is not None and kind in self._gated
+
     def cache_fingerprint(self, kind: str) -> str | None:
         """Identifies everything that could change a stored explanation, or None if this
         kind of text must not be shared between sessions.
@@ -181,7 +206,7 @@ class TutorWriter:
         while True:
             try:
                 result = self._provider.generate(
-                    system=SYSTEM,
+                    system=_system_for(kind),
                     prompt=prompt,
                     max_tokens=300 if kind == HINT else 700,
                     temperature=0.3,
@@ -282,7 +307,7 @@ class TutorWriter:
         for attempt in range(1, tries + 1):
             try:
                 result = self._provider.generate(
-                    system=SYSTEM,
+                    system=_system_for(kind),
                     prompt=prompt,
                     max_tokens=300 if kind == HINT else 700,
                     temperature=0.3,

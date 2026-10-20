@@ -37,9 +37,26 @@ class FeedbackOut(BaseModel):
     # Only after a correct answer, or after a wrong quick check (which never blocks).
     explanation: str | None = None
     correct_option: str | None = None
+    # A wrong multiple-choice quick check: which option the student chose and what it and the
+    # right one say, so the screen can set them side by side.
+    chosen_option: str | None = None
+    chosen_text: str | None = None
+    correct_text: str | None = None
     xp_earned: int = 0
     attempt: int = 1
     tries_left: int | None = None
+
+
+class MissOut(BaseModel):
+    """The short note on why a wrong quick-check answer was wrong, which takes a moment to write.
+
+    none: there is nothing to explain. pending: being written. ready: `text` is it, and it has
+    passed the faithfulness gate. unavailable: it could not be written (the model could not be
+    reached, or the checker would not pass it), so the screen shows the answer without it.
+    """
+
+    status: Literal["none", "pending", "ready", "unavailable"]
+    text: str | None = None
 
 
 class SourceOut(BaseModel):

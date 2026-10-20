@@ -244,6 +244,13 @@ def refers_to_option_letters(text: str) -> bool:
     return bool(_LETTER_REFERENCE_RE.search(re.sub(r"`[^`]*`", " ", text)))
 
 
+def presented(session_id: str, entry: BankEntry) -> tuple[Question, AnswerKey]:
+    """The question as one session shows it. The same every time it is rebuilt, so a letter a
+    student chose means the same option whenever it is looked at again."""
+    rng = random.Random(f"{session_id}:{entry.question.question_id}")
+    return shuffled(entry.question, entry.key, rng)
+
+
 def shuffled(question: Question, key: AnswerKey, rng: random.Random) -> tuple[Question, AnswerKey]:
     """The question with its options in a random order and the key adjusted to match.
 

@@ -20,14 +20,13 @@ Three rules worth knowing:
 
 from __future__ import annotations
 
-import random
 import uuid
 from collections import defaultdict
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from app.domain.questions import AnswerKey, BankEntry, Question, shuffled
+from app.domain.questions import AnswerKey, BankEntry, Question, presented
 from app.gamification.mastery import MIN_EVIDENCE, CheckpointResult, estimate
 from app.gamification.progression import (
     BADGE_BY_ID,
@@ -48,7 +47,7 @@ from app.gamification.rules import (
     unlock_status,
 )
 from app.gamification.xp import xp_for_checkpoint
-from app.grading.deterministic import grade
+from app.grading.deterministic import grade, read_option
 from app.models.sessions import (
     BadgeOut,
     BadgeStatusOut,
@@ -61,6 +60,7 @@ from app.models.sessions import (
     LeaderEntryOut,
     LevelOut,
     LevelUpOut,
+    MissOut,
     OptionOut,
     PositionOut,
     ProfileOut,
@@ -74,10 +74,9 @@ from app.models.sessions import (
     StreakOut,
     SummaryOut,
 )
-from app.retrieval.hybrid import BM25, tokens
 from app.sessions.catalog import Course, UnknownModule
 from app.sessions.gate_log import record_audits
-from app.sessions.grounding import Grounding, primary_only
+from app.sessions.grounding import Grounding, closest_passage, primary_only
 from app.sessions.plan import build_plan
 from app.sessions.repository import (
     AttemptRecord,
@@ -102,7 +101,7 @@ from app.sessions.state_machine import (
     start,
     step,
 )
-from app.sessions.writer import EXPLAIN, HINT, RETEACH, TutorWriter, gives_away
+from app.sessions.writer import EXPLAIN, HINT, MISS, RETEACH, TutorWriter, gives_away
 from app.verification.fill import Filler
 
 GENERIC_HINT = (
@@ -341,6 +340,9 @@ class SessionService:
 
         stored = replace(stored, state=new_state)
         self.repo.save(stored)
+
+        if verdict.outcome == "wrong" and not gating and question.kind == "mcq":
+            self._start_miss(state.session_id, course, current.ref)
 
         earned = None
         if correct:  # a wrong or unreadable answer pays nothing
@@ -602,8 +604,7 @@ class SessionService:
     @staticmethod
     def _presented(session_id: str, entry: BankEntry) -> tuple[Question, AnswerKey]:
         """The question as this session shows it. The same every time it is rebuilt."""
-        rng = random.Random(f"{session_id}:{entry.question.question_id}")
-        return shuffled(entry.question, entry.key, rng)
+        return presented(session_id, entry)
 
     # -------------------------------------------------------------------- views
     def _pay(
@@ -962,7 +963,7 @@ class SessionService:
             )
 
         entry = course.bank[last.question_id]
-        _, key = self._presented(state.session_id, entry)
+        question, key = self._presented(state.session_id, entry)
 
         if last.outcome == "correct":
             return FeedbackOut(
@@ -974,11 +975,16 @@ class SessionService:
             )
 
         if not last.gating:  # a quick check never blocks, so there is nothing to hide
+            options = {o.letter: o.text for o in question.options}
+            chosen = read_option(question, last.answer) if question.options else None
             return FeedbackOut(
                 outcome="wrong",
                 message="Not quite. Here is the answer.",
                 explanation=key.explanation or None,
                 correct_option=key.correct_option,
+                chosen_option=chosen,
+                chosen_text=options.get(chosen) if chosen else None,
+                correct_text=options.get(key.correct_option) if key.correct_option else None,
                 attempt=1,
             )
 
@@ -993,8 +999,41 @@ class SessionService:
     @staticmethod
     def _closest_ref(course: Course, state: SessionState, question_id: str) -> str:
         """The explanation part closest to the question the student keeps missing."""
-        refs = course.theory[state.concept_id]
-        stem = course.bank[question_id].question.stem
-        scores = BM25([tokens(course.chunk_text[r]) for r in refs]).scores(tokens(stem))
-        best = max(scores, key=scores.__getitem__) if scores else 0
-        return refs[best]
+        return closest_passage(course, state.concept_id, question_id)
+
+    def _start_miss(self, session_id: str, course: Course, question_id: str) -> None:
+        """Begin writing the note on why a wrong quick-check answer was wrong, so it is usually
+        ready by the time the student has read the answer. Never waits and never raises."""
+        if self.filler is None or not self.writer.checks(MISS):
+            return
+        self.filler.prefetch(
+            MISS, course.module_id, question_id, (session_id, f"miss:{question_id}")
+        )
+
+    def miss(self, user_id: str, session_id: str) -> MissOut:
+        """The note on why the student's last answer was wrong, if there is one to give."""
+        stored, course = self._load(user_id, session_id)
+        attempts = self.repo.attempts(session_id)
+        last = attempts[-1] if attempts else None
+        if last is None or last.outcome != "wrong" or last.gating:
+            return MissOut(status="none")
+        if course.bank[last.question_id].question.kind != "mcq":
+            return MissOut(status="none")
+
+        key = f"miss:{last.question_id}"
+        saved = self.repo.get_text(session_id, key)
+        if saved is not None:
+            return MissOut(status="ready", text=saved.text)
+        if self.filler is None or not self.writer.checks(MISS):
+            return MissOut(status="unavailable")
+
+        scope = (session_id, key)
+        module, question_id = course.module_id, last.question_id
+        if self.filler.is_running(MISS, module, question_id, scope):
+            return MissOut(status="pending")
+        if self.filler.failure_reason(MISS, module, question_id) is not None:
+            return MissOut(status="unavailable")
+        # Not started, or finished without leaving a note: start it (a finished job that
+        # stored nothing has a failure on record, so this is only a first request).
+        self.filler.prefetch(MISS, module, question_id, scope)
+        return MissOut(status="pending")

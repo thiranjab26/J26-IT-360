@@ -24,6 +24,7 @@ Design docs: `docs/c3/Implementation-plan.md`, `docs/c3/dsa-module-plan.md`,
 | POST | `/api/v1/tutor/sessions/{id}/end` | The student stops. Resumable for 48 hours | P2 |
 | POST | `/api/v1/tutor/sessions/{id}/resume` | Pick up after the last passed checkpoint (`student_ended`, `load_exit`, `timeout` only) | P2 |
 | GET | `/api/v1/tutor/progress?module_id=prog` | XP, mastery per concept, what is unlocked and why not, the suggested next concept | P2 |
+| GET | `/api/v1/tutor/sessions/{id}/miss` | The short note on why the student's last wrong quick-check answer was wrong: `none`, `pending`, `ready` (with the text) or `unavailable`. It is written for that student as they answer, so it is polled | P5 |
 | GET | `/api/v1/tutor/profile` | Level, XP towards the next level, streak and every badge (earned or locked) | P5 |
 | GET | `/api/v1/tutor/leaderboard?limit=10` | Top students by XP, names shortened to a first name and an initial, plus the caller's own rank if outside the top | P5 |
 
@@ -200,6 +201,15 @@ Lecturers only (`403 lecturers_only`), and any lecturer may approve. These respo
 - **Lecturer screens.** The Practical studio (`/studio`, lecturers only) generates drafts, shows each with its checks and a preview of the task, solution and tests, and approves or rejects one at a time or in bulk. It also lists what is live now, and the history with a Restore button.
 - **Safety.** The local runner is not a sandbox, so generated code is checked for dangerous APIs before it is run, only lecturers can start generation, and nothing reaches students until a lecturer approves it. The Piston runner should still come before wide use.
 - **Not built yet:** generated predict-the-output and multiple-choice questions, and checking generated tests against deliberately wrong solutions.
+
+## After a wrong quick check
+
+A wrong multiple-choice quick check never blocks anything, so the student is shown the answer straight away: the option they chose and the right option, each in words, then the course author's note on why the answer is right. The note on why THEIR choice was wrong is written afterwards, for that student, and appears when it is ready.
+
+- **How it is written.** `ensure_miss` (`app/verification/fill.py`) gives the model the question, its options as this student saw them (the options are shuffled per session), which one was chosen, and the answer key, and asks for two short sentences under 45 words. The key is passed as a passage so the faithfulness gate can check a claim about which option is right the same way it checks every other claim. It is stored with that session only and shown only if the gate passed it; this kind of text is always checked, whatever `TUTOR_GATE_KINDS` says. The live retry limits apply.
+- **When it fails** (no model, quota used up, or the checker would not pass it) nothing takes its place: the answer is still shown, without the note.
+- **Not for graded questions.** A wrong answer on a checkpoint that counts still reveals nothing before the last try, so the retries mean something.
+- **Cost.** One more model call and check for each wrong quick-check answer. Measured on a real run, the note took about 40 seconds, so the screen shows a placeholder until it arrives.
 
 ## Live and cached explanations
 

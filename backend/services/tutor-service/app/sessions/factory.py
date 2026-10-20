@@ -19,9 +19,9 @@ from app.practicals.runner import CodeRunner, LocalJavaRunner
 from app.retrieval.retriever import Retriever
 from app.sessions.catalog import Course, get_course
 from app.sessions.grounding import Grounding, build_grounding
-from app.sessions.writer import RetryPolicy, TutorWriter
+from app.sessions.writer import MISS, RetryPolicy, TutorWriter
 from app.verification.claims import Decomposer, LLMDecomposer, SentenceDecomposer
-from app.verification.fill import Filler, Outcome, ensure_live, ensure_verified
+from app.verification.fill import Filler, Outcome, ensure_live, ensure_miss, ensure_verified
 from app.verification.gate import FaithfulnessGate
 from app.verification.nli import DebertaNLI
 
@@ -53,7 +53,9 @@ def build_writer(settings: Settings) -> tuple[TutorWriter, DebertaNLI | None]:
     provider = build_provider(settings)
     built = build_gate(settings, provider)
     gate, nli = built if built else (None, None)
-    kinds = {k.strip() for k in settings.gate_kinds.split(",") if k.strip()}
+    # A note on why an answer was wrong is only ever shown if the gate passed it, whatever
+    # the setting says: that rule is not optional.
+    kinds = {k.strip() for k in settings.gate_kinds.split(",") if k.strip()} | {MISS}
     # Live mode tries until the gate has rejected N texts or the model has failed M times.
     # Cached mode keeps the original rule: one try, and one rewrite if the gate rejects it.
     policy = (
@@ -134,6 +136,16 @@ def get_filler() -> Filler:
         from app.db.session import SessionFactory
 
         course = get_course(module_id)
+        if kind == MISS:
+            # For a miss the "passage" slot holds the question id. It is written for one session.
+            return ensure_miss(
+                writer=get_writer(),
+                session_factory=SessionFactory,
+                course=course,
+                grounder=get_grounder(),
+                session_id=session_id or "",
+                text_key=text_key or "",
+            )
         grounding = get_grounder()(course, passage_id)
         if session_id is not None and text_key is not None:
             # Live mode: written for one session, stored with that session only.

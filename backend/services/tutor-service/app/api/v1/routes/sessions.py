@@ -18,6 +18,7 @@ from app.models.sessions import (
     AnswerIn,
     HistoryOut,
     LeaderboardOut,
+    MissOut,
     ProfileOut,
     ProgressOut,
     SessionOut,
@@ -97,6 +98,17 @@ def session_history(
 ) -> HistoryOut:
     """The parts the student has already read, so they can look back. Read-only."""
     return _run(lambda: service.history(str(caller.user_id), session_id))
+
+
+@router.get("/sessions/{session_id}/miss", response_model=MissOut)
+def session_miss(
+    session_id: str,
+    caller: CurrentUser = Depends(student),
+    service: SessionService = Depends(get_service),
+) -> MissOut:
+    """The short note on why the student's last quick-check answer was wrong. It is written
+    for them when they answer, so this is polled until it is ready."""
+    return _run(lambda: service.miss(str(caller.user_id), session_id))
 
 
 @router.post("/sessions/{session_id}/continue", response_model=SessionOut)
