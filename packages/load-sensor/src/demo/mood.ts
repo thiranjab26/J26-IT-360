@@ -1,4 +1,5 @@
 import { FEATURE_INDEX as I } from '../core/features/spec.js';
+import type { FrameSignals } from '../core/features/frame-signals.js';
 import { midpoint, point, type FaceMesh } from '../core/features/geometry.js';
 import { EngagementEstimator, HEURISTIC_CONFIG } from '../core/heuristics/index.js';
 import { Hysteresis } from '../core/classifier/smoothing.js';
@@ -34,6 +35,19 @@ import type { NormalisedSecond } from '../core/window/index.js';
  *
  * Expression rules need z-scores, so they start once the 30 s baseline is
  * ready, and they switch off with the FR3 expression features (ablation).
+ *
+ * The z-scores here are the mood's own, not the pipeline's: every face measure
+ * is collected per frame, skipping frames with the head turned or the eyes
+ * closed (a blink drops the upper lid, which reads as a brow raise), and is
+ * scored against a robust baseline (median, MAD) with a floor on the spread.
+ * Without the floor, a learner who sat very still while calibrating gets a
+ * spread of under a pixel, and ordinary landmark jitter then crosses every
+ * threshold: that was why moods appeared at random. The pipeline's z-scores
+ * are left alone because they are the model input (feature_spec.json).
+ *
+ * A mood that is showing needs less evidence to stay than it needed to start
+ * (MOOD_CONFIG.keep), so a reading near a threshold does not flip back and
+ * forth.
  */
 
 export type Mood =
@@ -63,20 +77,43 @@ export const MOOD_CONFIG = Object.freeze({
   engagementWindowSeconds: 10,
   focusedScore: HEURISTIC_CONFIG.engagement.high,
   distractedScore: HEURISTIC_CONFIG.engagement.low,
-  /** z thresholds against the learner's baseline. */
+  /**
+   * z thresholds against the learner's baseline. The brow and lip ones are
+   * stricter than `affect`'s (HEURISTIC_CONFIG.affect: 1 / 1 / 1.5) because a
+   * named mood on screen should need a deliberate expression, not a drift.
+   */
   smileZ: 1.5,
   smileWidthZ: 0.5,
-  sadCornerZ: -1.2,
+  sadCornerZ: -1.5,
   sadMaxWidthZ: 0.5,
-  surpriseBrowZ: 2,
-  surpriseMouthZ: 1.5,
-  furrowZ: HEURISTIC_CONFIG.affect.furrowZ,
-  pressZ: HEURISTIC_CONFIG.affect.pressZ,
-  confusedRaiseZ: HEURISTIC_CONFIG.affect.raiseZ,
-  /** Smallest baseline spread (IOD), so a very still calibration does not make z explode. */
-  minSpreadLift: 0.01,
-  minSpreadWidth: 0.015,
-  /** Frames with the head turned further than this are not used for mouth measures. */
+  surpriseBrowZ: 2.5,
+  surpriseMouthZ: 2,
+  furrowZ: 1.5,
+  pressZ: 1.5,
+  confusedRaiseZ: 2,
+  /**
+   * While a mood is showing, its thresholds are multiplied by this (a Schmitt
+   * trigger): it stays until the evidence falls clearly below the entry level.
+   */
+  keep: 0.7,
+  /** Engagement band around the focused / distracted cut-offs, same idea as `keep`. */
+  engagementBand: 0.05,
+  /**
+   * Smallest baseline spread per measure (IOD). Landmark jitter on a laptop
+   * webcam is roughly 0.005-0.015 IOD (under 1 px at a 70 px IOD), so a floor
+   * of 0.02 keeps jitter well under z = 1, while a held furrow or raise
+   * (several pixels) still clears the thresholds. The mouth-opening floor is
+   * higher because speech moves it all the time. (tune)
+   */
+  minSpread: Object.freeze({
+    lift: 0.01,
+    width: 0.015,
+    browRaise: 0.02,
+    browGap: 0.02,
+    lipThick: 0.02,
+    mouthOpen: 0.03,
+  }),
+  /** Frames with the head turned further than this are not used for face measures. */
   maxYawDeg: 25,
   maxPitchDeg: 20,
   /** Baseline seconds needed before the mouth measures are trusted. */
@@ -125,8 +162,18 @@ export interface MoodFrame {
   readonly landmarks: Float32Array | null;
   readonly aspect: number;
   /** From the per-frame signals; null without a face. */
-  readonly signals: { readonly iod: number; readonly yaw: number; readonly pitch: number } | null;
+  readonly signals: Pick<
+    FrameSignals,
+    'iod' | 'yaw' | 'pitch' | 'browRaise' | 'browInnerGap' | 'mouthOpen' | 'lipThickness'
+  > | null;
+  /** Eyes closed in this frame (blink detector); such frames are skipped. */
+  readonly eyesClosed?: boolean;
 }
+
+/** Face measures the mood scores against its own baseline, all in IOD. */
+const MEASURES = ['lift', 'width', 'browRaise', 'browGap', 'lipThick', 'mouthOpen'] as const;
+type Measure = (typeof MEASURES)[number];
+type Measures = Readonly<Record<Measure, number>>;
 
 /** Evidence behind the reading, each in "how unusual for you" units (z) or a share. */
 export interface MoodEvidence {
@@ -166,9 +213,8 @@ export interface MoodSegment {
 interface SecondRow {
   readonly startMs: number;
   readonly valid: boolean;
-  readonly lift: number | null;
-  readonly width: number | null;
-  readonly z: Float32Array | null;
+  /** Mean face measures over the usable frames of this second; null if none. */
+  readonly m: Measures | null;
   readonly closed: number;
   readonly tired: number;
   readonly engagement: number;
@@ -176,17 +222,17 @@ interface SecondRow {
 
 export class MoodEstimator {
   #expression: boolean;
-  #frameLift: number[] = [];
-  #frameWidth: number[] = [];
-  #baseLift: number[] = [];
-  #baseWidth: number[] = [];
-  #baseline: { lift: number; liftSd: number; width: number; widthSd: number } | null = null;
+  #frames: Measures[] = [];
+  #base: Measures[] = [];
+  #baseline: { mid: Measures; sd: Measures } | null = null;
+  #lastPhase: NormalisedSecond['phase'] | null = null;
   #rows: SecondRow[] = [];
   #gate = new Hysteresis<Mood>(MOOD_CONFIG.confirm);
   #shown: Mood | null = null;
   #sinceMs = 0;
   #history: MoodSegment[] = [];
   #reading: MoodReading | null = null;
+  #hidden = new Set<Mood>();
 
   constructor(useExpressionFeatures = true) {
     this.#expression = useExpressionFeatures;
@@ -208,52 +254,61 @@ export class MoodEstimator {
     this.reset();
   }
 
-  /** Every landmark frame: collects the mouth measures for the current second. */
+  /**
+   * Moods switched off in the admin panel: their rule is skipped, so the next
+   * matching rule wins (at worst "neutral"). "no-face" cannot be hidden.
+   * A hidden mood that is showing now is replaced on the next second, without
+   * the confirm delay.
+   */
+  setHidden(moods: Iterable<Mood>): void {
+    this.#hidden = new Set([...moods].filter((m) => m !== 'no-face' && m !== 'neutral'));
+    if (this.#shown !== null && this.#hidden.has(this.#shown)) {
+      this.#gate = new Hysteresis<Mood>(MOOD_CONFIG.confirm);
+    }
+  }
+
+  /** Every landmark frame: collects the face measures for the current second. */
   pushFrame(f: MoodFrame): void {
     const s = f.signals;
-    if (!f.landmarks || !s || s.iod <= 0) return;
+    if (!f.landmarks || !s || s.iod <= 0 || f.eyesClosed) return;
     if (Math.abs(s.yaw) > MOOD_CONFIG.maxYawDeg || Math.abs(s.pitch) > MOOD_CONFIG.maxPitchDeg) {
       return;
     }
     const mesh = { landmarks: f.landmarks, aspect: f.aspect };
-    const lift = mouthCornerLift(mesh, s.iod);
-    const width = mouthWidth(mesh, s.iod);
-    if (Number.isFinite(lift) && Number.isFinite(width)) {
-      this.#frameLift.push(lift);
-      this.#frameWidth.push(width);
-    }
+    const m: Measures = {
+      lift: mouthCornerLift(mesh, s.iod),
+      width: mouthWidth(mesh, s.iod),
+      browRaise: s.browRaise,
+      browGap: s.browInnerGap,
+      lipThick: s.lipThickness,
+      mouthOpen: s.mouthOpen,
+    };
+    if (MEASURES.every((k) => Number.isFinite(m[k]))) this.#frames.push(m);
   }
 
   /** Every finished second from the feature pipeline. */
   pushSecond(s: NormalisedSecond): MoodReading {
-    const lift = this.#frameLift.length > 0 ? mean(this.#frameLift) : null;
-    const width = this.#frameWidth.length > 0 ? mean(this.#frameWidth) : null;
-    this.#frameLift = [];
-    this.#frameWidth = [];
+    const m = this.#frames.length > 0 ? meanMeasures(this.#frames) : null;
+    this.#frames = [];
 
-    // Mouth baseline: the same calibration seconds as the pipeline's own baseline.
+    // Face baseline: the same calibration seconds as the pipeline's own baseline.
     if (s.phase === 'calibrating') {
+      // A new calibration (the pipeline recalibrated after a long absence):
+      // the old seconds describe a different sitting, so start again.
+      if (this.#lastPhase === 'ready') this.#base = [];
       this.#baseline = null;
-      if (s.valid && lift !== null && width !== null) {
-        this.#baseLift.push(lift);
-        this.#baseWidth.push(width);
-      }
-    } else if (!this.#baseline && this.#baseLift.length >= MOOD_CONFIG.minBaselineSeconds) {
-      this.#baseline = {
-        lift: median(this.#baseLift),
-        liftSd: Math.max(MOOD_CONFIG.minSpreadLift, robustSd(this.#baseLift)),
-        width: median(this.#baseWidth),
-        widthSd: Math.max(MOOD_CONFIG.minSpreadWidth, robustSd(this.#baseWidth)),
-      };
+      if (s.valid && m) this.#base.push(m);
+    } else if (!this.#baseline && this.#base.length >= MOOD_CONFIG.minBaselineSeconds) {
+      this.#baseline = robustBaseline(this.#base);
+      this.#base = [];
     }
+    this.#lastPhase = s.phase;
 
     const a = s.aux;
     this.#rows.push({
       startMs: s.startMs,
       valid: s.valid,
-      lift,
-      width,
-      z: s.z,
+      m,
       closed: s.raw[I.eyes_closed_fraction] ?? 0,
       tired: a.longClosures + a.yawns + a.nods,
       engagement: EngagementEstimator.secondScore(s),
@@ -292,11 +347,10 @@ export class MoodEstimator {
   }
 
   reset(): void {
-    this.#frameLift = [];
-    this.#frameWidth = [];
-    this.#baseLift = [];
-    this.#baseWidth = [];
+    this.#frames = [];
+    this.#base = [];
     this.#baseline = null;
+    this.#lastPhase = null;
     this.#rows = [];
     this.#gate = new Hysteresis<Mood>(MOOD_CONFIG.confirm);
     this.#shown = null;
@@ -305,7 +359,7 @@ export class MoodEstimator {
   }
 
   #zReady(): boolean {
-    return this.#baseline !== null && this.#rows.some((r) => r.z !== null);
+    return this.#baseline !== null;
   }
 
   #classify(valid: boolean): { mood: Mood; strength: number; evidence: MoodEvidence } {
@@ -316,34 +370,37 @@ export class MoodEstimator {
     const engRows = this.#rows.slice(-c.engagementWindowSeconds);
     const onScreen = engRows.length > 0 ? mean(engRows.map((r) => r.engagement)) : null;
 
-    const recent = this.#rows.slice(-c.expressionWindowSeconds).filter((r) => r.valid && r.z);
+    const recent = this.#rows
+      .slice(-c.expressionWindowSeconds)
+      .flatMap((r) => (r.valid && r.m ? [r.m] : []));
     const b = this.#baseline;
     const useExpr = this.#expression && b !== null && recent.length > 0;
-    const zMean = (index: number, sign = 1): number | null =>
-      useExpr ? sign * mean(recent.map((r) => r.z?.[index] ?? 0)) : null;
-    const lifts = recent.flatMap((r) => (r.lift === null ? [] : [r.lift]));
-    const widths = recent.flatMap((r) => (r.width === null ? [] : [r.width]));
-    const smile = useExpr && lifts.length > 0 ? (mean(lifts) - b.lift) / b.liftSd : null;
-    const widthZ = useExpr && widths.length > 0 ? (mean(widths) - b.width) / b.widthSd : null;
+    // Mean of a measure over the expression window, as z against the baseline.
+    const z = (k: Measure, sign = 1): number | null =>
+      useExpr ? (sign * (mean(recent.map((r) => r[k])) - b.mid[k])) / b.sd[k] : null;
     const evidence: MoodEvidence = {
-      smile,
-      mouthWidth: widthZ,
-      browRaise: zMean(I.brow_raise_mean),
-      browFurrow: zMean(I.brow_inner_gap_mean, -1),
-      lipPress: zMean(I.lip_thickness_mean, -1),
-      mouthOpen: zMean(I.mouth_open_mean),
+      smile: z('lift'),
+      mouthWidth: z('width'),
+      browRaise: z('browRaise'),
+      browFurrow: z('browGap', -1),
+      lipPress: z('lipThick', -1),
+      mouthOpen: z('mouthOpen'),
       eyesClosed,
       tiredEvents,
       onScreen,
     };
 
     if (!valid) return { mood: 'no-face', strength: 1, evidence };
+    // Threshold scale: the mood already showing needs less to stay (MOOD_CONFIG.keep).
+    const k = (mood: Mood): number => (this.#shown === mood ? c.keep : 1);
+    const on = (mood: Mood): boolean => !this.#hidden.has(mood);
     // `over(v, t)`: 0 at the threshold, 1 at twice it, clamped; used as strength.
     const over = (v: number, t: number): number => clamp01(0.4 + (0.6 * (v - t)) / Math.abs(t));
 
     if (
-      (eyesClosed !== null && eyesClosed >= c.drowsyClosedFraction) ||
-      tiredEvents >= c.drowsyEvents
+      on('drowsy') &&
+      ((eyesClosed !== null && eyesClosed >= c.drowsyClosedFraction * k('drowsy')) ||
+        tiredEvents >= Math.max(1, Math.round(c.drowsyEvents * k('drowsy'))))
     ) {
       const byClosed = eyesClosed === null ? 0 : over(eyesClosed, c.drowsyClosedFraction);
       return {
@@ -353,40 +410,48 @@ export class MoodEstimator {
       };
     }
     const e = evidence;
-    if (e.smile !== null && e.mouthWidth !== null) {
-      if (e.smile >= c.smileZ && e.mouthWidth >= c.smileWidthZ) {
+    if (on('happy') && e.smile !== null && e.mouthWidth !== null) {
+      if (e.smile >= c.smileZ * k('happy') && e.mouthWidth >= c.smileWidthZ * k('happy')) {
         return { mood: 'happy', strength: over(e.smile, c.smileZ), evidence };
       }
     }
-    if (e.browRaise !== null && e.mouthOpen !== null) {
-      if (e.browRaise >= c.surpriseBrowZ && e.mouthOpen >= c.surpriseMouthZ) {
+    if (on('surprised') && e.browRaise !== null && e.mouthOpen !== null) {
+      if (
+        e.browRaise >= c.surpriseBrowZ * k('surprised') &&
+        e.mouthOpen >= c.surpriseMouthZ * k('surprised')
+      ) {
         return { mood: 'surprised', strength: over(e.browRaise, c.surpriseBrowZ), evidence };
       }
     }
-    if (e.browFurrow !== null && e.lipPress !== null) {
-      if (e.browFurrow >= c.furrowZ && e.lipPress >= c.pressZ) {
+    if (on('frustrated') && e.browFurrow !== null && e.lipPress !== null) {
+      if (e.browFurrow >= c.furrowZ * k('frustrated') && e.lipPress >= c.pressZ * k('frustrated')) {
         return { mood: 'frustrated', strength: over(e.browFurrow, c.furrowZ), evidence };
       }
     }
-    if (e.smile !== null && e.mouthWidth !== null) {
-      if (e.smile <= c.sadCornerZ && e.mouthWidth <= c.sadMaxWidthZ) {
+    if (on('sad') && e.smile !== null && e.mouthWidth !== null) {
+      if (e.smile <= c.sadCornerZ * k('sad') && e.mouthWidth <= c.sadMaxWidthZ) {
         return { mood: 'sad', strength: over(-e.smile, -c.sadCornerZ), evidence };
       }
     }
-    if (e.browFurrow !== null && e.browRaise !== null) {
-      if (e.browFurrow >= c.furrowZ || e.browRaise >= c.confusedRaiseZ) {
+    if (on('confused') && e.browFurrow !== null && e.browRaise !== null) {
+      if (
+        e.browFurrow >= c.furrowZ * k('confused') ||
+        e.browRaise >= c.confusedRaiseZ * k('confused')
+      ) {
         const s = Math.max(over(e.browFurrow, c.furrowZ), over(e.browRaise, c.confusedRaiseZ));
         return { mood: 'confused', strength: s, evidence };
       }
     }
-    if (onScreen !== null && onScreen >= c.focusedScore) {
+    const focusedAt = c.focusedScore - (this.#shown === 'focused' ? c.engagementBand : 0);
+    const distractedAt = c.distractedScore + (this.#shown === 'distracted' ? c.engagementBand : 0);
+    if (on('focused') && onScreen !== null && onScreen >= focusedAt) {
       return {
         mood: 'focused',
         strength: clamp01((onScreen - c.focusedScore) / (1 - c.focusedScore) + 0.4),
         evidence,
       };
     }
-    if (onScreen !== null && onScreen < c.distractedScore) {
+    if (on('distracted') && onScreen !== null && onScreen < distractedAt) {
       return {
         mood: 'distracted',
         strength: clamp01(1 - onScreen / c.distractedScore + 0.4),
@@ -404,6 +469,24 @@ export class MoodEstimator {
 
 function mean(v: readonly number[]): number {
   return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+function meanMeasures(rows: readonly Measures[]): Measures {
+  const out = {} as Record<Measure, number>;
+  for (const k of MEASURES) out[k] = mean(rows.map((r) => r[k]));
+  return out;
+}
+
+/** Median and floored robust spread of each measure over the calibration seconds. */
+function robustBaseline(rows: readonly Measures[]): { mid: Measures; sd: Measures } {
+  const mid = {} as Record<Measure, number>;
+  const sd = {} as Record<Measure, number>;
+  for (const k of MEASURES) {
+    const v = rows.map((r) => r[k]);
+    mid[k] = median(v);
+    sd[k] = Math.max(MOOD_CONFIG.minSpread[k], robustSd(v));
+  }
+  return { mid, sd };
 }
 
 function median(v: readonly number[]): number {

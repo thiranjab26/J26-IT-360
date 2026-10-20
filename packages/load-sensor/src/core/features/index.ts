@@ -7,6 +7,7 @@ export {
 } from './blink.js';
 export { FEATURE_CONFIG, type FeatureConfig } from './config.js';
 export { NodDetector, YawnDetector } from './drowsiness.js';
+export { LookDownTracker, type LookDownOptions } from './look-down.js';
 export { browInnerGap, browRaise, lipThickness, mouthOpen } from './expression.js';
 export {
   earLeft,

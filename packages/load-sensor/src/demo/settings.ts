@@ -14,6 +14,7 @@
 
 import type { CameraStatus } from '../core/camera/index.js';
 import type { AlarmReason } from './attention-alarm.js';
+import type { Mood } from './mood.js';
 
 export interface DemoSettings {
   readonly sensing: {
@@ -23,6 +24,10 @@ export interface DemoSettings {
     readonly featurePoints: boolean;
     /** FR3 ablation switch. Changing it restarts calibration. */
     readonly expressionFeatures: boolean;
+    /** Show the apparent-mood card on the Signals tab. Display only. */
+    readonly showMood: boolean;
+    /** Moods switched off: never shown, the next matching mood shows instead. */
+    readonly hiddenMoods: readonly HideableMood[];
   };
   readonly alarm: {
     readonly enabled: boolean;
@@ -39,8 +44,31 @@ export interface DemoSettings {
   };
 }
 
+/**
+ * Moods the admin panel can switch off. "No face" and "Neutral" always stay:
+ * they are the fallbacks a hidden mood falls through to (mood.ts rule order).
+ */
+export const HIDEABLE_MOODS = [
+  'happy',
+  'focused',
+  'surprised',
+  'confused',
+  'frustrated',
+  'sad',
+  'drowsy',
+  'distracted',
+] as const satisfies readonly Mood[];
+
+export type HideableMood = (typeof HIDEABLE_MOODS)[number];
+
 export const DEFAULT_SETTINGS: DemoSettings = {
-  sensing: { targetFps: 15, featurePoints: false, expressionFeatures: true },
+  sensing: {
+    targetFps: 15,
+    featurePoints: false,
+    expressionFeatures: true,
+    showMood: true,
+    hiddenMoods: [],
+  },
   alarm: { enabled: true, absentS: 5, asleepS: 3, volume: 100 },
   // 20 min is the 20-20-20 rule; 30 min a common desk-work reminder.
   wellbeing: { eyeBreakMin: 20, moveBreakMin: 30 },
@@ -75,6 +103,8 @@ export function sanitizeSettings(raw: unknown): DemoSettings {
       targetFps: num(s.targetFps, d.sensing.targetFps, LIMITS.targetFps),
       featurePoints: bool(s.featurePoints, d.sensing.featurePoints),
       expressionFeatures: bool(s.expressionFeatures, d.sensing.expressionFeatures),
+      showMood: bool(s.showMood, d.sensing.showMood),
+      hiddenMoods: moodList(s.hiddenMoods),
     },
     alarm: {
       enabled: bool(a.enabled, d.alarm.enabled),
@@ -229,6 +259,12 @@ export function openControlChannel(onMessage: (m: ControlMessage) => void): {
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** Known hideable moods only, each once, in HIDEABLE_MOODS order. */
+function moodList(v: unknown): HideableMood[] {
+  if (!Array.isArray(v)) return [];
+  return HIDEABLE_MOODS.filter((m) => v.includes(m));
 }
 
 function bool(v: unknown, fallback: boolean): boolean {

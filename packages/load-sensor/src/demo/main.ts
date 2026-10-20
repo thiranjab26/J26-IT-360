@@ -57,6 +57,7 @@ import { WellbeingPanel } from './wellbeing-panel.js';
 
 const ALARM_BANNER: Record<AlarmReason, string> = {
   absent: 'No one at the screen',
+  away: 'Look back at the screen',
   asleep: 'Eyes closed — wake up',
 };
 
@@ -328,6 +329,9 @@ function mount(root: HTMLElement): void {
   const mood = new MoodEstimator(settings.value.sensing.expressionFeatures);
   const moodPanel = new MoodPanel();
   signals.mountAfterKpis(moodPanel.element);
+  moodPanel.element.hidden = !settings.value.sensing.showMood;
+  mood.setHidden(settings.value.sensing.hiddenMoods);
+  moodPanel.setHidden(settings.value.sensing.hiddenMoods);
   // Development builds only: the recorder is tree-shaken out of production.
   const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
   const loadCard = new LoadStateCard(`${import.meta.env.BASE_URL}consumer.html`);
@@ -502,6 +506,7 @@ function mount(root: HTMLElement): void {
   function createAttention(s: DemoSettings): AttentionMonitor {
     return new AttentionMonitor({
       absentMs: s.alarm.absentS * 1000,
+      awayMs: ATTENTION_DEFAULTS.awayMs,
       asleepMs: s.alarm.asleepS * 1000,
       reopenMs: ATTENTION_DEFAULTS.reopenMs,
     });
@@ -509,17 +514,25 @@ function mount(root: HTMLElement): void {
 
   /** Per-frame signals of the latest landmark frame, for the quality check. */
   let latestSignals: FrameSignals | null = null;
+  /** Eyes closed in the latest frame (the mood skips blink frames). */
+  let latestEyesClosed = false;
 
   function createPipeline(useExpressionFeatures: boolean): FeaturePipeline {
     const p = new FeaturePipeline({ useExpressionFeatures });
     p.onFrame((f) => {
       latestSignals = f.signals;
+      latestEyesClosed = f.eyesClosed;
       signals.pushFrame(f);
       breakPanel.pushPose(
         f.tMs,
         f.signals ? { yaw: f.signals.yaw, pitch: f.signals.pitch, roll: f.signals.roll } : null,
       );
-      attention.update({ tMs: f.tMs, faceFound: f.signals !== null, eyesClosed: f.eyesClosed });
+      attention.update({
+        tMs: f.tMs,
+        faceFound: f.signals !== null,
+        eyesClosed: f.eyesClosed,
+        offScreen: f.offScreen,
+      });
       renderAlarm();
       hub.updatePipeline(p.state);
     });
@@ -571,6 +584,9 @@ function mount(root: HTMLElement): void {
     pointsSwitch.input.checked = s.sensing.featurePoints;
     overlay.featurePoints = s.sensing.featurePoints;
     tracker.targetFps = s.sensing.targetFps;
+    moodPanel.element.hidden = !s.sensing.showMood;
+    mood.setHidden(s.sensing.hiddenMoods);
+    moodPanel.setHidden(s.sensing.hiddenMoods);
     if (s.sensing.expressionFeatures !== prev.sensing.expressionFeatures) {
       expressionSwitch.input.checked = s.sensing.expressionFeatures;
       // A different feature definition needs a fresh baseline (FeaturePipelineOptions).
@@ -655,9 +671,15 @@ function mount(root: HTMLElement): void {
     const aspect = video.videoWidth > 0 ? video.videoWidth / video.videoHeight : 4 / 3;
     const landmarks = sample.face?.landmarks ?? null;
     latestSignals = null;
+    latestEyesClosed = false;
     pipeline.push(sample.tMs, landmarks, aspect);
     quality.push({ tMs: sample.tMs, landmarks, aspect, signals: landmarks ? latestSignals : null });
-    mood.pushFrame({ landmarks, aspect, signals: landmarks ? latestSignals : null });
+    mood.pushFrame({
+      landmarks,
+      aspect,
+      signals: landmarks ? latestSignals : null,
+      eyesClosed: latestEyesClosed,
+    });
     recorder?.push(sample.tMs, landmarks, aspect);
   });
   tracker.onError((error) => {

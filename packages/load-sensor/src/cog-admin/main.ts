@@ -16,18 +16,23 @@ import { FEATURE_CONFIG } from '../core/features/config.js';
 import { AlarmSound } from '../demo/attention-alarm.js';
 import {
   DEFAULT_SETTINGS,
+  HIDEABLE_MOODS,
   LIMITS,
   openControlChannel,
   SettingsStore,
   STORAGE_PREFIX,
   type ControlCommand,
   type DemoSettings,
+  type HideableMood,
   type SensorStatus,
 } from '../demo/settings.js';
 import { subscribe, type LoadStateEvent } from '../signals.js';
 
 // Static inline icons (24Ã—24, stroke = currentColor). No icon font or CDN (invariant 3).
 const ICONS = {
+  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12.2 2.4 2.4 4.6-4.8"/>',
+  eyeOff:
+    '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.7 9.7 0 0 1 12 6c5 0 8.5 4.3 9.5 6a14.6 14.6 0 0 1-3 3.6M6.6 7.6A14.7 14.7 0 0 0 2.5 12c1 1.7 4.5 6 9.5 6 1.5 0 2.9-.4 4.1-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
   logo: '<path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7a5 5 0 1 0 5 5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
   overview:
     '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
@@ -389,7 +394,15 @@ function buildOverview(send: (c: ControlCommand) => void): {
       setText(screen.sub, s ? `eye break ${clock(s.sinceEyeBreakMs)} ago` : '');
       setText(
         alarmTile.value,
-        !s ? '–' : s.alarm === 'absent' ? 'Away' : s.alarm === 'asleep' ? 'Eyes closed' : 'Quiet',
+        !s
+          ? '–'
+          : s.alarm === 'absent'
+            ? 'No face'
+            : s.alarm === 'away'
+              ? 'Looking away'
+              : s.alarm === 'asleep'
+                ? 'Eyes closed'
+                : 'Quiet',
       );
       alarmTile.root.dataset.tone = s?.alarm ? 'error' : 'idle';
       setText(alarmTile.sub, s?.alarm ? 'Beeping on the sensor page' : '');
@@ -463,13 +476,141 @@ function buildSensing(store: SettingsStore): {
       store.update({ sensing: { expressionFeatures: v } });
     },
   });
-  body.append(rows(fps.root, points.root, expr.root));
+  const mood = switchRow({
+    label: 'Mood card',
+    hint: 'Show the apparent-mood read-out on the Signals tab. Display only: the event stream and the model are unaffected.',
+    testId: 'set-mood',
+    onChange: (v) => {
+      store.update({ sensing: { showMood: v } });
+    },
+  });
+  const moods = moodPicker(store);
+  body.append(rows(fps.root, points.root, expr.root, mood.root, moods.root));
   return {
     element,
     render(s) {
       fps.set(s.sensing.targetFps);
       points.set(s.sensing.featurePoints);
       expr.set(s.sensing.expressionFeatures);
+      mood.set(s.sensing.showMood);
+      moods.render(s);
+    },
+  };
+}
+
+const MOOD_LABELS: Record<HideableMood, string> = {
+  happy: 'Happy',
+  focused: 'Focused',
+  surprised: 'Surprised',
+  confused: 'Confused',
+  frustrated: 'Frustrated',
+  sad: 'Sad',
+  drowsy: 'Drowsy',
+  distracted: 'Distracted',
+};
+
+// Short enough to fit a chip on one line; the full rule is in src/demo/mood.ts.
+const MOOD_HINTS: Record<HideableMood, string> = {
+  happy: 'Smile',
+  focused: 'Steady gaze on screen',
+  surprised: 'Brows up, mouth open',
+  confused: 'Brows drawn or raised',
+  frustrated: 'Frown, lips pressed',
+  sad: 'Mouth corners down',
+  drowsy: 'Eyes closing, yawns',
+  distracted: 'Looking away',
+};
+
+/**
+ * One chip per mood, in a single row under the Mood card switch. A pressed
+ * chip is shown; an unpressed one is skipped by the estimator, so the next
+ * matching mood (at worst Neutral) shows instead (src/demo/mood.ts).
+ */
+function moodPicker(store: SettingsStore): {
+  root: HTMLElement;
+  render(s: DemoSettings): void;
+} {
+  const root = el('div', 'admin-moods');
+  const group = el('div', 'admin-moods-grid');
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', 'Moods shown on the Signals tab');
+
+  const setHidden = (hidden: Iterable<HideableMood>): void => {
+    store.update({ sensing: { hiddenMoods: [...hidden] } });
+  };
+
+  const head = el('div', 'admin-moods-head');
+  const title = el('div', 'admin-moods-title');
+  const count = el('span', 'admin-moods-count');
+  title.append(el('span', 'admin-row-label', 'Moods shown'), count);
+  const quick = el('div', 'admin-moods-quick');
+  const all = el('button', 'admin-moods-link', 'Show all');
+  all.type = 'button';
+  all.dataset.testid = 'set-moods-all';
+  all.addEventListener('click', () => {
+    setHidden([]);
+  });
+  const none = el('button', 'admin-moods-link', 'Hide all');
+  none.type = 'button';
+  none.dataset.testid = 'set-moods-none';
+  none.addEventListener('click', () => {
+    setHidden(HIDEABLE_MOODS);
+  });
+  quick.append(all, none);
+  head.append(title, quick);
+
+  const chips = HIDEABLE_MOODS.map((m) => {
+    const chip = el('button', 'admin-mood');
+    chip.type = 'button';
+    chip.dataset.mood = m;
+    chip.dataset.testid = `set-mood-${m}`;
+    const text = el('span', 'admin-mood-text');
+    text.append(
+      el('span', 'admin-mood-label', MOOD_LABELS[m]),
+      el('span', 'admin-mood-hint', MOOD_HINTS[m]),
+    );
+    const on = icon(ICONS.checkCircle);
+    on.classList.add('admin-mood-icon', 'admin-mood-on');
+    const off = icon(ICONS.eyeOff);
+    off.classList.add('admin-mood-icon', 'admin-mood-off');
+    chip.append(el('span', 'admin-mood-dot'), text, on, off);
+    chip.addEventListener('click', () => {
+      const hidden = new Set(store.value.sensing.hiddenMoods);
+      if (hidden.has(m)) hidden.delete(m);
+      else hidden.add(m);
+      setHidden(hidden);
+    });
+    group.append(chip);
+    return { mood: m, chip };
+  });
+
+  root.append(
+    head,
+    group,
+    el(
+      'p',
+      'admin-moods-foot',
+      'A hidden mood is never shown; the next matching mood, or Neutral, shows instead. No face and Neutral always show.',
+    ),
+  );
+
+  return {
+    root,
+    render(s) {
+      const hidden = new Set<HideableMood>(s.sensing.hiddenMoods);
+      const off = !s.sensing.showMood;
+      // The card is off: the chips have no visible effect, so grey them out.
+      root.dataset.muted = String(off);
+      for (const { mood, chip } of chips) {
+        const shown = !hidden.has(mood);
+        chip.setAttribute('aria-pressed', String(shown));
+        chip.title = `${MOOD_LABELS[mood]}: ${shown ? 'shown' : 'hidden'}. Click to ${shown ? 'hide' : 'show'}.`;
+        chip.disabled = off;
+      }
+      const total = HIDEABLE_MOODS.length;
+      setText(count, `${String(total - hidden.size)} of ${String(total)}`);
+      all.disabled = off || hidden.size === 0;
+      none.disabled = off || hidden.size === total;
     },
   };
 }
@@ -604,6 +745,7 @@ const GROUP_LABEL: Record<keyof typeof FEATURE_CONFIG, string> = {
   reference: 'Reference (open eye, neutral pose)',
   gaze: 'Gaze',
   offScreen: 'Off-screen',
+  lookDown: 'Looking down (keyboard)',
   presence: 'Presence',
   yawn: 'Yawn',
   nod: 'Nod',

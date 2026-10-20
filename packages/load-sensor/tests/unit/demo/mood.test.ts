@@ -1,5 +1,6 @@
 import { MEDIAPIPE_FACE_MESH_KEYPOINTS_BY_CONTOUR as CONTOURS } from '@tensorflow-models/face-landmarks-detection/dist/constants.js';
 import { describe, expect, it } from 'vitest';
+import { computeFrameSignals } from '../../../src/core/features/frame-signals.js';
 import { FEATURE_COUNT, FEATURE_INDEX as I } from '../../../src/core/features/spec.js';
 import type { NormalisedSecond } from '../../../src/core/window/index.js';
 import {
@@ -29,13 +30,12 @@ function face(p: FaceParams = {}): Float32Array {
 
 const mesh = (p: FaceParams = {}) => ({ landmarks: face(p), aspect: DEFAULT_ASPECT });
 
-/** A second with a face looking at the screen; `z` overrides baseline z-scores by feature name. */
+/** A second with a face looking at the screen. */
 function second(
   t: number,
   opts: {
     phase?: 'calibrating' | 'ready';
     valid?: boolean;
-    z?: Partial<Record<keyof typeof I, number>>;
     closed?: number;
     longClosures?: number;
     offScreen?: number;
@@ -46,11 +46,8 @@ function second(
   raw[I.eyes_closed_fraction] = opts.closed ?? 0;
   raw[I.gaze_centred_fraction] = opts.centred ?? 0.6;
   const phase = opts.phase ?? 'ready';
-  let z: Float32Array | null = null;
-  if (phase === 'ready') {
-    z = new Float32Array(FEATURE_COUNT);
-    for (const [name, v] of Object.entries(opts.z ?? {})) z[I[name as keyof typeof I]] = v;
-  }
+  // The estimator scores the face itself; the pipeline's z only marks the phase.
+  const z = phase === 'ready' ? new Float32Array(FEATURE_COUNT) : null;
   const valid = opts.valid ?? true;
   return {
     second: t,
@@ -71,24 +68,32 @@ function second(
   };
 }
 
-/** Runs a calibration of `n` seconds with a neutral mouth, then returns the estimator. */
-function calibrated(n = 20): { m: MoodEstimator; t: number } {
+/**
+ * Runs a calibration of `n` seconds with a neutral face, then returns the
+ * estimator. `jitter` is the per-second wobble (IOD) of every measure.
+ */
+function calibrated(n = 20, jitter = 0.004): { m: MoodEstimator; t: number } {
   const m = new MoodEstimator();
-  // Small natural variation so the baseline spread is realistic, not the floor.
   for (let t = 0; t < n; t += 1) {
-    const jitter = ((t % 5) - 2) * 0.004;
-    m.pushFrame(frame({ smile: jitter, mouthWidth: 0.9 + jitter }));
+    const j = ((t % 5) - 2) * jitter;
+    m.pushFrame(
+      frame({
+        smile: j,
+        mouthWidth: 0.9 + j,
+        browLift: j,
+        browInnerGap: 0.3 + j,
+        lipThickness: 0.2 + j,
+      }),
+    );
     m.pushSecond(second(t, { phase: 'calibrating' }));
   }
   return { m, t: n };
 }
 
-function frame(p: FaceParams) {
-  return {
-    landmarks: face(p),
-    aspect: DEFAULT_ASPECT,
-    signals: { iod: IOD, yaw: p.yaw ?? 0, pitch: p.pitch ?? 0 },
-  };
+function frame(p: FaceParams, eyesClosed = false) {
+  const landmarks = face(p);
+  const s = computeFrameSignals({ landmarks, aspect: DEFAULT_ASPECT });
+  return { landmarks, aspect: DEFAULT_ASPECT, signals: s, eyesClosed };
 }
 
 /** Feeds `seconds` identical seconds and returns the shown mood. */
@@ -150,18 +155,14 @@ describe('mood estimator', () => {
 
   it('brows furrowed + lips pressed → frustrated; furrow alone → confused', () => {
     let { m, t } = calibrated();
-    expect(
-      hold(m, t, 8, {}, { z: { brow_inner_gap_mean: -1.5, lip_thickness_mean: -1.5 } }).mood,
-    ).toBe('frustrated');
+    expect(hold(m, t, 8, { browInnerGap: 0.22, lipThickness: 0.12 }).mood).toBe('frustrated');
     ({ m, t } = calibrated());
-    expect(hold(m, t, 8, {}, { z: { brow_inner_gap_mean: -1.5 } }).mood).toBe('confused');
+    expect(hold(m, t, 8, { browInnerGap: 0.22 }).mood).toBe('confused');
   });
 
   it('brows high + mouth open → surprised', () => {
     const { m, t } = calibrated();
-    expect(hold(m, t, 8, {}, { z: { brow_raise_mean: 2.5, mouth_open_mean: 2 } }).mood).toBe(
-      'surprised',
-    );
+    expect(hold(m, t, 8, { browLift: 0.12, mouthOpen: 0.15 }).mood).toBe('surprised');
   });
 
   it('eyes closed a lot → drowsy, and drowsy wins over a smile', () => {
@@ -185,6 +186,29 @@ describe('mood estimator', () => {
     expect(moods.slice(-2)).toEqual(['happy', 'no-face']);
   });
 
+  it('a mood switched off is never shown; the next matching mood shows instead', () => {
+    let { m, t } = calibrated();
+    m.setHidden(['frustrated']);
+    expect(hold(m, t, 8, { browInnerGap: 0.22, lipThickness: 0.12 }).mood).toBe('confused');
+    ({ m, t } = calibrated());
+    m.setHidden(['sad']);
+    expect(hold(m, t, 8, { smile: -0.1, mouthWidth: 0.9 }).mood).not.toBe('sad');
+  });
+
+  it('switching off the mood on show replaces it on the next second', () => {
+    const { m, t } = calibrated();
+    const a = hold(m, t, 6, { smile: 0.12, mouthWidth: 1.1 });
+    expect(a.mood).toBe('happy');
+    m.setHidden(['happy']);
+    expect(hold(m, a.t, 1, { smile: 0.12, mouthWidth: 1.1 }).mood).not.toBe('happy');
+  });
+
+  it('"no-face" and "neutral" cannot be switched off', () => {
+    const { m, t } = calibrated();
+    m.setHidden(['no-face', 'neutral']);
+    expect(hold(m, t, 6, {}, { valid: false }).mood).toBe('no-face');
+  });
+
   it('with expression features off (FR3 ablation) a smile is not read as happy', () => {
     const { m, t } = calibrated();
     m.setExpression(false);
@@ -196,5 +220,45 @@ describe('mood estimator', () => {
   it('a turned head is not used for mouth measures', () => {
     const { m, t } = calibrated();
     expect(hold(m, t, 8, { smile: 0.12, mouthWidth: 1.1, yaw: 40 }).mood).not.toBe('happy');
+  });
+
+  it('a very still calibration does not turn landmark jitter into moods', () => {
+    // Baseline spread ~0: without the spread floor, a 0.01 IOD shift (under a
+    // pixel: how someone settles in the chair) is z ≫ 2.
+    const { m, t } = calibrated(20, 0);
+    const shifted = { browLift: 0.01, browInnerGap: 0.29, lipThickness: 0.19, smile: -0.005 };
+    const r = hold(m, t, 10, shifted);
+    expect(['neutral', 'focused']).toContain(r.mood);
+  });
+
+  it('blink frames are skipped (a closing lid is not a brow raise)', () => {
+    const { m, t } = calibrated();
+    let at = t;
+    for (let k = 0; k < 8; k += 1, at += 1) {
+      for (let f = 0; f < 15; f += 1) m.pushFrame(frame({ browLift: 0.12 }, true));
+      for (let f = 0; f < 15; f += 1) m.pushFrame(frame({}));
+      m.pushSecond(second(at));
+    }
+    expect(m.reading?.mood).not.toBe('confused');
+  });
+
+  it('a showing mood stays while the evidence is a little under the entry level', () => {
+    const { m, t } = calibrated();
+    const a = hold(m, t, 6, { smile: 0.12, mouthWidth: 1.1 });
+    expect(a.mood).toBe('happy');
+    // Smile z ≈ 1.2: below smileZ (1.5) but above smileZ · keep.
+    const lift = 1.2 * MOOD_CONFIG.minSpread.lift;
+    expect(hold(m, a.t, 6, { smile: lift, mouthWidth: 1.1 }).mood).toBe('happy');
+  });
+
+  it('a recalibration starts the face baseline again', () => {
+    const { m, t } = calibrated();
+    // Pipeline recalibrates; the learner now sits with a permanent smile.
+    let at = t;
+    for (let k = 0; k < 20; k += 1, at += 1) {
+      m.pushFrame(frame({ smile: 0.12, mouthWidth: 1.1 }));
+      m.pushSecond(second(at, { phase: 'calibrating' }));
+    }
+    expect(hold(m, at, 8, { smile: 0.12, mouthWidth: 1.1 }).mood).not.toBe('happy');
   });
 });

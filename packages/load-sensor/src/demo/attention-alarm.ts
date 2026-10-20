@@ -10,7 +10,7 @@
  * the workload being measured.
  */
 
-export type AlarmReason = 'absent' | 'asleep';
+export type AlarmReason = 'absent' | 'away' | 'asleep';
 
 export interface AttentionConfig {
   /**
@@ -19,6 +19,13 @@ export interface AttentionConfig {
    */
   readonly absentMs: number;
   /**
+   * Face visible but looking away from the screen for this long → `away`.
+   * Presence reads "away" after 3 s; the rest leaves room for a look out of
+   * the window while thinking. Looking down at the keyboard is not "away"
+   * (FrameFeatures.lookingDown). Demo default chosen by hand, not validated.
+   */
+  readonly awayMs: number;
+  /**
    * Eyes continuously closed for this long → `asleep`. A blink lasts at most
    * 500 ms (blink.ts) and resting the eyes for a moment is common, so 3 s is
    * well past both. Demo default chosen by hand, not validated on data.
@@ -26,13 +33,15 @@ export interface AttentionConfig {
   readonly asleepMs: number;
   /**
    * Eyes must be open this long before a closure counts as over, so a
-   * flicker of the EAR around the threshold does not reset the timer.
+   * flicker of the EAR around the threshold does not reset the timer. Also
+   * how long the gaze must be back on the screen before `away` ends.
    */
   readonly reopenMs: number;
 }
 
 export const ATTENTION_DEFAULTS: AttentionConfig = {
   absentMs: 5000,
+  awayMs: 8000,
   asleepMs: 3000,
   reopenMs: 250,
 };
@@ -43,12 +52,15 @@ export interface AttentionFrame {
   readonly faceFound: boolean;
   /** EAR below the blink-closing threshold on this frame (always false before the open-eye reference exists). */
   readonly eyesClosed: boolean;
+  /** Head or eyes turned away from the screen (looking at the keyboard does not count). */
+  readonly offScreen?: boolean;
 }
 
 export interface AttentionState {
   readonly reason: AlarmReason | null;
   /** How long the current condition has lasted (ms), 0 when none. */
   readonly noFaceMs: number;
+  readonly awayMs: number;
   readonly eyesClosedMs: number;
 }
 
@@ -57,7 +69,9 @@ export class AttentionMonitor {
   #noFaceSince: number | null = null;
   #closedSince: number | null = null;
   #openSince: number | null = null;
-  #state: AttentionState = { reason: null, noFaceMs: 0, eyesClosedMs: 0 };
+  #awaySince: number | null = null;
+  #backSince: number | null = null;
+  #state: AttentionState = { reason: null, noFaceMs: 0, awayMs: 0, eyesClosedMs: 0 };
 
   constructor(config: AttentionConfig = ATTENTION_DEFAULTS) {
     this.#cfg = config;
@@ -73,8 +87,20 @@ export class AttentionMonitor {
       // Face lost with the eyes closed (head dropped): keep the closure
       // running, the absent timer covers it from here.
       this.#openSince = null;
+      this.#awaySince = null;
+      this.#backSince = null;
     } else {
       this.#noFaceSince = null;
+      if (f.offScreen) {
+        this.#awaySince ??= f.tMs;
+        this.#backSince = null;
+      } else if (this.#awaySince !== null) {
+        this.#backSince ??= f.tMs;
+        if (f.tMs - this.#backSince >= this.#cfg.reopenMs) {
+          this.#awaySince = null;
+          this.#backSince = null;
+        }
+      }
       if (f.eyesClosed) {
         this.#closedSince ??= f.tMs;
         this.#openSince = null;
@@ -88,14 +114,17 @@ export class AttentionMonitor {
     }
 
     const noFaceMs = this.#noFaceSince === null ? 0 : f.tMs - this.#noFaceSince;
+    const awayMs = this.#awaySince === null ? 0 : f.tMs - this.#awaySince;
     const eyesClosedMs = this.#closedSince === null || !f.faceFound ? 0 : f.tMs - this.#closedSince;
     const reason: AlarmReason | null =
       noFaceMs >= this.#cfg.absentMs
         ? 'absent'
         : eyesClosedMs >= this.#cfg.asleepMs
           ? 'asleep'
-          : null;
-    this.#state = { reason, noFaceMs, eyesClosedMs };
+          : awayMs >= this.#cfg.awayMs
+            ? 'away'
+            : null;
+    this.#state = { reason, noFaceMs, awayMs, eyesClosedMs };
     return this.#state;
   }
 
@@ -103,23 +132,44 @@ export class AttentionMonitor {
     this.#noFaceSince = null;
     this.#closedSince = null;
     this.#openSince = null;
-    this.#state = { reason: null, noFaceMs: 0, eyesClosedMs: 0 };
+    this.#awaySince = null;
+    this.#backSince = null;
+    this.#state = { reason: null, noFaceMs: 0, awayMs: 0, eyesClosedMs: 0 };
   }
 }
 
-/** Beep patterns: [frequency Hz, start offset s, duration s] per tone, repeated every `period` s. */
-const PATTERNS: Record<AlarmReason, { period: number; tones: [number, number, number][] }> = {
-  // Two falling tones: "come back".
+/**
+ * Beep patterns: [frequency Hz, start offset s, duration s] per tone, repeated
+ * every `period` s, with the oscillator wave shape.
+ *
+ * "No face" and "looking away" are deep tones (around 165-220 Hz): a call
+ * back, not a shock. Laptop speakers reproduce little below ~300 Hz, so these
+ * use a triangle wave, whose odd harmonics (3x, 5x the note) keep a low note
+ * audible on small speakers.
+ */
+const PATTERNS: Record<
+  AlarmReason,
+  { period: number; wave: OscillatorType; tones: [number, number, number][] }
+> = {
+  // Two falling deep tones: "come back".
   absent: {
-    period: 1.6,
+    period: 1.8,
+    wave: 'triangle',
     tones: [
-      [880, 0, 0.16],
-      [660, 0.22, 0.2],
+      [220, 0, 0.32],
+      [165, 0.4, 0.45],
     ],
+  },
+  // One long deep tone, slower and gentler than absent: "look back at the screen".
+  away: {
+    period: 2.2,
+    wave: 'triangle',
+    tones: [[185, 0, 0.6]],
   },
   // Three quick high tones, more insistent: meant to wake someone up.
   asleep: {
     period: 1.1,
+    wave: 'sine',
     tones: [
       [1320, 0, 0.1],
       [1320, 0.15, 0.1],
@@ -171,7 +221,7 @@ export class AlarmSound {
     const play = (): void => {
       const elapsed = ctx.currentTime - this.#startedAt;
       const gain = START_GAIN + (MAX_GAIN - START_GAIN) * Math.min(1, elapsed / RAMP_S);
-      this.#burst(ctx, pattern.tones, gain * this.volume);
+      this.#burst(ctx, pattern, gain * this.volume);
     };
     play();
     this.#timer = window.setInterval(play, pattern.period * 1000);
@@ -186,17 +236,17 @@ export class AlarmSound {
   /** One short pattern, e.g. for a "Test sound" button. Call from a user gesture. */
   test(reason: AlarmReason = 'absent'): void {
     this.unlock();
-    if (this.#ctx) this.#burst(this.#ctx, PATTERNS[reason].tones, START_GAIN * 1.5 * this.volume);
+    if (this.#ctx) this.#burst(this.#ctx, PATTERNS[reason], START_GAIN * 1.5 * this.volume);
   }
 
-  #burst(ctx: AudioContext, tones: readonly [number, number, number][], gain: number): void {
+  #burst(ctx: AudioContext, pattern: (typeof PATTERNS)[AlarmReason], gain: number): void {
     // exponentialRamp cannot reach 0, and a silent alarm needs no oscillators.
     if (gain <= 0.0001) return;
     const t0 = ctx.currentTime + 0.02;
-    for (const [freq, offset, dur] of tones) {
+    for (const [freq, offset, dur] of pattern.tones) {
       const osc = ctx.createOscillator();
       const env = ctx.createGain();
-      osc.type = 'sine';
+      osc.type = pattern.wave;
       osc.frequency.value = freq;
       // 10 ms attack and exponential release: no clicks at the edges.
       env.gain.setValueAtTime(0.0001, t0 + offset);

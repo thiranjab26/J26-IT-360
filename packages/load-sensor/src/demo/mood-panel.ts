@@ -107,6 +107,7 @@ const Z_RANGE = 3;
 
 export class MoodPanel {
   readonly element: HTMLElement;
+  readonly #legendItems = new Map<Mood, HTMLElement>();
   readonly #icon: HTMLElement;
   readonly #label: HTMLElement;
   readonly #what: HTMLElement;
@@ -181,6 +182,7 @@ export class MoodPanel {
     const legend = el('div', 'mood-legend');
     for (const m of LEGEND) {
       const item = el('span', 'mood-legend-item');
+      this.#legendItems.set(m, item);
       const sw = el('span', 'mood-swatch');
       sw.dataset.mood = m;
       item.append(sw, document.createTextNode(MOODS[m].label));
@@ -252,6 +254,12 @@ export class MoodPanel {
     }
 
     this.#renderTimeline(history, end);
+  }
+
+  /** Moods switched off in the admin panel drop out of the legend. */
+  setHidden(moods: Iterable<Mood>): void {
+    const hidden = new Set(moods);
+    for (const [m, item] of this.#legendItems) item.hidden = hidden.has(m);
   }
 
   reset(): void {

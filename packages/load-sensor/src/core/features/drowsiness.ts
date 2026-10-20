@@ -45,12 +45,17 @@ export class YawnDetector {
  * falling forward) and recovers to within `recoverDeg` inside `maxMs`. That
  * drop-and-catch is the typical movement of someone dozing off at a desk;
  * looking down at a keyboard for longer than `maxMs` is not counted.
+ *
+ * The eyes must also have been closed at some point during the drop: a quick
+ * glance down at the keys and back up has the same head movement with the
+ * eyes open, and while typing that happens every few seconds.
  */
 export class NodDetector {
   readonly #dropDeg: number;
   readonly #recoverDeg: number;
   readonly #maxMs: number;
   #droppedAtMs: number | null = null;
+  #closedSeen = false;
 
   constructor(
     dropDeg: number = FEATURE_CONFIG.nod.dropDeg,
@@ -62,12 +67,20 @@ export class NodDetector {
     this.#maxMs = maxMs;
   }
 
-  /** `pitchFromNeutral` > 0 means the head is tilted further down than usual. Returns true on a completed nod. */
-  update(tMs: number, pitchFromNeutral: number): boolean {
+  /**
+   * `pitchFromNeutral` > 0 means the head is tilted further down than usual;
+   * `eyesClosed` is this frame's blink-detector state. Returns true on a
+   * completed nod.
+   */
+  update(tMs: number, pitchFromNeutral: number, eyesClosed: boolean): boolean {
     if (this.#droppedAtMs === null) {
-      if (pitchFromNeutral > this.#dropDeg) this.#droppedAtMs = tMs;
+      if (pitchFromNeutral > this.#dropDeg) {
+        this.#droppedAtMs = tMs;
+        this.#closedSeen = eyesClosed;
+      }
       return false;
     }
+    if (eyesClosed) this.#closedSeen = true;
     if (tMs - this.#droppedAtMs > this.#maxMs) {
       // Held down too long: looking down on purpose, not a nod. Wait for recovery.
       if (pitchFromNeutral < this.#recoverDeg) this.#droppedAtMs = null;
@@ -75,12 +88,13 @@ export class NodDetector {
     }
     if (pitchFromNeutral < this.#recoverDeg) {
       this.#droppedAtMs = null;
-      return true;
+      return this.#closedSeen;
     }
     return false;
   }
 
   reset(): void {
     this.#droppedAtMs = null;
+    this.#closedSeen = false;
   }
 }

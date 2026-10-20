@@ -36,6 +36,20 @@ describe('demo settings (admin panel)', () => {
     expect(s.wellbeing).toEqual(DEFAULT_SETTINGS.wellbeing);
   });
 
+  it('shows the mood card by default and keeps it hidden once switched off', () => {
+    expect(DEFAULT_SETTINGS.sensing.showMood).toBe(true);
+    const s = mergeSettings(DEFAULT_SETTINGS, { sensing: { showMood: false } });
+    expect(sanitizeSettings(JSON.parse(JSON.stringify(s))).sensing.showMood).toBe(false);
+  });
+
+  it('keeps only known hideable moods, once each', () => {
+    const s = sanitizeSettings({
+      sensing: { hiddenMoods: ['sad', 'nope', 'sad', 'no-face', 'neutral', 3, 'happy'] },
+    });
+    expect(s.sensing.hiddenMoods).toEqual(['happy', 'sad']);
+    expect(sanitizeSettings({ sensing: { hiddenMoods: 'sad' } }).sensing.hiddenMoods).toEqual([]);
+  });
+
   it('keeps defaults inside their own limits', () => {
     expect(sanitizeSettings(DEFAULT_SETTINGS)).toEqual(DEFAULT_SETTINGS);
   });

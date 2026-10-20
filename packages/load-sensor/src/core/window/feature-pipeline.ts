@@ -2,6 +2,7 @@ import { BlinkDetector, type EyeClosure } from '../features/blink.js';
 import { FEATURE_CONFIG } from '../features/config.js';
 import { NodDetector, YawnDetector } from '../features/drowsiness.js';
 import { computeFrameSignals, type FrameSignals } from '../features/frame-signals.js';
+import { LookDownTracker } from '../features/look-down.js';
 import { BaselineCalibrator } from './baseline.js';
 import { FeatureWindow } from './feature-window.js';
 import { PresenceTracker, type Presence } from './presence.js';
@@ -15,6 +16,12 @@ import {
 /** Everything known about one processed frame, for the overlay and charts. */
 export interface FrameFeatures extends FrameObservation {
   readonly presence: Presence;
+  /**
+   * Looking down at the keyboard or desk (look-down.ts). Eye closure uses
+   * the look-down thresholds, and it does not count as off-screen unless the
+   * head is also turned or dropped past FEATURE_CONFIG.lookDown.maxPitchDeg.
+   */
+  readonly lookingDown: boolean;
   /** References the thresholds were measured against; null in the first second. */
   readonly reference: ReferenceValues | null;
 }
@@ -71,6 +78,7 @@ export class FeaturePipeline {
   readonly #blink = new BlinkDetector();
   readonly #yawn = new YawnDetector();
   readonly #nod = new NodDetector();
+  readonly #lookDown = new LookDownTracker();
   readonly #presence = new PresenceTracker();
   readonly #aggregator: SecondAggregator;
   readonly #baseline: BaselineCalibrator;
@@ -144,6 +152,7 @@ export class FeaturePipeline {
     this.#blink.reset();
     this.#yawn.reset();
     this.#nod.reset();
+    this.#lookDown.reset();
     this.#presence.reset();
     this.#aggregator.reset();
     this.#baseline.reset();
@@ -154,7 +163,15 @@ export class FeaturePipeline {
   #withFace(tMs: number, s: FrameSignals): FrameFeatures {
     this.#references.observe(tMs, s);
     const ref = this.#references.current();
-    const blink = this.#blink.update(tMs, s.ear, ref?.ear ?? null);
+    const wasLookingDown = this.#lookDown.down;
+    const lookingDown =
+      ref !== null && ref.ear > 0
+        ? this.#lookDown.update(tMs, s.pitch - ref.pitch, s.irisDy - ref.irisDy, s.ear / ref.ear)
+        : false;
+    // The lid drops with the gaze a moment before the look-down state is
+    // confirmed; a "closure" started then is that drop, not a blink: drop it.
+    if (lookingDown && !wasLookingDown) this.#blink.reset();
+    const blink = this.#blink.update(tMs, s.ear, ref?.ear ?? null, lookingDown);
 
     let gazeCentred = false;
     let offScreen = false;
@@ -162,14 +179,22 @@ export class FeaturePipeline {
     if (ref) {
       const dx = s.irisDx - ref.irisDx;
       const dy = s.irisDy - ref.irisDy;
+      const yawOff = Math.abs(s.yaw - ref.yaw);
+      const pitchDown = s.pitch - ref.pitch;
       const g = FEATURE_CONFIG.gaze.centredTolerance;
       const o = FEATURE_CONFIG.offScreen;
       gazeCentred = Math.abs(dx) <= g && Math.abs(dy) <= g;
+      // Typing: eyes on the keys is part of the task, not looking away.
+      const atKeyboard =
+        lookingDown && yawOff <= o.yawDeg && pitchDown <= FEATURE_CONFIG.lookDown.maxPitchDeg;
       offScreen =
-        Math.abs(s.yaw - ref.yaw) > o.yawDeg ||
-        Math.abs(s.pitch - ref.pitch) > o.pitchDeg ||
-        Math.hypot(dx, dy) > o.irisTolerance;
-      nod = this.#nod.update(tMs, s.pitch - ref.pitch);
+        !atKeyboard &&
+        (yawOff > o.yawDeg ||
+          Math.abs(pitchDown) > o.pitchDeg ||
+          Math.hypot(dx, dy) > o.irisTolerance);
+      // Head dropped means looking down, so only the strict look-down threshold
+      // counts as shut eyes for a nod (not the lid lowering at the onset).
+      nod = this.#nod.update(tMs, pitchDown, blink.eyesClosed && lookingDown);
     }
     const yawn = this.#yawn.update(tMs, s.mouthOpen) !== null;
     const presence = this.#presence.update(tMs, true, offScreen);
@@ -185,6 +210,7 @@ export class FeaturePipeline {
       nod,
       presence,
       reference: ref,
+      lookingDown,
     };
   }
 
@@ -193,6 +219,7 @@ export class FeaturePipeline {
     this.#blink.reset();
     this.#yawn.reset();
     this.#nod.reset();
+    this.#lookDown.reset();
     const closure: EyeClosure | null = null;
     return {
       tMs,
@@ -205,6 +232,7 @@ export class FeaturePipeline {
       nod: false,
       presence: this.#presence.update(tMs, false, false),
       reference: this.#references.current(),
+      lookingDown: false,
     };
   }
 

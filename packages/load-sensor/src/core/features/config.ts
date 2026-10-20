@@ -49,6 +49,30 @@ export const FEATURE_CONFIG = Object.freeze({
     /** Or the eyes far off-centre even with the head straight. */
     irisTolerance: 0.18,
   }),
+  lookDown: Object.freeze({
+    /**
+     * Looking down at the keyboard or desk (look-down.ts): head pitched this
+     * far below neutral. A glance at the keys from a laptop is about 10–30°
+     * of head and eyes together; 10° of head alone is past normal reading
+     * movement. (tune)
+     */
+    pitchDeg: 10,
+    /** Or the iris this far below neutral (eye widths; full travel ≈ ±0.25) with the head still. (tune) */
+    irisDy: 0.06,
+    /** Further down than this is the lap or a phone, not the keyboard: off-screen as before. (tune) */
+    maxPitchDeg: 45,
+    /**
+     * Eye-closed thresholds while looking down (fractions of open EAR). The
+     * upper lid follows the gaze down, so open eyes looking at the keys sit
+     * near the normal 0.75 threshold; a shut eye stays well under 0.4
+     * (closed EAR ≈ 0.05–0.1 against ≈ 0.3 open), so real closures are still
+     * caught. (tune)
+     */
+    closeRatio: 0.4,
+    reopenRatio: 0.5,
+    /** A change of state must hold this long: longer than a blink's closing phase. */
+    holdMs: 300,
+  }),
   presence: Object.freeze({
     /** No face for longer than this = absent (ARCHITECTURE.md §5.5 uses 2 s). */
     absentAfterMs: 2_000,

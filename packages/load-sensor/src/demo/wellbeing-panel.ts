@@ -1,6 +1,6 @@
 import type { LoadStateEvent } from '../core/events/types.js';
 import type { NormalisedSecond } from '../core/window/index.js';
-import type { AlarmReason } from './attention-alarm.js';
+import { ATTENTION_DEFAULTS, type AlarmReason } from './attention-alarm.js';
 
 /**
  * Wellbeing side panel on the Camera tab: the away/asleep alarm controls,
@@ -155,10 +155,14 @@ export type AlarmView = 'sensing-off' | 'disabled' | 'watching' | AlarmReason;
 
 const ALARM_TEXT: Record<AlarmView, { label: string; hint: string }> = {
   'sensing-off': { label: 'Inactive', hint: 'Starts when sensing is on.' },
-  disabled: { label: 'Off', hint: 'Turn on to get a beep when you leave or fall asleep.' },
+  disabled: {
+    label: 'Off',
+    hint: 'Turn on to get a beep when you leave, look away or fall asleep.',
+  },
   // Hint filled in from the alarm timings (setAlarmTimes).
   watching: { label: 'Watching', hint: '' },
   absent: { label: 'Not at the screen', hint: 'Come back to the screen to stop the beep.' },
+  away: { label: 'Looking away', hint: 'Look back at the screen to stop the beep.' },
   asleep: { label: 'Eyes closed — wake up', hint: 'Open your eyes to stop the beep.' },
 };
 
@@ -346,7 +350,7 @@ export class WellbeingPanel {
 
   /** Alarm timings in seconds, for the "watching" hint. */
   setAlarmTimes(absentS: number, asleepS: number): void {
-    this.#watchingHint = `Beeps after ${String(absentS)} s with no face or ${String(asleepS)} s with eyes closed, until you are back.`;
+    this.#watchingHint = `Beeps after ${String(absentS)} s with no face, ${String(ATTENTION_DEFAULTS.awayMs / 1000)} s looking away (typing is fine) or ${String(asleepS)} s with eyes closed, until you are back.`;
     if (this.#alarm.root.dataset.state === 'watching') this.setAlarm('watching');
   }
 

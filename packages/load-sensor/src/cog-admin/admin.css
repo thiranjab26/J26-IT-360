@@ -474,6 +474,218 @@
   text-align: center;
 }
 
+/* Mood picker: one chip per mood under the Mood card switch. The chip colour
+   is the mood's own timeline colour, so the admin and Signals tab match. */
+.admin-moods {
+  display: grid;
+  gap: 12px;
+  padding: 4px 18px 16px;
+  transition: opacity 0.2s ease;
+}
+
+.admin-moods[data-muted='true'] {
+  opacity: 0.5;
+}
+
+.admin-moods-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-moods-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-moods-count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.admin-moods-quick {
+  display: flex;
+  gap: 4px;
+}
+
+.admin-moods-link {
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-moods-link:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.admin-moods-link:disabled {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.admin-moods-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.admin-mood {
+  --c: var(--mood-neutral);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--c) 9%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.admin-mood[data-mood='happy'] {
+  --c: var(--mood-happy);
+}
+
+.admin-mood[data-mood='focused'] {
+  --c: var(--mood-focused);
+}
+
+.admin-mood[data-mood='surprised'] {
+  --c: var(--mood-surprised);
+}
+
+.admin-mood[data-mood='confused'] {
+  --c: var(--mood-confused);
+}
+
+.admin-mood[data-mood='frustrated'] {
+  --c: var(--mood-frustrated);
+}
+
+.admin-mood[data-mood='sad'] {
+  --c: var(--mood-sad);
+}
+
+.admin-mood[data-mood='drowsy'] {
+  --c: var(--mood-drowsy);
+}
+
+.admin-mood[data-mood='distracted'] {
+  --c: var(--mood-distracted);
+}
+
+.admin-mood:hover:not(:disabled) {
+  border-color: var(--c);
+}
+
+.admin-mood:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+
+.admin-mood:disabled {
+  cursor: not-allowed;
+}
+
+.admin-mood-dot {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--c);
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+}
+
+.admin-mood-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.admin-mood-label {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.admin-mood-hint {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-mood-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-mood-on {
+  color: var(--c);
+}
+
+.admin-mood-off {
+  display: none;
+  color: var(--text-faint);
+}
+
+/* Hidden mood: dashed outline, hollow dot, struck-through label. */
+.admin-mood[aria-pressed='false'] {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: var(--surface);
+}
+
+.admin-mood[aria-pressed='false'] .admin-mood-dot {
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.admin-mood[aria-pressed='false'] .admin-mood-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.admin-mood[aria-pressed='false'] .admin-mood-on {
+  display: none;
+}
+
+.admin-mood[aria-pressed='false'] .admin-mood-off {
+  display: block;
+}
+
+.admin-moods-foot {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+@media (max-width: 560px) {
+  .admin-moods-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
 .admin-default {
   color: var(--text-faint);
   font-family: var(--mono);

@@ -2876,6 +2876,10 @@ h1 {
   gap: 6px;
 }
 
+.mood-legend-item[hidden] {
+  display: none;
+}
+
 .mood-swatch {
   display: inline-block;
   flex: none;

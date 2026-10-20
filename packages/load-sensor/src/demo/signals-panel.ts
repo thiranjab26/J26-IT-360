@@ -50,6 +50,8 @@ export class SignalsPanel {
   readonly #hover = new HoverBus();
   readonly #earChart: StripChart;
   readonly #featureCharts = new Map<number, StripChart>();
+  /** Raw unit of each feature chart, to restore it when leaving z mode. */
+  readonly #featureUnits = new Map<number, string>();
   readonly #calib: { root: HTMLElement; bar: HTMLElement; text: HTMLElement; meta: HTMLElement };
   readonly #kpi: Record<string, { value: HTMLElement; caption: HTMLElement; root: HTMLElement }> =
     {};
@@ -216,6 +218,7 @@ export class SignalsPanel {
       chart.setEmptyText('Turn sensing on to see this signal.');
       chart.element.dataset.testid = `feature-${f.name}`;
       this.#featureCharts.set(index, chart);
+      this.#featureUnits.set(index, f.unit);
       body.append(chart.element);
     }
     const legend = el('div', 'grid-legend');
@@ -245,6 +248,16 @@ export class SignalsPanel {
     this.#mode = mode;
     for (const [m, b] of Object.entries(this.#modeButtons)) {
       b.setAttribute('aria-pressed', String(m === mode));
+    }
+    for (const [index, chart] of this.#featureCharts) {
+      const unit = this.#featureUnits.get(index) ?? '';
+      chart.setScale(
+        mode === 'z'
+          ? // z-scores are unitless; ±Z_FLOOR always in range so baseline noise
+            // (|z| < 1) reads as small instead of being stretched to full height.
+            { unit: 'z', format: formatZ, include: [-Z_FLOOR, 0, Z_FLOOR] }
+          : { unit, format: formatter(unit), include: unit === 'count' ? [0] : [] },
+      );
     }
     this.#renderFeatures();
   }
@@ -427,6 +440,13 @@ export class SignalsPanel {
   get mode(): ValueMode {
     return this.#mode;
   }
+}
+
+/** z charts always show at least ±2 (about 95 % of baseline seconds fall inside). */
+const Z_FLOOR = 2;
+
+function formatZ(v: number): string {
+  return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)}`;
 }
 
 /** Gaze pad full-scale: ±0.25 eye widths (about the iris's full travel). */

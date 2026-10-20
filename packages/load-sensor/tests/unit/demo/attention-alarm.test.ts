@@ -9,7 +9,7 @@ function run(
   m: AttentionMonitor,
   startMs: number,
   seconds: number,
-  frame: (tMs: number) => { faceFound: boolean; eyesClosed: boolean },
+  frame: (tMs: number) => { faceFound: boolean; eyesClosed: boolean; offScreen?: boolean },
 ): { reason: string | null; endMs: number; firstAlarmMs: number | null } {
   let t = startMs;
   let firstAlarmMs: number | null = null;
@@ -25,6 +25,7 @@ function run(
 const open = { faceFound: true, eyesClosed: false };
 const closed = { faceFound: true, eyesClosed: true };
 const noFace = { faceFound: false, eyesClosed: false };
+const lookingAway = { faceFound: true, eyesClosed: false, offScreen: true };
 
 describe('AttentionMonitor (demo away / asleep alarm)', () => {
   it('stays quiet for a normal face with blinks', () => {
@@ -78,6 +79,22 @@ describe('AttentionMonitor (demo away / asleep alarm)', () => {
     run(m, 2000, 1, () => closed);
     const r = run(m, 3000, 6, () => noFace);
     expect(r.reason).toBe('absent');
+  });
+
+  it('alarms "away" after looking away long enough and stops on looking back', () => {
+    const m = new AttentionMonitor();
+    run(m, 0, 2, () => open);
+    const r = run(m, 2000, 10, () => lookingAway);
+    expect(r.reason).toBe('away');
+    expect((r.firstAlarmMs ?? 0) - 2000).toBeGreaterThanOrEqual(ATTENTION_DEFAULTS.awayMs - STEP);
+    expect(run(m, r.endMs, 1, () => open).reason).toBeNull();
+  });
+
+  it('does not alarm "away" for glances away shorter than the limit', () => {
+    const m = new AttentionMonitor();
+    // 4 s away, 2 s back, repeated: never 8 s in a row.
+    const r = run(m, 0, 60, (t) => (t % 6000 < 4000 ? lookingAway : open));
+    expect(r.firstAlarmMs).toBeNull();
   });
 
   it('reset clears running timers (e.g. after a pause)', () => {

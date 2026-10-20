@@ -11,10 +11,16 @@ function yawns(fps: number, signal: (t: number) => number, durationMs = 6000): n
   return out;
 }
 
-function nods(fps: number, pitch: (t: number) => number, durationMs = 8000): number {
+/** `closed`: eyes closed on this frame; by default closed whenever the head is dropped (dozing). */
+function nods(
+  fps: number,
+  pitch: (t: number) => number,
+  durationMs = 8000,
+  closed: (t: number) => boolean = (t) => pitch(t) > 15,
+): number {
   const det = new NodDetector();
   let n = 0;
-  for (let t = 0; t < durationMs; t += 1000 / fps) if (det.update(t, pitch(t))) n += 1;
+  for (let t = 0; t < durationMs; t += 1000 / fps) if (det.update(t, pitch(t), closed(t))) n += 1;
   return n;
 }
 
@@ -38,6 +44,11 @@ describe('NodDetector (drowsiness)', () => {
 
   it('does not count looking down at the keyboard for a while', () => {
     expect(nods(15, (t) => (t >= 1000 && t < 6000 ? 25 : 0))).toBe(0);
+  });
+
+  it('does not count a quick glance at the keyboard with the eyes open (typing)', () => {
+    const glances = (t: number): number => (t % 2000 < 800 ? 25 : 0);
+    expect(nods(15, glances, 8000, () => false)).toBe(0);
   });
 
   it('does not count small movements or looking up', () => {

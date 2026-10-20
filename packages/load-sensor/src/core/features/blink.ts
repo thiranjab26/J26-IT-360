@@ -22,6 +22,9 @@ export interface BlinkUpdate {
 export interface BlinkOptions {
   readonly closeRatio?: number;
   readonly reopenRatio?: number;
+  /** Thresholds used while the learner looks down (FEATURE_CONFIG.lookDown). */
+  readonly lookDownCloseRatio?: number;
+  readonly lookDownReopenRatio?: number;
   readonly minMs?: number;
   readonly maxMs?: number;
 }
@@ -44,6 +47,8 @@ export interface BlinkOptions {
 export class BlinkDetector {
   readonly #closeRatio: number;
   readonly #reopenRatio: number;
+  readonly #downCloseRatio: number;
+  readonly #downReopenRatio: number;
   readonly #minMs: number;
   readonly #maxMs: number;
 
@@ -55,9 +60,14 @@ export class BlinkDetector {
     const d = FEATURE_CONFIG.blink;
     this.#closeRatio = options.closeRatio ?? d.closeRatio;
     this.#reopenRatio = options.reopenRatio ?? d.reopenRatio;
+    this.#downCloseRatio = options.lookDownCloseRatio ?? FEATURE_CONFIG.lookDown.closeRatio;
+    this.#downReopenRatio = options.lookDownReopenRatio ?? FEATURE_CONFIG.lookDown.reopenRatio;
     this.#minMs = options.minMs ?? d.minMs;
     this.#maxMs = options.maxMs ?? d.maxMs;
-    if (!(this.#closeRatio < this.#reopenRatio)) {
+    if (
+      !(this.#closeRatio < this.#reopenRatio) ||
+      !(this.#downCloseRatio < this.#downReopenRatio)
+    ) {
       throw new RangeError('closeRatio must be below reopenRatio (hysteresis)');
     }
   }
@@ -68,9 +78,11 @@ export class BlinkDetector {
 
   /**
    * Feeds one frame. `openEar` is the open-eye reference; while it is unknown
-   * (null) no closure is detected and the state stays open.
+   * (null) no closure is detected and the state stays open. `lookingDown`
+   * switches to the lower look-down thresholds: the lid follows the gaze down,
+   * so open eyes looking at the keyboard would otherwise read as closed.
    */
-  update(tMs: number, ear: number, openEar: number | null): BlinkUpdate {
+  update(tMs: number, ear: number, openEar: number | null, lookingDown = false): BlinkUpdate {
     const previousMs = this.#lastFrameMs ?? tMs;
     this.#lastFrameMs = tMs;
     if (openEar === null || !(openEar > 0) || !Number.isFinite(ear)) {
@@ -78,8 +90,8 @@ export class BlinkDetector {
       return { phase: 'open', eyesClosed: false, closure: null };
     }
 
-    const closeAt = openEar * this.#closeRatio;
-    const reopenAt = openEar * this.#reopenRatio;
+    const closeAt = openEar * (lookingDown ? this.#downCloseRatio : this.#closeRatio);
+    const reopenAt = openEar * (lookingDown ? this.#downReopenRatio : this.#reopenRatio);
     const eyesClosed = ear < closeAt;
     let closure: EyeClosure | null = null;
 

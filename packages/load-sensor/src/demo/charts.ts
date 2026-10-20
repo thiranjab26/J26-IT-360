@@ -106,9 +106,11 @@ export class StripChart {
   readonly #canvas: HTMLCanvasElement;
   readonly #ctx: CanvasRenderingContext2D;
   readonly #value: HTMLElement;
+  readonly #unit: HTMLElement;
   readonly #empty: HTMLElement;
   readonly #opts: StripChartOptions;
-  readonly #format: (v: number) => string;
+  #format: (v: number) => string;
+  #include: readonly number[];
   /** Read lazily: computed styles are empty until the element is in the document. */
   #theme: Theme | null = null;
   #points: readonly ChartPoint[] = [];
@@ -128,6 +130,7 @@ export class StripChart {
   constructor(options: StripChartOptions) {
     this.#opts = options;
     this.#format = options.format ?? ((v) => v.toFixed(2));
+    this.#include = options.include ?? [];
     this.#height = options.height ?? 64;
 
     this.element = document.createElement('figure');
@@ -141,6 +144,7 @@ export class StripChart {
     const unit = document.createElement('span');
     unit.className = 'strip-unit';
     unit.textContent = options.unit ?? '';
+    this.#unit = unit;
     this.#value = document.createElement('span');
     this.#value.className = 'strip-value';
     this.#value.textContent = '–';
@@ -183,6 +187,21 @@ export class StripChart {
     if (text === this.#emptyText) return;
     this.#emptyText = text;
     this.#empty.textContent = text;
+  }
+
+  /**
+   * Switches what the values mean (e.g. raw units ↔ z-scores): the unit label,
+   * the value format and the values always kept in the y range.
+   */
+  setScale(scale: {
+    unit: string;
+    format: (v: number) => string;
+    include: readonly number[];
+  }): void {
+    this.#unit.textContent = scale.unit;
+    this.#format = scale.format;
+    this.#include = scale.include;
+    this.invalidate();
   }
 
   /** Re-reads colours after a theme change. */
@@ -268,7 +287,7 @@ export class StripChart {
     const values = visible.flatMap((p) => (p.v === null ? [] : [p.v]));
     const [lo, hi] = yRange([
       ...values,
-      ...(this.#opts.include ?? []),
+      ...this.#include,
       ...(this.#threshold === null ? [] : [this.#threshold]),
     ]);
     const padTop = 4;
