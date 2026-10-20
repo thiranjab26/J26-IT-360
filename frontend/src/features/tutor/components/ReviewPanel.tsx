@@ -1,99 +1,114 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
-import { Badge, Button, Card, cx } from '@/shared/components/ui';
-import { useSessionHistory, type HistoryPart } from '../api/sessionApi';
+import { Badge, Card, cx } from '@/shared/components/ui';
+import type { HistoryPart } from '../api/sessionApi';
+import { GameButton } from './GameButton';
 import { Markdown } from './Markdown';
 import { Sources } from './SessionCards';
 
 /**
- * Look back at the parts already read in this session, without changing anything: the
- * session stays exactly where it was. Parts are shown as the student first saw them.
+ * Back and forward through the parts already read in this session. Looking back changes
+ * nothing: the session stays exactly where it was, and "forward" past the last part returns to
+ * where the student was. The left and right arrow keys do the same.
  */
-export function ReviewPanel({
-  sessionId,
-  onClose,
+export function PartNav({
+  label,
+  canBack,
+  canForward,
+  looking,
+  onBack,
+  onForward,
 }: {
-  sessionId: string;
-  onClose: () => void;
+  label: string;
+  canBack: boolean;
+  canForward: boolean;
+  /** True while an earlier part is on screen, so the right button says where it leads. */
+  looking: boolean;
+  onBack: () => void;
+  onForward: () => void;
 }) {
-  const { data, isPending, error } = useSessionHistory(sessionId);
-  const [index, setIndex] = useState<number | null>(null);
-
-  // Open on the most recent part, since that is the one people want to look at again.
+  // Arrow keys, unless the student is typing somewhere.
   useEffect(() => {
-    if (data && index === null && data.parts.length > 0) setIndex(data.parts.length - 1);
-  }, [data, index]);
-
-  const parts = data?.parts ?? [];
-  const part: HistoryPart | undefined = index === null ? undefined : parts[index];
+    const onKey = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+      ) {
+        return;
+      }
+      if (event.key === 'ArrowLeft' && canBack) onBack();
+      if (event.key === 'ArrowRight' && canForward) onForward();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canBack, canForward, onBack, onForward]);
 
   return (
-    <Card className="animate-slide-up px-[26px] py-[24px]">
+    <nav
+      aria-label="Move between the parts you have read"
+      className="flex items-center justify-between gap-[10px]"
+    >
+      <GameButton
+        variant="secondary"
+        className="px-[14px] py-[7px] text-[12px]"
+        onClick={onBack}
+        disabled={!canBack}
+        title="Earlier part (left arrow key)"
+      >
+        <span aria-hidden="true">←</span> Back
+      </GameButton>
+      <span
+        className={cx(
+          'font-mono text-[11px]',
+          looking ? 'font-semibold text-brand' : 'text-ink-faint',
+        )}
+      >
+        {label}
+      </span>
+      <GameButton
+        variant="secondary"
+        className="px-[14px] py-[7px] text-[12px]"
+        onClick={onForward}
+        disabled={!canForward}
+        title={
+          canForward ? 'Later part (right arrow key)' : 'You are on the current part. Use Continue.'
+        }
+      >
+        Next <span aria-hidden="true">→</span>
+      </GameButton>
+    </nav>
+  );
+}
+
+/** One earlier part, as the student first saw it. Read-only. */
+export function PartView({ part, onClose }: { part: HistoryPart; onClose: () => void }) {
+  return (
+    <Card className="animate-fade-in px-[26px] py-[24px]">
       <div className="flex flex-wrap items-center justify-between gap-[10px]">
         <p className="font-mono text-[10.5px] tracking-wide text-ink-faint uppercase">
-          Looking back{parts.length > 0 && index !== null ? `: part ${index + 1} of ${parts.length}` : ''}
+          Looking back. Nothing here changes your place.
         </p>
-        <Button variant="secondary" onClick={onClose} className="px-[13px] py-[6px] text-[12.5px]">
-          Back to where I was
-        </Button>
+        <GameButton variant="ghost" onClick={onClose} className="px-[12px] py-[5px] text-[12px]">
+          Return to where I was
+        </GameButton>
       </div>
 
-      {isPending && <p className="mt-[16px] text-[13px] text-ink-muted">Loading earlier parts...</p>}
-      {error && (
-        <p className="mt-[16px] text-[13px] text-caution-ink">Could not load the earlier parts.</p>
-      )}
-      {data && parts.length === 0 && (
-        <p className="mt-[16px] text-[13px] text-ink-muted">
-          Nothing to look back at yet. Earlier parts appear here as you read them.
-        </p>
-      )}
-
-      {part && (
-        <>
-          <div className="mt-[14px] flex items-start justify-between gap-[12px]">
-            <h2 className="text-[19px] font-semibold tracking-tight text-ink">{part.heading}</h2>
-            {part.text_source === 'generated' && part.text_check === 'verified' ? (
-              <Badge tone="verified" className="shrink-0">
-                AI explanation, checked against the course
-              </Badge>
-            ) : (
-              <Badge tone="verified" className="shrink-0">
-                Course material
-              </Badge>
-            )}
-          </div>
-          <Markdown className="mt-[14px]">{part.text}</Markdown>
-          {part.sources && <Sources sources={part.sources} />}
-
-          <div className="mt-[22px] flex items-center justify-between gap-[10px]">
-            <Button
-              variant="secondary"
-              disabled={index === 0}
-              onClick={() => setIndex((i) => Math.max(0, (i ?? 0) - 1))}
-            >
-              Earlier part
-            </Button>
-            <div className="flex gap-[5px]" aria-hidden="true">
-              {parts.map((_, i) => (
-                <span
-                  key={i}
-                  className={cx(
-                    'size-[7px] rounded-full transition-colors',
-                    i === index ? 'bg-brand' : 'bg-line-strong',
-                  )}
-                />
-              ))}
-            </div>
-            <Button
-              variant="secondary"
-              disabled={index === parts.length - 1}
-              onClick={() => setIndex((i) => Math.min(parts.length - 1, (i ?? 0) + 1))}
-            >
-              Later part
-            </Button>
-          </div>
-        </>
-      )}
+      <div className="mt-[10px] flex items-start justify-between gap-[12px]">
+        <h2 className="text-[19px] font-semibold tracking-tight text-ink">{part.heading}</h2>
+        {part.text_source === 'generated' && part.text_check === 'verified' ? (
+          <Badge tone="verified" className="shrink-0">
+            AI explanation, checked against the course
+          </Badge>
+        ) : (
+          <Badge tone="verified" className="shrink-0">
+            Course material
+          </Badge>
+        )}
+      </div>
+      <Markdown className="mt-[14px]">{part.text}</Markdown>
+      {part.sources && <Sources sources={part.sources} />}
     </Card>
   );
 }

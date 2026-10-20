@@ -9,6 +9,7 @@ import {
   useEndSession,
   useResumeSession,
   useSession,
+  useSessionHistory,
   useStartSession,
   type Rewards,
   type Session,
@@ -17,7 +18,7 @@ import { companionSays } from '../components/companion';
 import { fireConfetti, useCountUp, useElapsedSeconds } from '../components/fx';
 import { GameButton } from '../components/GameButton';
 import { GeneratingCard } from '../components/GeneratingCard';
-import { ReviewPanel } from '../components/ReviewPanel';
+import { PartNav, PartView } from '../components/ReviewPanel';
 import { BoltIcon, FlameIcon } from '../components/icons';
 import { Companion } from '../components/Mascot';
 import { RewardCelebration } from '../components/RewardCelebration';
@@ -50,7 +51,9 @@ export function SessionPage() {
 
   // The full-screen moments (a level up, a badge). Everything else is shown inline.
   const [celebration, setCelebration] = useState<{ key: number; rewards: Rewards } | null>(null);
-  const [reviewing, setReviewing] = useState(false);
+  // Which earlier part is on screen (an index into the parts already read), or null for the
+  // part the student is actually on. Looking back never changes the session.
+  const [viewing, setViewing] = useState<number | null>(null);
   // Right answers in a row on this screen. A miss resets it. It is flair, not a score.
   const [combo, setCombo] = useState(0);
   // Moving on can mean preparing the next part (retrieve, write, check), which takes a while.
@@ -61,6 +64,19 @@ export function SessionPage() {
   const counter = useRef(0);
   const timers = useRef<number[]>([]);
   useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+
+  const stepNumber = session?.position.step_number;
+  const parts = useSessionHistory(sessionId, stepNumber).data?.parts ?? [];
+  const goBack = useCallback(
+    () => setViewing((now) => (now === null ? parts.length - 1 : Math.max(0, now - 1))),
+    [parts.length],
+  );
+  const goForward = useCallback(
+    () => setViewing((now) => (now === null || now >= parts.length - 1 ? null : now + 1)),
+    [parts.length],
+  );
+  // Moving on, or a new answer, always brings the student back to the part they are on.
+  useEffect(() => setViewing(null), [stepNumber, session?.phase]);
 
   const react = useCallback((response: Session) => {
     if (response.feedback?.outcome === 'correct') fireConfetti('small', { x: 0.5, y: 0.3 });
@@ -73,7 +89,10 @@ export function SessionPage() {
         setCelebration({ key: counter.current, rewards });
       }, 900);
       timers.current.push(id);
-    } else if (response.summary && ['completed', 'mastery_satisfied'].includes(response.summary.exit_reason)) {
+    } else if (
+      response.summary &&
+      ['completed', 'mastery_satisfied'].includes(response.summary.exit_reason)
+    ) {
       fireConfetti('big', { x: 0.5, y: 0.25 });
       playCue('clear');
     }
@@ -133,63 +152,70 @@ export function SessionPage() {
         className="animate-slide-up"
       />
 
-      {session.position.step_number > 1 && !preparing && (
-        <button
-          type="button"
-          onClick={() => setReviewing((open) => !open)}
-          className="self-start rounded-full border border-line bg-surface px-[12px] py-[5px] text-[12px] font-medium text-ink-soft transition-colors hover:border-brand-soft hover:text-brand"
-        >
-          {reviewing ? 'Back to where I was' : 'Review earlier parts'}
-        </button>
+      {parts.length > 0 && !preparing && session.phase !== 'ended' && (
+        <PartNav
+          label={
+            viewing === null
+              ? `You are on part ${session.position.step_number} of ${session.position.total_steps}`
+              : `Looking back: part ${viewing + 1} of ${parts.length}`
+          }
+          canBack={viewing === null || viewing > 0}
+          canForward={viewing !== null}
+          looking={viewing !== null}
+          onBack={goBack}
+          onForward={goForward}
+        />
       )}
 
       {preparing && <GeneratingCard elapsed={elapsed} />}
-      {reviewing && !preparing && (
-        <ReviewPanel sessionId={session.session_id} onClose={() => setReviewing(false)} />
+      {viewing !== null && parts[viewing] && !preparing && (
+        <PartView part={parts[viewing]} onClose={() => setViewing(null)} />
       )}
 
-      {!preparing && !reviewing && (
+      {!preparing && viewing === null && (
         <>
-      {session.phase === 'hook' && <HookCard session={session} busy={busy} onNext={goNext} />}
-      {session.phase === 'teach' && <TeachCard session={session} busy={busy} onNext={goNext} />}
-      {session.phase === 'checkpoint' && session.question && (
-        <QuestionCard
-          session={session}
-          question={session.question}
-          busy={busy}
-          onAnswer={(text) =>
-            answer.mutate(
-              { sessionId: session.session_id, answer: text },
-              {
-                onSuccess: (response) => {
-                  const outcome = response.feedback?.outcome;
-                  if (outcome === 'correct') setCombo((n) => n + 1);
-                  else if (outcome === 'wrong') setCombo(0);
-                  react(response);
-                },
-              },
-            )
-          }
-        />
-      )}
-      {session.phase === 'feedback' && (
-        <FeedbackCard session={session} busy={busy} onNext={goNext} />
-      )}
-      {session.phase === 'reteach' && <ReteachCard session={session} busy={busy} onNext={goNext} />}
-      {session.phase === 'ended' && session.summary && (
-        <SummaryCard
-          session={session}
-          summary={session.summary}
-          busy={busy}
-          onResume={() => resume.mutate(session.session_id)}
-          onRestart={() =>
-            restart.mutate(session.concept_id, {
-              onSuccess: (started) => navigate(`/sessions/${started.session_id}`),
-            })
-          }
-          onBack={backToMap}
-        />
-      )}
+          {session.phase === 'hook' && <HookCard session={session} busy={busy} onNext={goNext} />}
+          {session.phase === 'teach' && <TeachCard session={session} busy={busy} onNext={goNext} />}
+          {session.phase === 'checkpoint' && session.question && (
+            <QuestionCard
+              session={session}
+              question={session.question}
+              busy={busy}
+              onAnswer={(text) =>
+                answer.mutate(
+                  { sessionId: session.session_id, answer: text },
+                  {
+                    onSuccess: (response) => {
+                      const outcome = response.feedback?.outcome;
+                      if (outcome === 'correct') setCombo((n) => n + 1);
+                      else if (outcome === 'wrong') setCombo(0);
+                      react(response);
+                    },
+                  },
+                )
+              }
+            />
+          )}
+          {session.phase === 'feedback' && (
+            <FeedbackCard session={session} busy={busy} onNext={goNext} />
+          )}
+          {session.phase === 'reteach' && (
+            <ReteachCard session={session} busy={busy} onNext={goNext} />
+          )}
+          {session.phase === 'ended' && session.summary && (
+            <SummaryCard
+              session={session}
+              summary={session.summary}
+              busy={busy}
+              onResume={() => resume.mutate(session.session_id)}
+              onRestart={() =>
+                restart.mutate(session.concept_id, {
+                  onSuccess: (started) => navigate(`/sessions/${started.session_id}`),
+                })
+              }
+              onBack={backToMap}
+            />
+          )}
         </>
       )}
 
@@ -249,7 +275,12 @@ function SessionHeader({
             </span>
           )}
           {!ended && (
-            <GameButton variant="ghost" onClick={onEnd} busy={ending} className="px-[10px] py-[5px]">
+            <GameButton
+              variant="ghost"
+              onClick={onEnd}
+              busy={ending}
+              className="px-[10px] py-[5px]"
+            >
               End session
             </GameButton>
           )}
@@ -285,7 +316,8 @@ function StepTrail({ current, total }: { current: number; total: number }) {
             key={i}
             className={cx(
               'h-[11px] flex-1 rounded-full transition-all duration-500',
-              done && 'bg-gradient-to-r from-brand to-violet shadow-[0_0_10px_oklch(0.68_0.19_275/0.55)]',
+              done &&
+                'bg-gradient-to-r from-brand to-violet shadow-[0_0_10px_oklch(0.68_0.19_275/0.55)]',
               here && !done && 'animate-pulse-ring bg-brand',
               !done && !here && 'bg-surface-sunken',
             )}

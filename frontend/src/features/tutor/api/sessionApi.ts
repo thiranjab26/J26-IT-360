@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 
 import { request } from '@/shared/api/client';
 
@@ -33,6 +34,10 @@ export interface SessionFeedback {
   message: string;
   explanation: string | null;
   correct_option: string | null;
+  /** A wrong multiple-choice quick check: what was chosen and what the right option says. */
+  chosen_option: string | null;
+  chosen_text: string | null;
+  correct_text: string | null;
   xp_earned: number;
   attempt: number;
   tries_left: number | null;
@@ -132,12 +137,15 @@ export interface HistoryPart {
   sources: Source[] | null;
 }
 
-export function useSessionHistory(sessionId: string | undefined) {
+/**
+ * The parts read so far. `step` is the step the student is on: it is part of the key, so the
+ * list is fetched again whenever they move on. Nothing is fetched on the first step.
+ */
+export function useSessionHistory(sessionId: string | undefined, step?: number) {
   return useQuery({
-    queryKey: ['tutor', 'session', sessionId, 'history'],
-    queryFn: () =>
-      request<{ parts: HistoryPart[] }>(`/v1/tutor/sessions/${sessionId}/history`),
-    enabled: Boolean(sessionId),
+    queryKey: ['tutor', 'session', sessionId, 'history', step],
+    queryFn: () => request<{ parts: HistoryPart[] }>(`/v1/tutor/sessions/${sessionId}/history`),
+    enabled: Boolean(sessionId) && step !== undefined && step > 1,
     staleTime: 0,
     retry: false,
   });
@@ -301,4 +309,30 @@ export function useResumeSession() {
   return useSessionAction((sessionId: string) =>
     request<Session>(`/v1/tutor/sessions/${sessionId}/resume`, { method: 'POST' }),
   );
+}
+
+export interface Miss {
+  status: 'none' | 'pending' | 'ready' | 'unavailable';
+  text: string | null;
+}
+
+/**
+ * The short note on why the last quick-check answer was wrong. It is written as the student
+ * answers, so this asks again every couple of seconds until it is ready or cannot be made.
+ */
+export function useMiss(sessionId: string, enabled: boolean) {
+  const since = useRef(Date.now());
+  return useQuery({
+    queryKey: ['tutor', 'session', sessionId, 'miss'],
+    queryFn: () => request<Miss>(`/v1/tutor/sessions/${sessionId}/miss`),
+    enabled,
+    staleTime: 0,
+    gcTime: 0, // a note for one question must never be shown under another
+    retry: false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status !== undefined && status !== 'pending') return false;
+      return Date.now() - since.current > 180_000 ? false : 2000;
+    },
+  });
 }

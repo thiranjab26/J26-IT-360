@@ -17,6 +17,7 @@ import { GameButton, Hearts } from './GameButton';
 import { CheckIcon, SparkleIcon } from './icons';
 import { Markdown } from './Markdown';
 import { RewardStrip } from './RewardStrip';
+import { WrongAnswer } from './WrongAnswer';
 import { playCue } from './sound';
 
 /* ------------------------------------------------------------------- shells */
@@ -156,7 +157,11 @@ export function ReteachCard({ session, onNext, busy }: StepProps) {
   return (
     <div className="flex flex-col gap-[14px]">
       {session.feedback && (
-        <FeedbackBanner feedback={session.feedback} rewards={session.rewards} />
+        <FeedbackBanner
+          feedback={session.feedback}
+          rewards={session.rewards}
+          sessionId={session.session_id}
+        />
       )}
       <Panel>
         <div className="flex items-start justify-between gap-[12px]">
@@ -202,7 +207,11 @@ export function QuestionCard({
   return (
     <div className="flex flex-col gap-[14px]">
       {session.feedback && (
-        <FeedbackBanner feedback={session.feedback} rewards={session.rewards} />
+        <FeedbackBanner
+          feedback={session.feedback}
+          rewards={session.rewards}
+          sessionId={session.session_id}
+        />
       )}
       <QuestionBody
         key={`${question.question_id}:${question.attempt}`}
@@ -250,9 +259,7 @@ function QuestionBody({
       {question.hint && (
         <div className="mt-[14px] rounded-[10px] border border-caution-line bg-caution-wash px-[14px] py-[10px]">
           <div className="flex items-center justify-between gap-[8px]">
-            <p className="font-mono text-[10.5px] tracking-wide text-caution-ink uppercase">
-              Hint
-            </p>
+            <p className="font-mono text-[10.5px] tracking-wide text-caution-ink uppercase">Hint</p>
             {question.hint_source === 'generated' && (
               <span className="font-mono text-[10px] text-ink-faint">
                 {question.hint_check === 'verified' ? 'AI-written, checked' : 'AI-written'}
@@ -296,7 +303,11 @@ function QuestionBody({
                     : 'border-line-strong text-ink-muted',
                 )}
               >
-                {choice === option.letter ? <CheckIcon className="size-[13px] animate-pop" /> : option.letter}
+                {choice === option.letter ? (
+                  <CheckIcon className="size-[13px] animate-pop" />
+                ) : (
+                  option.letter
+                )}
               </span>
               <span className="pt-[3px] text-[14px] text-ink">{option.text}</span>
             </label>
@@ -319,7 +330,12 @@ function QuestionBody({
       )}
 
       <div className="mt-[18px]">
-        <GameButton variant="go" onClick={() => onAnswer(answer)} busy={busy} disabled={!answer.trim()}>
+        <GameButton
+          variant="go"
+          onClick={() => onAnswer(answer)}
+          busy={busy}
+          disabled={!answer.trim()}
+        >
           Check answer
         </GameButton>
       </div>
@@ -332,9 +348,11 @@ function QuestionBody({
 export function FeedbackBanner({
   feedback,
   rewards,
+  sessionId,
 }: {
   feedback: SessionFeedback;
   rewards?: Rewards | null;
+  sessionId?: string;
 }) {
   const correct = feedback.outcome === 'correct';
   const unreadable = feedback.outcome === 'unreadable';
@@ -394,10 +412,15 @@ export function FeedbackBanner({
         </div>
       </div>
 
-      {feedback.correct_option && (
-        <p className="mt-[6px] text-[13px] text-ink-soft">
-          The answer was <strong className="font-semibold text-ink">{feedback.correct_option}</strong>.
-        </p>
+      {feedback.correct_text && sessionId ? (
+        <WrongAnswer feedback={feedback} sessionId={sessionId} />
+      ) : (
+        feedback.correct_option && (
+          <p className="mt-[6px] text-[13px] text-ink-soft">
+            The answer was{' '}
+            <strong className="font-semibold text-ink">{feedback.correct_option}</strong>.
+          </p>
+        )
       )}
       {feedback.explanation && !unreadable && (
         <Markdown className="mt-[8px]">{feedback.explanation}</Markdown>
@@ -415,7 +438,13 @@ export function FeedbackCard({ session, onNext, busy }: StepProps) {
   const retry = feedback?.outcome === 'wrong' && (feedback.tries_left ?? 0) > 0;
   return (
     <div className="flex flex-col gap-[14px]">
-      {feedback && <FeedbackBanner feedback={feedback} rewards={session.rewards} />}
+      {feedback && (
+        <FeedbackBanner
+          feedback={feedback}
+          rewards={session.rewards}
+          sessionId={session.session_id}
+        />
+      )}
       <div>
         <GameButton variant={retry ? 'go' : 'primary'} onClick={onNext} busy={busy}>
           {retry ? 'Try again' : 'Continue'}
@@ -476,7 +505,11 @@ export function SummaryCard({
   return (
     <div className="flex flex-col gap-[14px]">
       {session.feedback && (
-        <FeedbackBanner feedback={session.feedback} rewards={session.rewards} />
+        <FeedbackBanner
+          feedback={session.feedback}
+          rewards={session.rewards}
+          sessionId={session.session_id}
+        />
       )}
       <Panel>
         <Eyebrow>{session.concept_title}</Eyebrow>
@@ -498,7 +531,9 @@ export function SummaryCard({
           />
           <Stat
             label="Mastery"
-            value={summary.mastery === null ? 'not enough yet' : `${Math.round(summary.mastery * 100)}%`}
+            value={
+              summary.mastery === null ? 'not enough yet' : `${Math.round(summary.mastery * 100)}%`
+            }
           />
         </dl>
 
@@ -562,9 +597,7 @@ function Stat({
     <div
       className={cx(
         'rounded-[10px] border px-[14px] py-[12px]',
-        highlight
-          ? 'border-gold bg-gold-wash'
-          : 'border-line-soft bg-surface-muted',
+        highlight ? 'border-gold bg-gold-wash' : 'border-line-soft bg-surface-muted',
       )}
     >
       <dt className="text-[11.5px] text-ink-muted">{label}</dt>
