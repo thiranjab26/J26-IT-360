@@ -8,8 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev:frontend": "pnpm --filter frontend dev",
-    "dev:gateway": "pnpm --filter api-gateway dev",
+    "dev:frontend": "node api.js && pnpm --filter frontend dev",
+    "dev:gateway": "node api.js && pnpm --filter api-gateway dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "gen:types:auth": "openapi-typescript http://localhost:8001/openapi.json -o frontend/src/shared/api/generated/auth.d.ts",

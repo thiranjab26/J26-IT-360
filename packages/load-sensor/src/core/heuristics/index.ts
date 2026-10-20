@@ -1,3 +1,14 @@
+export {
+  BoredomEstimator,
+  type BoredomCues,
+  type BoredomEntry,
+  type BoredomEvidence,
+  type BoredomReading,
+  type BoredomSignals,
+  type BoredomState,
+  type BoredomVeto,
+  yawnProximity,
+} from './boredom.js';
 export { HEURISTIC_CONFIG, type HeuristicConfig } from './config.js';
 export {
   AffectEstimator,
@@ -19,3 +30,13 @@ export {
   type StrainStorage,
   type StrainTrackerOptions,
 } from './strain.js';
+export {
+  OverloadEstimator,
+  overloadBaseline,
+  type OverloadBaseline,
+  type OverloadCues,
+  type OverloadEvidence,
+  type OverloadReading,
+  type OverloadSignals,
+  type OverloadState,
+} from './overload.js';

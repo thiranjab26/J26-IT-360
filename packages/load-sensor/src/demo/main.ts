@@ -25,6 +25,7 @@ import {
   UnsupportedBackendError,
 } from '../core/landmarks/index.js';
 import { LoadStateHub, type SourceStatus } from '../core/events/index.js';
+import { BoredomEstimator, OverloadEstimator } from '../core/heuristics/index.js';
 import { sourceForCamera } from '../core/sensor.js';
 import type { FrameSignals } from '../core/features/index.js';
 import { FeaturePipeline } from '../core/window/index.js';
@@ -34,6 +35,8 @@ import {
   AttentionMonitor,
   type AlarmReason,
 } from './attention-alarm.js';
+import { BoredomPanel } from './boredom-panel.js';
+import { OverloadPanel } from './overload-panel.js';
 import { BreakPanel } from './break/break-panel.js';
 import { CalibrationPrompt } from './calibration-prompt.js';
 import { ConsentDialog, ConsentStore } from './consent.js';
@@ -332,6 +335,15 @@ function mount(root: HTMLElement): void {
   moodPanel.element.hidden = !settings.value.sensing.showMood;
   mood.setHidden(settings.value.sensing.hiddenMoods);
   moodPanel.setHidden(settings.value.sensing.hiddenMoods);
+  // Apparent boredom (display only; not in the event stream, see boredom.ts).
+  // On the Signals tab, so the Camera tab stays a calm study view.
+  const boredom = new BoredomEstimator();
+  const boredomPanel = new BoredomPanel();
+  moodPanel.element.after(boredomPanel.element);
+  // Apparent overload: the other end of the same inverted U (see overload.ts).
+  const overload = new OverloadEstimator();
+  const overloadPanel = new OverloadPanel();
+  boredomPanel.element.after(overloadPanel.element);
   // Development builds only: the recorder is tree-shaken out of production.
   const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
   const loadCard = new LoadStateCard(`${import.meta.env.BASE_URL}consumer.html`);
@@ -542,6 +554,9 @@ function mount(root: HTMLElement): void {
       wellbeing.pushSecond(s);
       signals.setState(p.state);
       hub.pushSecond(s, p.state, p.window.classifiable ? p.window.toModelInput() : null);
+      // After the hub, so this second's load and engagement are already published.
+      boredomPanel.update(boredom.update(s, hub.latest), hub.latest.status);
+      overloadPanel.update(overload.update(s, hub.latest), hub.latest.status);
     });
     return p;
   }
@@ -576,6 +591,10 @@ function mount(root: HTMLElement): void {
     mood.setExpression(useExpressionFeatures);
     mood.reset();
     moodPanel.reset();
+    boredom.reset();
+    boredomPanel.reset();
+    overload.reset();
+    overloadPanel.reset();
     if (camera.status === 'active' || camera.status === 'paused') signals.setState(pipeline.state);
   }
 
@@ -698,6 +717,10 @@ function mount(root: HTMLElement): void {
       mood.reset();
       moodPanel.reset();
       wellbeing.reset();
+      boredom.reset();
+      boredomPanel.reset();
+      overload.reset();
+      overloadPanel.reset();
     }
     // No frames while paused: start the away/asleep timers again on resume.
     if (next !== 'active') attention.reset();
