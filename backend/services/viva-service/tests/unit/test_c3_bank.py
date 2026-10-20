@@ -14,8 +14,8 @@ SEED = Path(__file__).resolve().parents[5] / "database" / "seed"
 def test_every_question_is_valid_and_grounded_in_its_material():
     bank = c3_bank.build()
     questions = [q for course in bank for q in course["questions"]]
-    assert len(bank) == 10 and len(questions) == 24
-    assert len({q["id"] for q in questions}) == 24
+    assert len(bank) == 10 and len(questions) == 23
+    assert len({q["id"] for q in questions}) == 23
     for course in bank:
         assert 1 <= len(course["questions"]) <= 6  # a session asks at most six concepts
         context = {"c03": {"chunks": course["material"]["chunks"]}}

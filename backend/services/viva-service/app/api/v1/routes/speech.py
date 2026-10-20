@@ -52,6 +52,7 @@ async def synthesize_speech(body: SpeakIn, user: User = Depends(current_user)):
 async def transcribe_audio(
     audio: UploadFile = File(...),
     live_transcript: str | None = Form(default=None, max_length=10000),
+    topic_id: str | None = Form(default=None, max_length=128),
     user: User = Depends(participant),
 ):
     types = {
@@ -80,24 +81,30 @@ async def transcribe_audio(
         live = (" ".join(live_transcript.split()), f"deepgram:{settings().deepgram_stt_model}:live")
     else:
         await run_in_threadpool(limits.reserve_speech, user.id)
-    result = await run_in_threadpool(speech.transcribe, content, types[mime], live)
+    terms = []
+    if topic_id and not live:
+        with SessionLocal() as db:
+            terms = topic_terms(db, topic_id)
+    result = await run_in_threadpool(speech.transcribe, content, types[mime], live, terms)
     return {**result, "command": spoken_command(result.get("transcript", ""))}
 
 
 def topic_terms(db, topic_id):
-    """Course vocabulary for Deepgram keyterm prompting, built from the approved bank.
+    """Course vocabulary for the transcriber (Groq prompt, Deepgram keyterms), built from the approved bank.
 
     Topic-wide and including misconception terms, so it helps recognise technical words
     without favouring the correct answer to the current question.
     """
-    terms = []
+    terms, lists = [], []
     for bank in db.scalars(
         select(Bank).where(Bank.topic_id == topic_id, Bank.status == "approved")
     ):
         data = bank.data
         terms += [data["concept"]]
-        terms += [k for p in data["rubric_points"] for k in p["keywords"]]
-        terms += [k for m in data["misconceptions"] for k in m["keywords"]]
+        lists += [p["keywords"] for p in data["rubric_points"]]
+        lists += [m["keywords"] for m in data["misconceptions"]]
+    # Each point's main keyword first (integer, boolean, string), then the second ones, and so on.
+    terms += [k[i] for i in range(max(map(len, lists), default=0)) for k in lists if i < len(k)]
     clean = (" ".join(t.split()) for t in terms)
     return list(dict.fromkeys(t for t in clean if 4 <= len(t) <= 40))[:50]
 

@@ -7,8 +7,8 @@
   --st-line: #e2e8f0;
   --st-card: #ffffff;
   --st-soft: #f1f5f9;
-  --st-accent: #4f46e5;
-  --st-accent-soft: #eef2ff;
+  --st-accent: #315bd6;
+  --st-accent-soft: #eef3fd;
   --st-green: #059669;
   --st-amber: #d97706;
   --st-rose: #e11d48;
@@ -34,13 +34,13 @@
 .viva-app .st-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid transparent; border-radius: 12px; padding: 11px 18px; font-weight: 600; font-size: 15px; transition: background 0.15s, box-shadow 0.15s, transform 0.05s; }
 .viva-app .st-btn:active:not(:disabled) { transform: translateY(1px); }
 .viva-app .st-btn:disabled { opacity: 0.5; }
-.viva-app .st-btn-primary { background: var(--st-accent); color: #fff; box-shadow: 0 6px 16px rgb(79 70 229 / 0.25); }
-.viva-app .st-btn-primary:hover:not(:disabled) { background: #4338ca; }
+.viva-app .st-btn-primary { background: var(--st-accent); color: #fff; box-shadow: 0 6px 16px rgb(49 91 214 / 0.25); }
+.viva-app .st-btn-primary:hover:not(:disabled) { background: #2749b3; }
 .viva-app .st-btn-ghost { background: #fff; border-color: var(--st-line); color: var(--st-ink); }
 .viva-app .st-btn-ghost:hover:not(:disabled) { background: var(--st-soft); }
 .viva-app .st-btn-danger { background: #fff1f2; color: var(--st-rose); border-color: #fecdd3; }
 .viva-app .st-link { background: none; border: 0; padding: 0; color: var(--st-accent); font-weight: 600; font-size: 14px; }
-.viva-app .st-btn:focus-visible, .viva-app .st-link:focus-visible, .viva-app .st-option:focus-visible, .viva-app .st-mic:focus-visible { outline: 3px solid #a5b4fc; outline-offset: 2px; }
+.viva-app .st-btn:focus-visible, .viva-app .st-link:focus-visible, .viva-app .st-option:focus-visible, .viva-app .st-mic:focus-visible { outline: 3px solid #a6bdf3; outline-offset: 2px; }
 
 
 /* The student page: a slim top bar over a soft gradient, content centred. */
@@ -49,14 +49,14 @@
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(900px 520px at 8% -8%, #e0e7ff 0%, transparent 62%),
+    radial-gradient(900px 520px at 8% -8%, #e1e9fb 0%, transparent 62%),
     radial-gradient(760px 460px at 100% 4%, #fce7f3 0%, transparent 58%),
-    radial-gradient(900px 600px at 55% 110%, #ede9fe 0%, transparent 60%),
+    radial-gradient(900px 600px at 55% 110%, #e6eefc 0%, transparent 60%),
     #f8fafc;
   background-attachment: fixed;
 }
 .viva-app .sh-bar { position: sticky; top: 0; z-index: 20; background: rgb(255 255 255 / 0.78); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--st-line); }
-.viva-app .sh-bar-inner { max-width: 1328px; margin: 0 auto; padding: 0 24px; min-height: 60px; display: flex; align-items: center; gap: 28px; }
+.viva-app .sh-bar-inner { max-width: 1648px; margin: 0 auto; padding: 0 24px; min-height: 60px; display: flex; align-items: center; gap: 28px; }
 .viva-app .sh-bar .brand { margin: 0; font-size: 20px; }
 .viva-app .sh-bar .brand-symbol { width: 34px; height: 37px; border-radius: 10px; }
 .viva-app .sh-bar .brand-symbol svg { width: 28px; height: 28px; }
@@ -70,11 +70,11 @@
 .viva-app .sh-icon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--st-line); border-radius: 10px; background: #fff; color: var(--st-muted); }
 .viva-app .sh-icon:hover { background: var(--st-soft); color: var(--st-ink); }
 /* Pages fill the window below the bar; a page scrolls only when its content is taller. */
-.viva-app .sh-main { flex: 1; width: 100%; max-width: 1328px; margin: 0 auto; padding: 20px 24px 24px; display: flex; flex-direction: column; }
+.viva-app .sh-main { flex: 1; width: 100%; max-width: 1648px; margin: 0 auto; padding: 20px 24px 24px; display: flex; flex-direction: column; }
 .viva-app .sh-main > .view-enter { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .viva-app .st-fill { width: 100%; }
-.viva-app .sh-main > .notice { width: 100%; max-width: 1280px; margin: 0 auto 14px; }
-.viva-app .sh-foot { width: 100%; max-width: 1328px; margin: 0 auto; padding: 12px 24px 16px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--st-muted); border-top: 1px solid var(--st-line); }
+.viva-app .sh-main > .notice { width: 100%; max-width: 1600px; margin: 0 auto 14px; }
+.viva-app .sh-foot { width: 100%; max-width: 1648px; margin: 0 auto; padding: 12px 24px 16px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--st-muted); border-top: 1px solid var(--st-line); }
 .viva-app .sh-foot a { color: var(--st-accent); font-weight: 600; }
 .viva-app .sh-foot a:hover { text-decoration: underline; }
 
@@ -103,12 +103,12 @@
 .viva-app .st-card-head h2 { font-size: 20px; margin-top: 4px; }
 .viva-app .st-block { width: 100%; }
 .viva-app .st-btn-sm { padding: 7px 12px; font-size: 14px; border-radius: 10px; }
-.viva-app .st-start, .viva-app .st-session { max-width: 1280px; }
+.viva-app .st-start, .viva-app .st-session { max-width: 1600px; }
 
 /* Start page: topics on the left, the viva summary on the right. */
-.viva-app .st-start { grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr); gap: 20px; height: calc(100dvh - 105px); min-height: 480px; }
+.viva-app .st-start { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
 .viva-app .st-topics { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
-.viva-app .st-topic-scroll { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 20px; align-content: start; padding: 2px 4px 2px 2px; margin: -2px; }
+.viva-app .st-topic-scroll { display: grid; gap: 20px; align-content: start; padding: 2px 4px 2px 2px; margin: -2px; }
 .viva-app .st-topic-group { display: grid; gap: 10px; }
 .viva-app .st-topic-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; color: var(--st-ink); }
 .viva-app .st-topic-group-head small { font-size: 12px; font-weight: 500; color: var(--st-muted); }
@@ -117,7 +117,7 @@
 .viva-app .st-search:focus-within { border-color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
 .viva-app .st-search input, .viva-app .st-search input:focus { border: 0; outline: none; background: transparent; padding: 9px 0; font-size: 14px; width: 100%; color: var(--st-ink); box-shadow: none; }
 .viva-app .st-topic { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 6px; text-align: left; background: #fff; border: 1.5px solid var(--st-line); border-radius: 14px; padding: 14px 16px; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
-.viva-app .st-topic:hover { border-color: #c7d2fe; transform: translateY(-1px); box-shadow: 0 6px 16px rgb(15 23 42 / 0.06); }
+.viva-app .st-topic:hover { border-color: #c9d7f7; transform: translateY(-1px); box-shadow: 0 6px 16px rgb(15 23 42 / 0.06); }
 .viva-app .st-topic[aria-pressed="true"] { border-color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
 .viva-app .st-topic .st-icon { grid-row: span 2; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--st-accent-soft); color: var(--st-accent); }
 .viva-app .st-topic-text { display: grid; gap: 2px; padding-right: 22px; }
@@ -125,7 +125,7 @@
 .viva-app .st-topic-text .st-small { font-size: 13px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .viva-app .st-topic-count { grid-column: 2; font-size: 12px; font-weight: 600; color: var(--st-muted); }
 .viva-app .st-topic-check { position: absolute; top: 12px; right: 12px; color: var(--st-accent); }
-.viva-app .st-plan-card { display: flex; flex-direction: column; gap: 18px; min-height: 0; overflow-y: auto; }
+.viva-app .st-plan-card { display: flex; flex-direction: column; gap: 18px; }
 .viva-app .st-plan-card > .st-btn-primary { margin-top: auto; }
 .viva-app .st-plan-head { display: flex; align-items: center; gap: 14px; padding-bottom: 16px; border-bottom: 1px solid var(--st-line); }
 .viva-app .st-plan-head h2 { font-size: 18px; line-height: 1.25; margin: 2px 0; }
@@ -144,7 +144,7 @@
 .viva-app .st-rail-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; align-content: start; flex: 1 1 auto; min-height: 96px; overflow-y: auto; }
 .viva-app .st-rail-steps li { position: relative; display: flex; gap: 12px; padding: 0 0 18px; }
 .viva-app .st-rail-steps li:not(:last-child)::before { content: ""; position: absolute; left: 13px; top: 28px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--st-line); }
-.viva-app .st-rail-steps li.is-done:not(:last-child)::before { background: #c7d2fe; }
+.viva-app .st-rail-steps li.is-done:not(:last-child)::before { background: #c9d7f7; }
 .viva-app .st-rail-dot { flex: none; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: #fff; border: 2px solid var(--st-line); color: var(--st-muted); }
 .viva-app .is-done .st-rail-dot { background: var(--st-accent); border-color: var(--st-accent); color: #fff; }
 .viva-app .is-current .st-rail-dot { border-color: var(--st-accent); color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
@@ -178,7 +178,7 @@
 .viva-app .st-answer-box { flex: 1; min-height: 84px; width: 100%; border: 1.5px solid var(--st-line); border-radius: 14px; padding: 14px 16px; font-size: 16px; line-height: 1.55; resize: none; background: #fff; color: var(--st-ink); }
 .viva-app .st-answer-box:focus { outline: none; border-color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
 .viva-app .st-answer-empty { flex: 1; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px; border: 1.5px dashed var(--st-line); border-radius: 14px; color: var(--st-muted); text-align: center; font-size: 14px; }
-.viva-app .st-answer-empty svg { color: #a5b4fc; }
+.viva-app .st-answer-empty svg { color: #a6bdf3; }
 .viva-app .st-a-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 4px; }
 .viva-app .st-viva-ready { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 14px; padding: 28px; text-align: center; overflow-y: auto; }
 .viva-app .st-viva-ready h2 { font-size: 24px; }
@@ -230,7 +230,7 @@
 .viva-app .st-hero p { margin-top: 10px; font-size: 16px; }
 .viva-app .st-options { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin-top: 14px; }
 .viva-app .st-option { text-align: left; background: #fff; border: 1.5px solid var(--st-line); border-radius: 16px; padding: 16px; display: grid; gap: 6px; transition: border-color 0.15s, box-shadow 0.15s; }
-.viva-app .st-option:hover { border-color: #c7d2fe; }
+.viva-app .st-option:hover { border-color: #c9d7f7; }
 .viva-app .st-option[aria-pressed="true"] { border-color: var(--st-accent); box-shadow: 0 0 0 4px var(--st-accent-soft); }
 .viva-app .st-option strong { font-size: 16px; }
 .viva-app .st-option .st-icon { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--st-accent-soft); color: var(--st-accent); }
@@ -245,17 +245,17 @@
 .viva-app .st-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--st-soft); font-size: 13px; font-weight: 600; color: var(--st-muted); }
 .viva-app .st-chip-accent { background: var(--st-accent-soft); color: var(--st-accent); }
 .viva-app .st-progress { height: 6px; border-radius: 999px; background: var(--st-soft); overflow: hidden; }
-.viva-app .st-progress span { display: block; height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: inherit; transition: width 0.4s; }
+.viva-app .st-progress span { display: block; height: 100%; background: linear-gradient(90deg, #4f78e0, #5b8def); border-radius: inherit; transition: width 0.4s; }
 .viva-app .st-stage { display: grid; justify-items: center; text-align: center; gap: 18px; padding: 36px 24px; }
-.viva-app .st-orb { width: 96px; height: 96px; border-radius: 999px; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 30% 30%, #818cf8, #4f46e5); box-shadow: 0 12px 32px rgb(79 70 229 / 0.35); }
+.viva-app .st-orb { width: 96px; height: 96px; border-radius: 999px; display: grid; place-items: center; color: #fff; background: radial-gradient(circle at 30% 30%, #7d9cec, #315bd6); box-shadow: 0 12px 32px rgb(49 91 214 / 0.35); }
 .viva-app .st-orb.is-speaking { animation: st-pulse 1.4s ease-in-out infinite; }
 .viva-app .st-orb.is-listening { background: radial-gradient(circle at 30% 30%, #fb7185, #e11d48); box-shadow: 0 12px 32px rgb(225 29 72 / 0.35); animation: st-pulse 1s ease-in-out infinite; }
-.viva-app .st-orb.is-thinking { background: radial-gradient(circle at 30% 30%, #a78bfa, #7c3aed); animation: st-spin-glow 1.6s linear infinite; }
+.viva-app .st-orb.is-thinking { background: radial-gradient(circle at 30% 30%, #7d9cec, #2f63d0); animation: st-spin-glow 1.6s linear infinite; }
 @keyframes st-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.07); } }
 @keyframes st-spin-glow { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(40deg); } }
 .viva-app .st-question { font-size: clamp(20px, 2.4vw, 28px); line-height: 1.35; font-weight: 650; max-width: 760px; }
 .viva-app .st-status { font-size: 14px; color: var(--st-muted); min-height: 21px; }
-.viva-app .st-mic { width: 76px; height: 76px; border-radius: 999px; border: 0; display: grid; place-items: center; background: var(--st-accent); color: #fff; box-shadow: 0 10px 24px rgb(79 70 229 / 0.3); transition: background 0.15s; }
+.viva-app .st-mic { width: 76px; height: 76px; border-radius: 999px; border: 0; display: grid; place-items: center; background: var(--st-accent); color: #fff; box-shadow: 0 10px 24px rgb(49 91 214 / 0.3); transition: background 0.15s; }
 .viva-app .st-mic.is-recording { background: var(--st-rose); box-shadow: 0 10px 24px rgb(225 29 72 / 0.3); }
 .viva-app .st-mic:disabled { opacity: 0.5; }
 .viva-app .st-answer { width: 100%; max-width: 760px; display: grid; gap: 10px; text-align: left; }
@@ -324,12 +324,12 @@
 .viva-app .st-dots { display: flex; gap: 6px; }
 .viva-app .st-dots span { flex: 1; height: 6px; border-radius: 999px; background: var(--st-soft); transition: background 0.4s; }
 .viva-app .st-dots .is-done { background: var(--st-accent); }
-.viva-app .st-dots .is-current { background: linear-gradient(90deg, var(--st-accent), #a5b4fc); animation: st-dot-pulse 1.8s ease-in-out infinite; }
+.viva-app .st-dots .is-current { background: linear-gradient(90deg, var(--st-accent), #a6bdf3); animation: st-dot-pulse 1.8s ease-in-out infinite; }
 @keyframes st-dot-pulse { 50% { opacity: 0.55; } }
 .viva-app .st-miccheck { display: flex; flex-direction: column; align-items: center; gap: 8px; min-height: 64px; }
 .viva-app .st-miccheck .st-mic-wave { color: var(--st-accent); }
 .viva-app .st-ok { color: var(--st-green); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-.viva-app .st-celebrate { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; border-color: #c7d2fe; background: linear-gradient(135deg, #fff, #eef2ff); }
+.viva-app .st-celebrate { position: relative; overflow: hidden; display: flex; align-items: center; gap: 14px; border-color: #c9d7f7; background: linear-gradient(135deg, #fff, #eef3fd); }
 .viva-app .st-celebrate > svg { color: var(--st-accent); flex: none; }
 .viva-app .st-celebrate strong { font-size: 18px; }
 .viva-app .st-confetti { position: absolute; inset: 0; pointer-events: none; }
@@ -394,20 +394,21 @@
 .viva-app .st-plan-why { display: block; margin-top: 4px; font-size: 13px; line-height: 1.45; color: var(--st-muted); }
 
 /* The examiner: the still portrait, replaced by the live 3D examiner once it has loaded. */
-.viva-app .ex { position: relative; flex: none; width: 210px; height: 214px; border-radius: 22px; overflow: hidden; background: radial-gradient(circle at 50% 30%, #eef2ff 0%, #e0e7ff 78%); box-shadow: 0 0 0 1px rgb(79 70 229 / 0.08); transition: box-shadow 0.3s; }
+.viva-app .ex { position: relative; flex: none; width: 210px; height: 214px; border-radius: 22px; overflow: hidden; background: radial-gradient(circle at 50% 30%, #eef3fd 0%, #e1e9fb 78%); box-shadow: 0 0 0 1px rgb(49 91 214 / 0.08); transition: box-shadow 0.3s; }
 .viva-app .ex-portrait, .viva-app .ex-3d { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity 0.5s; }
 .viva-app .ex-portrait { object-fit: cover; object-position: 50% 30%; }
 .viva-app .ex-3d { opacity: 0; }
 .viva-app .ex-3d-stage { width: 100%; height: 100%; }
 .viva-app .ex.is-live .ex-3d { opacity: 1; }
 .viva-app .ex.is-live .ex-portrait { opacity: 0; }
-.viva-app .ex.is-speaking { box-shadow: 0 0 0 3px #fff, 0 0 0 6px #a5b4fc; }
+.viva-app .ex.is-speaking { box-shadow: 0 0 0 3px #fff, 0 0 0 6px #a6bdf3; }
 .viva-app .ex.is-listening { box-shadow: 0 0 0 3px #fff, 0 0 0 6px #fda4af; }
 .viva-app .st-viva-ready .ex { width: 240px; height: 248px; border-radius: 26px; }
-.viva-app .ex-still { display: block; flex: none; width: 72px; height: 72px; border-radius: 999px; object-fit: cover; object-position: 50% 26%; background: radial-gradient(circle at 50% 30%, #eef2ff 0%, #e0e7ff 78%); }
-.viva-app .st-signin .ex-still { width: 92px; height: 92px; justify-self: center; }
+/* Start pages: the live examiner in a circle, framed on her face. */
+.viva-app .ex.ex-round { width: 104px; height: 104px; border-radius: 999px; }
+.viva-app .st-signin .ex.ex-round { width: 128px; height: 128px; justify-self: center; }
 @media (max-height: 700px) and (min-width: 861px) {
-  .viva-app .st-signin .ex-still { display: none; }
+  .viva-app .st-signin .ex-round { display: none; }
   .viva-app .st-viva-q .ex { width: 190px; height: 196px; }
 }
 @media (max-width: 600px) {
@@ -421,7 +422,7 @@
 .viva-app .st-command q { font-weight: 600; color: var(--st-accent); quotes: "\201C" "\201D"; }
 .viva-app .st-command small { font-size: 12px; color: var(--st-muted); }
 /* A command was heard: say so plainly before the student submits. */
-.viva-app .st-command-heard { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid #c7d2fe; background: var(--st-accent-soft); color: #3730a3; font-size: 14px; line-height: 1.5; }
+.viva-app .st-command-heard { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border-radius: 12px; border: 1px solid #c9d7f7; background: var(--st-accent-soft); color: #3730a3; font-size: 14px; line-height: 1.5; }
 .viva-app .st-command-heard svg { flex: none; margin-top: 2px; }
 .viva-app .st-command-heard q { font-weight: 700; quotes: "\201C" "\201D"; }
 .viva-app .st-rail-actions .st-btn { white-space: nowrap; font-size: 13px; padding: 9px 8px; }
@@ -437,3 +438,10 @@
 .st-modal-close { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--st-muted); cursor: pointer; }
 .st-modal-close:hover { background: var(--st-soft); }
 .st-modal h3 { padding-right: 28px; }
+
+.viva-app .st-next { display: grid; gap: 12px; padding: 20px 24px; } .viva-app .st-next .st-row { flex-wrap: wrap; gap: 10px; }
+.viva-app .st-win { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; color: #1f7a4d; font-weight: 600; font-size: 15px; }
+/* Ready screen: items keep their size (the card scrolls if needed), so "Test again" never slides under the start button. */
+.viva-app .st-viva-ready > * { flex-shrink: 0; }
+.viva-app .st-viva-ready .st-commands { justify-content: center; }
+.viva-app .st-viva-ready .ex { width: 200px; height: 206px; }

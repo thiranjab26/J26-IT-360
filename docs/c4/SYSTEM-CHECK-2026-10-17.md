@@ -31,7 +31,7 @@ tests and the frontend production build. Your real database was not touched.
 
 ## Limits to state at PP1 (PP2 work)
 
-- **Fillers in the live viva:** Groq keeps about 7% of fillers, so the filler signal rarely fires.
+- **Fillers in the live viva:** Groq (`whisper-large-v3-turbo`, filler prompt) kept 64 of 96 CrisperWhisper fillers (67%) on 4 pilot students (P01, P05, P08, P10; 19 Oct), `whisper-large-v3` 61%; the 7% figure was local Whisper. The filler signal is conservative, not silent.
   A communication result needs the fluency signal plus a signal heard in the words (your rule:
   timing alone never decides), so today that word signal mostly comes from hedges and restarts.
   PP2: the filler detector.

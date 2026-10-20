@@ -1,12 +1,29 @@
 import { useEffect, useState } from "react";
-import { BookOpenCheck, Check, ChevronDown, Pencil, RefreshCw, Sparkles, X } from "../components/icons";
+import { ArrowLeft, ArrowRight, BookOpenCheck, Check, ChevronDown, Pencil, Plus, RefreshCw, Sparkles, Trash2, X } from "../components/icons";
 import { api, label } from "../api/client";
 import type { Auth, BankQuestion, Topic } from "../api/types";
 import { Badge, Empty, Modal, PageTitle, Skeleton } from "../components/components";
 import Courses, { Step } from "../pages/Courses";
 import { QuestionEditor } from "../components/QuestionEditor";
 
-/** Question bank: course, material, generation, then review and approval. */
+const STEPS = ["Course", "Material", "Add questions", "Review and approve"];
+
+/** An empty question for the lecturer to write; the backup follow-ups start with plain defaults. */
+const blank = (topic_id: string): BankQuestion => ({
+  id: "", topic_id, status: "draft", origin: "lecturer_written", version: 1, review_notes: "",
+  concept: "", question: "", reference_answer: "", misconceptions: [],
+  rubric_points: [{ id: "p1", point: "", keywords: [] }],
+  sources: [{ source: "Written by the lecturer" }],
+  follow_ups: {
+    partial: "Good start. What else can you tell me about it?",
+    superficial: "Can you explain why it works that way?",
+    incorrect: "Let us look at it another way. What do you know about this idea?",
+    misconception_bearing: "Think of a small example. What would happen there?",
+    non_answer: "That is okay. Let me ask it in a different way.",
+  },
+});
+
+/** Question bank: one step at a time: course, material, add questions, then review and approval. */
 export default function Bank({
   auth,
   topics,
@@ -18,7 +35,8 @@ export default function Bank({
   onError: (s: string) => void;
   onTopicsChanged: () => Promise<void>;
 }) {
-  const [topic, setTopic] = useState(topics[0]?.id || ""),
+  const [step, setStep] = useState(1),
+    [topic, setTopic] = useState(topics[0]?.id || ""),
     [status, setStatus] = useState<"draft" | "approved" | "rejected" | "all">("draft"),
     [count, setCount] = useState(3),
     [items, setItems] = useState<BankQuestion[]>([]),
@@ -60,8 +78,21 @@ export default function Bank({
         `${result.items.length} new questions are waiting for your review in step 4.`,
       );
       setStatus("draft");
+      setStep(4);
       await load();
       await onTopicsChanged();
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  }
+  async function remove(q: BankQuestion) {
+    if (!window.confirm(`Delete "${q.concept}" for good?`)) return;
+    setWorking(true);
+    try {
+      await api(`/bank/${q.id}`, auth.token, undefined, "DELETE");
+      await load();
     } catch (e) {
       onError((e as Error).message);
     } finally {
@@ -86,10 +117,12 @@ export default function Bank({
   async function save(question: BankQuestion) {
     setWorking(true);
     try {
-      await api(`/bank/${question.id}`, auth.token, question, "PUT");
+      if (question.id) await api(`/bank/${question.id}`, auth.token, question, "PUT");
+      else await api("/bank", auth.token, question);
       setEdit(null);
-      setSaved(`"${question.concept}" saved. It is back in Waiting for review; approve it again before students get it.`);
+      setSaved(`"${question.concept}" saved. It is in Waiting for review; approve it before students get it.`);
       setStatus("draft");
+      setStep(4);
       await load();
     } catch (e) {
       onError((e as Error).message);
@@ -102,27 +135,34 @@ export default function Bank({
       <PageTitle
         eyebrow="QUESTION BANK"
         title="Create viva questions"
-        description="Four steps: choose a course, add its material, generate questions, then approve the ones students should get."
+        description="Four steps: choose a course, add its material, add questions (AI or your own), then approve the ones students should get."
       />
       <ol className="bank-flow" aria-label="Steps">
-        {["Course", "Material", "Generate", "Review and approve"].map((t, i) => (
-          <li key={t}><span>{i + 1}</span>{t}</li>
+        {STEPS.map((t, i) => (
+          <li key={t}>
+            <button className={step === i + 1 ? "active" : ""} aria-current={step === i + 1 ? "step" : undefined} onClick={() => setStep(i + 1)}>
+              <span>{i + 1}</span>{t}{i === 3 && tally("draft") > 0 ? ` (${tally("draft")} waiting)` : ""}
+            </button>
+          </li>
         ))}
       </ol>
-      <Courses
+      {step < 3 && <Courses
+        step={step as 1 | 2}
+        onNext={() => setStep(2)}
         auth={auth}
         topics={topics}
         selected={topic}
         onSelect={setTopic}
         onChanged={onTopicsChanged}
         onError={onError}
-      />
-      <Step
+      />}
+      {step === 3 && <Step
         n={3}
-        title="Generate questions"
-        hint="AI writes draft questions, model answers and marking points from the course material. Nothing reaches students yet."
+        title="Add questions"
+        hint="Let the AI draft questions from the course material, or write your own. Nothing reaches students until you approve it in step 4."
         done={items.length > 0}
       >
+        <h3>Generate with AI</h3>
         <div className="bank-step-row">
           <label className="field-inline">
             How many
@@ -142,8 +182,15 @@ export default function Bank({
             {message}
           </div>
         )}
-      </Step>
-      <Step
+        <h3>Write your own</h3>
+        <div className="bank-step-row">
+          <button className="button secondary" disabled={!topic} onClick={() => { setSaved(""); setEdit(blank(topic)); }}>
+            <Plus size={16} />
+            Write a question
+          </button>
+        </div>
+      </Step>}
+      {step === 4 && <Step
         n={4}
         title="Review and approve"
         hint="Read each question and its marking points. Only approved questions are asked in new vivas."
@@ -269,6 +316,12 @@ export default function Bank({
                   Edit question
                 </button>
                 <div className="button-row">
+                  {q.status !== "approved" && (
+                    <button className="button subtle" disabled={working} onClick={() => remove(q)}>
+                      <Trash2 size={15} />
+                      Delete
+                    </button>
+                  )}
                   {q.status !== "rejected" && (
                     <button
                       className="button subtle"
@@ -308,12 +361,24 @@ export default function Bank({
           icon={<BookOpenCheck size={28} />}
           title={status === "draft" ? "Nothing waiting for review" : "No questions here"}
         >
-          {items.length ? "Try another tab above." : "Generate questions in step 3."}
+          {items.length ? "Try another tab above." : "Add questions in step 3."}
         </Empty>
       )}
-      </Step>
+      </Step>}
+      <div className="bank-nav">
+        <button className="button secondary" disabled={step === 1} onClick={() => setStep(step - 1)}>
+          <ArrowLeft size={16} />
+          Back
+        </button>
+        {step < 4 && (
+          <button className="button primary" disabled={!topic} onClick={() => setStep(step + 1)}>
+            Next: {STEPS[step]}
+            <ArrowRight size={16} />
+          </button>
+        )}
+      </div>
       {edit && (
-        <Modal title="Edit question" onClose={() => setEdit(null)}>
+        <Modal title={edit.id ? "Edit question" : "Write a question"} onClose={() => setEdit(null)}>
           <QuestionEditor question={edit} working={working} onSave={save} />
         </Modal>
       )}

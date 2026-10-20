@@ -47,16 +47,25 @@ export function useService(onError: (s: string) => void, offlineMessage: string)
     [topics, setTopics] = useState<Topic[]>([]);
   const reloadTopics = async () => setTopics((await api<{ items: Topic[] }>("/topics")).items);
   useEffect(() => {
-    api<Health>("/health")
-      .then((h) => {
-        setHealth(h);
-        setStatus("online");
-        return reloadTopics().catch((e) => onError(e.message));
-      })
-      .catch(() => {
-        setStatus("offline");
-        onError(offlineMessage);
-      });
+    let timer = 0,
+      failed = false;
+    // Keep trying: a dropped internet connection or a sleeping cloud database usually comes back by itself.
+    const connect = () =>
+      api<Health>("/health")
+        .then((h) => {
+          setHealth(h);
+          setStatus("online");
+          if (failed) onError("");
+          return reloadTopics().catch((e) => onError(e.message));
+        })
+        .catch(() => {
+          failed = true;
+          setStatus("offline");
+          onError(offlineMessage);
+          timer = window.setTimeout(connect, 5000);
+        });
+    void connect();
+    return () => clearTimeout(timer);
   }, []);
   return { health, status, topics, reloadTopics };
 }

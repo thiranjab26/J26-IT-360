@@ -138,3 +138,30 @@ def test_voice_says_code_and_maths_as_words():
     assert speakable("factorial(n - 1), 7.5 and first-in, first-out") == (
         "factorial of n minus 1, 7.5 and first-in, first-out"
     )
+    assert speakable("Name three kinds of operators, e.g., +, -, *?") == (
+        "Name three kinds of operators, for example, plus, minus, times?"
+    )
+    assert speakable("Is it comparison/relational, i.e. a **boolean** test?") == (
+        "Is it comparison or relational, that is, a boolean test?"
+    )
+
+
+def test_course_words_prime_the_transcriber():
+    from app.integrations.speech import FILLER_PROMPT, vocabulary_prompt
+
+    assert vocabulary_prompt() == FILLER_PROMPT
+    assert vocabulary_prompt(["float", "whole number", "7.5", "integer", "name"]).endswith(
+        "programming, uh, float, um, whole, um, number, um, integer."
+    )
+
+
+def test_audio_for_the_cloud_transcriber_is_a_valid_wav():
+    import io
+    import wave
+
+    import numpy as np
+
+    from app.integrations.speech import SAMPLE_RATE, wav_bytes
+
+    with wave.open(io.BytesIO(wav_bytes(np.zeros(SAMPLE_RATE, dtype=np.float32)))) as w:
+        assert (w.getnchannels(), w.getframerate(), w.getnframes()) == (1, SAMPLE_RATE, SAMPLE_RATE)

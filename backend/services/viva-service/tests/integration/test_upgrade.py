@@ -109,6 +109,7 @@ def grounded_question(course, chunk):
     for key in ("id", "origin", "status", "review_notes", "version"):
         question.pop(key)
     question["topic_id"] = course
+    question["question"] = "How does a stack decide which item comes out first?"  # generated questions are short and spoken
     question["sources"] = [chunk]
     for point in question["rubric_points"]:
         point["source_indices"] = [0]
@@ -382,3 +383,59 @@ def test_cloud_gate_precedes_budget_and_network(client, monkeypatch):
     with pytest.raises(providers.ProviderUnavailable):
         providers.call_llm("openai", "Assess", {}, {})
     assert limits.usage() == []
+
+
+def test_lecturer_writes_approves_and_deletes_a_question(client):
+    headers = auth(client, "admin")
+    course = create_course(client, headers)
+    written = deepcopy(seed_questions()[0])
+    for key in ("id", "origin", "status", "review_notes", "version", "sources"):
+        written.pop(key)
+    written["topic_id"] = course
+    bank = "/api/v1/viva/bank"
+    created = client.post(bank, headers=headers, json=written)
+    assert created.status_code == 201, created.text
+    item = created.json()
+    assert item["status"] == "draft" and item["origin"] == "lecturer_written"
+    # Approved without a quote from the course material.
+    review = client.post(f"{bank}/{item['id']}/review", headers=headers, json={"status": "approved"})
+    assert review.status_code == 200, review.text
+    assert client.delete(f"{bank}/{item['id']}", headers=headers).status_code == 409
+    client.post(f"{bank}/{item['id']}/review", headers=headers, json={"status": "rejected"})
+    assert client.delete(f"{bank}/{item['id']}", headers=headers).status_code == 204
+    assert client.delete(f"{bank}/{item['id']}", headers=headers).status_code == 404
+
+
+def test_student_deletes_a_test_viva(client):
+    headers = auth(client)
+    session = start(client, headers)
+    answer(client, headers, session, "A stack is last in, first out.")
+    other = auth(client, code="P002")
+    url = f"/api/v1/viva/sessions/{session['id']}"
+    assert client.delete(url, headers=other).status_code == 403
+    assert client.delete(url, headers=headers).status_code == 204
+    assert client.get(url, headers=headers).status_code == 404
+
+
+def test_same_code_reopens_the_same_account(client):
+    first = auth(client, code="p07")
+    session = start(client, first)
+    again = auth(client, code="P07")
+    listed = client.get("/api/v1/viva/sessions", headers=again).json()["items"]
+    assert [s["id"] for s in listed] == [session["id"]]
+
+
+def test_fillers_are_counted_from_the_spoken_transcript(client):
+    headers = auth(client)
+    session = start(client, headers, input_mode="speech")
+    answer(
+        client,
+        headers,
+        session,
+        "A stack is last in, first out.",
+        input_mode="speech",
+        spoken_transcript="Uh, a stack is, um, last in, uh, first out.",
+    )
+    turn = client.get(f"/api/v1/viva/sessions/{session['id']}", headers=headers).json()
+    report_turns = turn.get("turns") or []
+    assert report_turns and report_turns[0]["hesitation"]["filler_count"] == 3

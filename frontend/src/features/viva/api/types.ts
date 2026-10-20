@@ -108,6 +108,8 @@ export type Report = {
     rubric_coverage: number;
     turn_count: number;
     no_weakness?: boolean;
+    /** Gap rules 1.8: difficulty heard, but only 51 to 79% of the points came through. */
+    speaking_unclear?: boolean;
     signal_details?: { signal: string; value: string; threshold: string; counted: boolean }[];
     /** Points the last answer covered and missed (reports from 18 Oct 2026). */
     covered?: string[];

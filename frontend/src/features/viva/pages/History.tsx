@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, History as HistoryIcon, Search } from "../components/icons";
+import { ArrowRight, BookOpen, History as HistoryIcon, Search, Trash2 } from "../components/icons";
 import { ago, api, date, resultLabels, resultOf } from "../api/client";
 import type { Auth, Report, Session, Summary } from "../api/types";
 import { Empty, PageTitle, Skeleton } from "../components/components";
@@ -51,6 +51,18 @@ export default function History({
       if (s.status === "completed")
         onReport(await api<Report>(`/sessions/${s.id}/report`, auth.token), s.participant_code ?? undefined);
       else onResume(await api<Session>(`/sessions/${s.id}`, auth.token));
+    } catch (e) {
+      onError((e as Error).message);
+    } finally {
+      setOpening("");
+    }
+  }
+  async function remove(s: Summary) {
+    if (!window.confirm("Delete this viva and its report for good? Use this for test runs.")) return;
+    setOpening(s.id);
+    try {
+      await api(`/sessions/${s.id}`, auth.token, undefined, "DELETE");
+      setItems((all) => all.filter((x) => x.id !== s.id));
     } catch (e) {
       onError((e as Error).message);
     } finally {
@@ -146,14 +158,19 @@ export default function History({
                       </div>
                     )}
                   </div>
-                  {staff && s.status === "active" ? (
-                    <span className="small muted">Not finished yet</span>
-                  ) : (
-                    <button className="button secondary" disabled={!!opening} onClick={() => open(s)}>
-                      {opening === s.id ? "Opening…" : s.status === "active" ? "Continue" : "View report"}
-                      <ArrowRight size={16} />
+                  <div className="hx-actions">
+                    {staff && s.status === "active" ? (
+                      <span className="small muted">Not finished yet</span>
+                    ) : (
+                      <button className="button secondary" disabled={!!opening} onClick={() => open(s)}>
+                        {opening === s.id ? "Opening…" : s.status === "active" ? "Continue" : "View report"}
+                        <ArrowRight size={16} />
+                      </button>
+                    )}
+                    <button className="icon-button" disabled={!!opening} onClick={() => remove(s)} aria-label="Delete this viva" title="Delete this viva">
+                      <Trash2 size={16} />
                     </button>
-                  )}
+                  </div>
                 </article>
               );
             })}

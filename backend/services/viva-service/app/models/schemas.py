@@ -69,6 +69,8 @@ class AudioMetrics(StrictModel):
 class AnswerIn(StrictModel):
     question_id: str = Field(min_length=1, max_length=128)
     transcript: str = Field(max_length=12000)
+    # What speech-to-text heard, fillers included; the student sees and sends the transcript without them.
+    spoken_transcript: str | None = Field(default=None, max_length=12000)
     input_mode: Literal["text", "speech"]
     response_latency_ms: float | None = Field(default=None, ge=0, le=900000)
     audio_metrics: AudioMetrics | None = None

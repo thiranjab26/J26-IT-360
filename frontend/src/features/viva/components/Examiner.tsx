@@ -22,6 +22,8 @@ type Head = {
   lookAhead(ms: number): void;
   speakWithHands(delay?: number, prob?: number): void;
   playGesture(name: string, dur?: number, mirror?: boolean, ms?: number): void;
+  setView(view: string, opt?: object): void;
+  lookAt(x: number, y: number, ms: number): void;
   start(): void;
   stop(): void;
   audioCtx: AudioContext;
@@ -61,6 +63,9 @@ function examiner(box: HTMLElement) {
   })();
   return shared;
 }
+
+// Camera framing per place: the viva card shows her upper body; the round start-page picture, her face.
+const VIEWS = { upper: { cameraDistance: 0.25, cameraY: 0.22 }, head: { cameraDistance: 0.3 } };
 
 let gestures = 0; // alternates the hand used for the explaining gesture
 
@@ -102,7 +107,20 @@ function mouth(head: Head, text: string, seconds: number, voiced?: [number, numb
   if (Math.random() < 0.6) head.playGesture("index", 2, gestures++ % 2 === 1, 800);
 }
 
-export function Examiner({ state, voice }: { state: ExaminerState; voice?: MutableRefObject<((e: VoiceEvent) => void) | null> }) {
+export function Examiner({
+  state,
+  voice,
+  view = "upper",
+  follow = false,
+  className = "",
+}: {
+  state: ExaminerState;
+  voice?: MutableRefObject<((e: VoiceEvent) => void) | null>;
+  view?: keyof typeof VIEWS;
+  /** Look towards the pointer (start pages only; in the viva she looks at the student). */
+  follow?: boolean;
+  className?: string;
+}) {
   const box = useRef<HTMLDivElement>(null);
   const head = useRef<Head | null>(null);
   const [live, setLive] = useState(false);
@@ -113,6 +131,7 @@ export function Examiner({ state, voice }: { state: ExaminerState; voice?: Mutab
         if (!mounted || !box.current) return;
         box.current.append(node); // moves it here if another card showed it before
         h.start();
+        h.setView(view, VIEWS[view]);
         head.current = h;
         setLive(true);
       })
@@ -124,6 +143,20 @@ export function Examiner({ state, voice }: { state: ExaminerState; voice?: Mutab
       head.current = null;
     };
   }, []);
+  useEffect(() => {
+    if (!follow) return;
+    // A gentle follow: the point is kept near her face, so a pointer far below never makes her look down.
+    const clamp = (v: number, c: number, r: number) => Math.max(c - r, Math.min(c + r, v));
+    const move = (e: PointerEvent) => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r) return;
+      const cx = r.left + r.width / 2,
+        cy = r.top + r.height / 2;
+      head.current?.lookAt(clamp(e.clientX, cx, 160), clamp(e.clientY, cy, 30), 800);
+    };
+    window.addEventListener("pointermove", move);
+    return () => window.removeEventListener("pointermove", move);
+  }, [follow]);
   useEffect(() => {
     if (!voice) return;
     voice.current = (e) => {
@@ -143,7 +176,7 @@ export function Examiner({ state, voice }: { state: ExaminerState; voice?: Mutab
       h.makeEyeContact(60000);
       h.playGesture("🙂", 3); // a soft, attentive smile while the student answers
     } else if (state === "thinking") {
-      h.playGesture("🤔", 2.5); // hand to chin while the answer is marked
+      h.lookAhead(2500); // a short look away while the answer is marked; the hand-to-chin gesture clipped through the face
     } else if (state === "nodding") {
       h.playGesture("yes", 1); // the same small nod after every answer
       h.makeEyeContact(10000);
@@ -157,14 +190,9 @@ export function Examiner({ state, voice }: { state: ExaminerState; voice?: Mutab
     nodding: "Examiner acknowledges your answer",
   }[state];
   return (
-    <div className={`ex is-${state} ${live ? "is-live" : ""}`} role="img" aria-label={label}>
+    <div className={`ex ${className} is-${state} ${live ? "is-live" : ""}`} role="img" aria-label={label}>
       <img className="ex-portrait" src={portrait} alt="" />
       <div className="ex-3d" ref={box} />
     </div>
   );
-}
-
-/** The still portrait, for pages without a live examiner (sign-in, the start page). */
-export function ExaminerPortrait({ className = "" }: { className?: string }) {
-  return <img className={`ex-still ${className}`} src={portrait} alt="Your viva examiner" />;
 }

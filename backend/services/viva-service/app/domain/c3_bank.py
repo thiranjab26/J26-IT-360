@@ -55,7 +55,7 @@ COURSES = [
         "it1010-basics",
         "IT1010",
         "Programming basics",
-        ["prog.variables_types", "prog.operators_expressions"],
+        ["prog.variables_types"],  # operators question removed 18 Oct: too hard to answer aloud
     ),
     (
         "it1010-control-flow",

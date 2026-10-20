@@ -2318,3 +2318,13 @@
 /* Speech lab transcript: fillers and measured pauses (lecturers only). */
 .viva-app .st-filler { background: #fde7b0; color: inherit; border-radius: 4px; padding: 0 2px; }
 .viva-app .st-pause { display: inline-block; margin: 0 4px; padding: 0 7px; border-radius: 999px; background: #e3e9f2; color: #4a5b74; font-size: 12px; line-height: 1.6; vertical-align: 1px; }
+/* Question bank steps: one step shows at a time; the bar switches between them. */
+.viva-app .bank-flow button { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border: 1px solid transparent; border-radius: 999px; background: none; color: inherit; font: inherit; cursor: pointer; }
+.viva-app .bank-flow button:hover { background: #f1f5fd; }
+.viva-app .bank-flow button.active { border-color: #c9d7f5; background: #fff; color: #1d3f8f; font-weight: 600; }
+.viva-app .bank-flow button.active span { background: #416bca; color: #fff; }
+.viva-app .bank-step > h3 { margin: 18px 0 8px; font-size: 15px; }
+.viva-app .bank-step > h3:first-of-type { margin-top: 4px; }
+.viva-app .bank-nav { display: flex; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.viva-app .notice.toast { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 200; width: min(640px, calc(100vw - 32px)); margin: 0; box-shadow: 0 12px 32px rgb(15 23 42 / 0.18); }
+.viva-app .hx-actions { display: flex; align-items: center; gap: 8px; }

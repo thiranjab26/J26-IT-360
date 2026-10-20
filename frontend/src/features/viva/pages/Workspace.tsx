@@ -21,7 +21,7 @@ import { api, ApiError, label } from "../api/client";
 import type { AudioMetrics, Auth, Report, Session, Topic } from "../api/types";
 import { Busy, ErrorNotice, Modal } from "../components/components";
 import { useSpeech, type SpokenCommand } from "../hooks/useSpeech";
-import { Examiner, ExaminerPortrait } from "../components/Examiner";
+import { Examiner } from "../components/Examiner";
 import { MicCheck, VoiceWave } from "../components/voice";
 
 /** Topics under their module (IT1010 first, then IT2070), other courses last. */
@@ -43,6 +43,20 @@ function studentMessage(error: unknown) {
   if (error instanceof ApiError && [429, 502, 503, 504].includes(error.status))
     return "We could not mark your answer just now because the marking service is busy. Your answer is still here: wait a few seconds, then press Submit again.";
   return (error as Error).message;
+}
+
+/**
+ * The transcript without "um" and "uh", for the student to read and edit. The server still counts the
+ * fillers from the original, which is sent as spoken_transcript. Same filler words as disfluency.py.
+ */
+function withoutFillers(text: string) {
+  return text
+    .replace(/\b(?:u+m+|u+h+|e+rm+|e+r+|h+m+|m{2,}|a+h{2,})\b[,.]?\s*/gi, "")
+    .replace(/\s+([,.?!])/g, "$1")
+    .replace(/([,.])(?:\s*,)+/g, "$1")
+    .replace(/^[\s,.]+/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 /** What a student can say at any time; the service recognises them only when said on their own. */
@@ -199,7 +213,7 @@ export default function Workspace({
 
       <aside className="st-card st-plan-card">
         <div className="st-plan-head">
-          <ExaminerPortrait />
+          <Examiner state="idle" view="head" follow className="ex-round" />
           <div>
             <div className="st-eyebrow">Your viva</div>
             <h2>{selected ? (selected.short_name ?? selected.name) : "Pick a topic"}</h2>
@@ -333,7 +347,7 @@ function LiveSession({
   const speech = useSpeech(
     auth.token,
     (text, metrics, latency, provider, _heard, command) => {
-      setAnswer(text);
+      setAnswer(withoutFillers(text));
       setAudioEvidence({ metrics, latency, provider, text, command });
     },
     session.topic_id,
@@ -374,6 +388,7 @@ function LiveSession({
       const result = await api<{ session: Session }>(`/sessions/${session.id}/answers`, auth.token, {
         question_id: q.id,
         transcript: answer.trim(),
+        spoken_transcript: audioEvidence?.text ?? null,
         input_mode: audioEvidence ? "speech" : "text",
         response_latency_ms: audioEvidence?.latency ?? null,
         audio_metrics: audioEvidence?.metrics ?? null,
@@ -530,9 +545,10 @@ function LiveSession({
             <Examiner state="idle" voice={speech.voiceEvents} />
             <h2>Ready when you are.</h2>
             <p className="st-muted">
-              Your examiner will ask each question out loud. Find a quiet place, then allow microphone access when asked. The words on the
-              left work at any time, for example "Skip this question".
+              Your examiner will ask each question out loud. Find a quiet place, then allow microphone access when asked. During the viva
+              you can also say these on their own:
             </p>
+            <Commands />
             {mode === "speech" && <MicCheck />}
             <button
               className="st-btn st-btn-primary"

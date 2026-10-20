@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, Download, Info, ListChecks, Mic, PartyPopper, Printer } from "../components/icons";
+import { ArrowLeft, ArrowRight, BookOpen, Download, Info, ListChecks, Mic, PartyPopper, Printer, RotateCcw, Sparkles } from "../components/icons";
 import type { CSSProperties, ReactNode } from "react";
 import type { Context, PlanItem, Report } from "../api/types";
 import { api, conceptLabel, date, downloadJson, label, resultLabels, resultOf } from "../api/client";
@@ -20,6 +20,10 @@ const RESULT: Record<string, { tone: string; meaning: string }> = {
     tone: "tone-mixed",
     meaning: "You reached the expected points, but only after follow-up questions. Practise giving the full answer the first time.",
   },
+  SPEAKING_DIFFICULTY_SEEN: {
+    tone: "tone-communication",
+    meaning: "Explaining out loud was hard in this viva, and not all the expected points came through, so it is not yet clear which held you back. Practise with your speaking plan, and revise the missing points too.",
+  },
   MIXED_RESULTS: { tone: "tone-mixed", meaning: "Some topics came through well and some need more work. See each topic below." },
   NOT_ENOUGH_EVIDENCE: {
     tone: "tone-mixed",
@@ -38,6 +42,7 @@ const COLOR: Record<string, string> = {
   "No gap identified": "var(--st-green)",
   "Likely knowledge gap": "var(--st-rose)",
   "Likely communication difficulty": "var(--st-amber)",
+  "Speaking difficulty seen; knowledge unclear": "var(--st-amber)",
   "Reached with help": "var(--st-indigo, #4f7be0)",
 };
 
@@ -105,6 +110,13 @@ export default function ReportView({
   const shown = RESULT[result] ?? RESULT.NOT_ENOUGH_EVIDENCE!;
   const h = report.hesitation;
   const coverage = Math.round(report.rubric_coverage);
+  // What went well, said next to the result so a mixed outcome still names its strengths.
+  const full = report.concepts.filter((c) => Math.round(c.rubric_coverage) >= 100).map((c) => c.concept);
+  const wins = full.length
+    ? `You reached every expected point on ${full.join(" and ")}.`
+    : coverage >= 50
+      ? `You covered ${coverage}% of the expected points.`
+      : "";
   const followUps = report.transcript?.filter((t) => t.follow_up).length ?? 0;
   // Topics where every question was skipped.
   const skipped = new Set(
@@ -160,10 +172,15 @@ export default function ReportView({
           </div>
           <h1>{resultLabels[result] ?? label(report.outcome)}</h1>
           <p className="st-muted">
-            {result === "MIXED_RESULTS"
+            {new Set(report.concepts.map((c) => conceptLabel(c))).size > 1
               ? report.concepts.map((c) => `${c.concept}: ${conceptLabel(c).toLowerCase()}.`).join(" ")
               : shown.meaning}
           </p>
+          {wins && result !== "STRONG" && (
+            <p className="st-win">
+              <Sparkles size={16} /> {wins}
+            </p>
+          )}
           <div className="st-facts">
             <span>
               {report.concepts.length} {report.concepts.length === 1 ? "question" : "questions"}
@@ -373,6 +390,22 @@ export default function ReportView({
           </details>
         )}
       </Section>
+      {!staff && (
+        <section className="st-card st-next no-print" aria-label="What next">
+          <strong>What next?</strong>
+          <div className="st-row">
+            <button className="st-btn st-btn-primary" onClick={onBack}>
+              <RotateCcw size={16} /> Practise this topic again
+            </button>
+            <button className="st-btn st-btn-ghost" disabled title="Opens the C3 lesson for this topic once AdaptLearn is connected.">
+              <BookOpen size={16} /> Revise the material (C3, coming soon)
+            </button>
+            <button className="st-btn st-btn-ghost" onClick={onBack}>
+              Pick another topic <ArrowRight size={16} />
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

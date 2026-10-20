@@ -108,7 +108,7 @@ def evidence(state, coverage, mis=None, scaffolded=False, fluency=SLOW):
         "assessment": {"state": state, "coverage": coverage, "misconceptions": mis or []},
         "input_mode": "speech",
         "scaffolded": scaffolded,
-        "hesitation": hesitation("um I think", "speech", 4000, {"fluency": fluency}),
+        "hesitation": hesitation("um I think, uh", "speech", 4000, {"fluency": fluency}),
     }
 
 
@@ -156,7 +156,7 @@ def test_complete_initial_answer_explains_absence_of_weakness():
 def test_fluency_signal_uses_the_pilot_profile():
     from app.domain.logic import GAP_PROFILE, GAP_VERSION, hesitation_signals
 
-    assert GAP_VERSION == "c04-gap-1.6-probed-low-coverage"
+    assert GAP_VERSION == "c04-gap-1.8-pilot-word-signals"
     assert GAP_PROFILE["name"] == "pilot-2026-10"
     # Fluent by the literature (2.2 is above its 1.97) but slow by the pilot (below 2.53).
     between = dict(FLUENT, speech_rate_syll_s=2.2, articulation_rate_syll_s=3.3)
@@ -194,7 +194,9 @@ def test_result_label_splits_mixed_into_mixed_results_or_not_enough_evidence():
     concept = lambda outcome, fine=False: {"outcome": outcome, "no_weakness": fine}  # noqa: E731
     assert result_label({"outcome": MIXED, "strong_answers": True, "concepts": []}) == "STRONG"
     assert result_label({"outcome": KNOWLEDGE, "concepts": [concept(KNOWLEDGE)]}) == KNOWLEDGE
-    mixed = {"outcome": MIXED, "concepts": [concept(KNOWLEDGE), concept(MIXED, fine=True)]}
+    named = {"outcome": MIXED, "concepts": [concept(KNOWLEDGE), concept(MIXED, fine=True)]}
+    assert result_label(named) == KNOWLEDGE
+    mixed = {"outcome": MIXED, "concepts": [concept(KNOWLEDGE), concept(MIXED)]}
     assert result_label(mixed) == "MIXED_RESULTS"
     assert result_label({"outcome": MIXED, "concepts": [concept(MIXED)]}) == "NOT_ENOUGH_EVIDENCE"
     assert result_label(None) is None
@@ -249,7 +251,7 @@ def test_plans_come_from_the_evidence_and_say_why():
         concepts, {"available": True, "fillers_per_100_words": 9, "response_latency_ms": 5200}
     )
     reasons = " ".join(i["reason"] for i in spoken)
-    assert "about 9 filler words per 100 words" in reasons and "8 or more" in reasons
+    assert "about 9 filler words per 100 words" in reasons and "5.42 or more" in reasons
     assert '"I think" 3 times' in reasons and "5.2 seconds" in reasons
     assert (
         len(spoken) == 4
@@ -275,3 +277,47 @@ def test_low_answers_after_a_follow_up_are_a_knowledge_gap():
     assert differentiate([evidence("non_answer", 0)] * 3, "B")[0] == MIXED
     helped = {"outcome": MIXED, "concepts": [{"outcome": MIXED, "final_state": "complete"}]}
     assert result_label(helped) == "REACHED_WITH_HELP"
+
+
+def test_gap_rules_1_7_from_the_p00_pilot_viva():
+    # 90% covered every time, one point only half credited, with fillers and slow speech: knowledge shown.
+    assert differentiate([evidence("partial", 90)] * 3)[0] == COMMUNICATION
+    # Half credits lifted the last answer to exactly 50% after a misconception: still a knowledge gap.
+    low = [evidence("misconception_bearing", 25, ["reversed"]), evidence("partial", 37.5), evidence("partial", 50)]
+    assert differentiate(low)[0] == KNOWLEDGE
+    # Repeats and cut-off words count as restarts; fillers between repeats are ignored.
+    assert hesitation("we, we, we add them. float has, uh, float has a decimal", "speech")["restart_count"] == 3
+
+
+def test_gap_rules_1_8_pilot_word_signals_and_unclear_knowledge():
+    from app.domain.logic import hesitation_signals, speaking_unclear
+
+    def spoken(text, seconds=20):
+        h = hesitation(text, "speech", 1000, {"fluency": {"speaking_time_s": seconds}})
+        return {"input_mode": "speech", "hesitation": h}
+
+    # Pilot cut-off 5.42 per 100 words: 2 fillers in 30 words fire; one filler never does.
+    words = "a variable stores a value " * 6
+    assert "fillers" in hesitation_signals(spoken("uh " + words + "um"))
+    assert "fillers" not in hesitation_signals(spoken("uh " + words))
+    # Pilot cut-off 0.34 repairs per minute, with at least two repairs.
+    assert "restarts" in hesitation_signals(spoken("we, we have float has, float has a decimal"))
+    assert "restarts" not in hesitation_signals(spoken("we, we have a float"))
+    # Difficulty heard but only 60% covered: shown as knowledge unclear, research category stays mixed.
+    unclear = [evidence("partial", 60), evidence("partial", 60)]
+    assert differentiate(unclear)[0] == MIXED and speaking_unclear(unclear)
+    assert not speaking_unclear([evidence("partial", 90)] * 2)
+
+
+def test_one_gap_and_the_rest_fine_names_the_gap():
+    concepts = [{"outcome": KNOWLEDGE}, {"outcome": MIXED, "no_weakness": True}]
+    assert result_label({"outcome": MIXED, "concepts": concepts}) == KNOWLEDGE
+    concepts.append({"outcome": COMMUNICATION})
+    assert result_label({"outcome": MIXED, "concepts": concepts}) == "MIXED_RESULTS"
+
+
+def test_speaking_difficulty_with_unclear_knowledge_joins_a_communication_headline():
+    concepts = [{"outcome": MIXED, "speaking_unclear": True}, {"outcome": COMMUNICATION}]
+    assert result_label({"outcome": MIXED, "concepts": concepts}) == COMMUNICATION
+    concepts[1] = {"outcome": KNOWLEDGE}
+    assert result_label({"outcome": MIXED, "concepts": concepts}) == "MIXED_RESULTS"

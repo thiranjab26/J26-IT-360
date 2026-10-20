@@ -19,7 +19,7 @@ def test_replace_bank_clears_old_data_and_serves_c3_topics(client):
         removed, added = replace_bank(db)
         assert removed["viva_sessions"] == 1 and removed["participants"] == 1
         assert removed["courses"] == 1
-        assert added == {"courses": 10, "materials": 10, "questions": 24}
+        assert added == {"courses": 10, "materials": 10, "questions": 23}
         assert db.scalar(select(func.count()).select_from(VivaSession)) == 0
         roles = list(db.scalars(select(User.role)))
         assert roles == ["admin"]  # staff stay, so nobody is signed out

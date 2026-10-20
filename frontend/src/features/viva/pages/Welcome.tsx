@@ -3,7 +3,7 @@ import { ArrowRight, ClipboardCheck, MessagesSquare, Mic, ShieldCheck } from "..
 import { api } from "../api/client";
 import type { Auth } from "../api/types";
 import { Busy } from "../components/components";
-import { ExaminerPortrait } from "../components/Examiner";
+import { Examiner } from "../components/Examiner";
 
 /** The student sign-in page: a participant code and consent. */
 export default function Welcome({ onSignedIn, onError }: { onSignedIn: (a: Auth) => void; onError: (s: string) => void }) {
@@ -61,7 +61,7 @@ export default function Welcome({ onSignedIn, onError }: { onSignedIn: (a: Auth)
         </ul>
       </section>
       <section className="st-card st-signin">
-        <ExaminerPortrait />
+        <Examiner state="idle" view="head" follow className="ex-round" />
         <div>
           <h2>Sign in to start</h2>
           <p className="st-muted st-small">Enter the participant code your lecturer gave you.</p>

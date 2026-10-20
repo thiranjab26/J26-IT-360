@@ -5,9 +5,10 @@ from app.db.tables import HumanRating, VivaSession
 from tests.conftest import answer, auth, start
 
 
-def test_auth_fresh_identity_and_owner_role_enforcement(client):
-    a, b = auth(client, code="SAME"), auth(client, code="SAME")
+def test_auth_same_code_identity_and_owner_role_enforcement(client):
+    a, same, b = auth(client, code="SAME"), auth(client, code="same"), auth(client, code="OTHER")
     session = start(client, a)
+    assert client.get(f"/api/v1/viva/sessions/{session['id']}", headers=same).status_code == 200
     assert client.get(f"/api/v1/viva/sessions/{session['id']}", headers=b).status_code == 403
     assert client.get("/api/v1/viva/bank", headers=a).status_code == 403
     assert client.get("/api/v1/viva/sessions").status_code == 401

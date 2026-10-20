@@ -22,12 +22,6 @@ export function Brand({ sub, onClick }: { sub: string; onClick: () => void }) {
         onClick();
       }}
     >
-      <span className="brand-symbol">
-        <svg viewBox="0 0 40 40" aria-hidden="true">
-          <path d="M10 27L20 10l10 17-10 6z" />
-          <path d="M15 23h10" />
-        </svg>
-      </span>
       <span>
         AdaptLearn<span className="brand-sub">{sub}</span>
       </span>
@@ -55,12 +49,15 @@ export function Skeleton({ rows = 3, height = 92 }: { rows?: number; height?: nu
 export function ErrorNotice({
   message,
   onClose,
+  toast,
 }: {
   message: string;
   onClose?: () => void;
+  /** Page-level errors float above everything, open editors included, so they are always seen. */
+  toast?: boolean;
 }) {
   return message ? (
-    <div className="notice error" role="alert">
+    <div className={`notice error${toast ? " toast" : ""}`} role="alert">
       <AlertCircle size={18} />
       <span>{message}</span>
       {onClose && (
