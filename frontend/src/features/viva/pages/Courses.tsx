@@ -16,8 +16,9 @@ export function Step({ n, title, hint, done, children }: { n: number; title: str
   </section>;
 }
 
-/** Steps 1 and 2: pick or create a course, then give it source material. */
-export default function Courses({ auth, topics, selected, onSelect, onChanged, onError }: {
+/** Step 1 (pick or create a course) or step 2 (give it source material), one at a time. */
+export default function Courses({ step, onNext, auth, topics, selected, onSelect, onChanged, onError }: {
+  step: 1 | 2; onNext: () => void;
   auth: Auth; topics: Topic[]; selected: string; onSelect: (id: string) => void;
   onChanged: () => Promise<void>; onError: (s: string) => void;
 }) {
@@ -47,7 +48,7 @@ export default function Courses({ auth, topics, selected, onSelect, onChanged, o
   const course = courses.find(c => c.id === selected);
   const sample = !!selected && !course;
   return <>
-    <Step n={1} title="Choose a course" hint="Each course becomes one viva topic that students can pick." done={!!selected && !creating}>
+    {step === 1 && <Step n={1} title="Choose a course" hint="Each course becomes one viva topic that students can pick." done={!!selected && !creating}>
       <div className="bank-step-row">
         <label className="field-inline">Course
           <select value={selected} onChange={e => { onSelect(e.target.value); setPreview([]); setMessage(''); }}>
@@ -60,17 +61,17 @@ export default function Courses({ auth, topics, selected, onSelect, onChanged, o
       {creating && <form className="bank-form" onSubmit={e => { e.preventDefault(); void run(async () => {
         const c = await api<Course>('/courses', auth.token, { name: name.trim(), description });
         onSelect(c.id); setName(''); setDescription(''); setCreating(false);
-        setMessage(`Course "${c.name}" created. Now add its material in step 2.`);
+        setMessage(`Course "${c.name}" created. Now add its material.`); onNext();
       }); }}>
         <label>Course name<input value={name} onChange={e => setName(e.target.value)} minLength={2} maxLength={150} required placeholder="e.g. Database Systems" /></label>
         <label>Topics and learning objectives (optional)<textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={2000} rows={2} /></label>
         <button className="button primary" disabled={busy || name.trim().length < 2}>Create course</button>
       </form>}
-    </Step>
+    </Step>}
 
-    <Step n={2} title="Add course material" hint="Questions are written only from this material, so add the notes or slides students studied." done={sample || !!course?.materials.length}>
+    {step === 2 && <Step n={2} title="Add course material" hint="Questions are written only from this material, so add the notes or slides students studied." done={sample || !!course?.materials.length}>
       {!selected ? <p className="muted">Choose a course in step 1 first.</p>
-        : sample ? <p className="muted">This built-in topic already has its material. Go to step 3.</p>
+        : sample ? <p className="muted">This built-in topic already has its material. Press Next.</p>
         : <>
           {course && course.materials.length > 0 && <ul className="bank-materials">
             {course.materials.map(m => <li key={m.id}><FileText size={16} /><span>{m.name}<small className="muted"> · {m.chunk_count} excerpts</small></span>
@@ -89,14 +90,14 @@ export default function Courses({ auth, topics, selected, onSelect, onChanged, o
               if (!file) return;
               const form = new FormData(); form.append('file', file);
               const result = await api<{ chunk_count: number; duplicate: boolean }>(`/courses/${selected}/materials`, auth.token, form);
-              setMessage(result.duplicate ? 'This file is already stored.' : `File saved as ${result.chunk_count} excerpts. Go to step 3.`);
+              setMessage(result.duplicate ? 'This file is already stored.' : `File saved as ${result.chunk_count} excerpts. Press Next to add questions.`);
             })}><Upload size={16} />{busy ? 'Uploading…' : 'Upload file'}</button>
           </div> : <div className="bank-form">
             <label>Title<input value={sourceName} onChange={e => setSourceName(e.target.value)} maxLength={190} /></label>
             <label>Text (at least 40 characters)<textarea value={text} onChange={e => setText(e.target.value)} maxLength={200000} rows={5} /></label>
             <button className="button primary" disabled={busy || text.trim().length < 40 || !sourceName.trim()} onClick={() => void run(async () => {
               const result = await api<{ duplicate: boolean }>(`/courses/${selected}/materials/text`, auth.token, { name: sourceName, text });
-              setText(''); setMessage(result.duplicate ? 'This text is already stored.' : 'Text saved. Go to step 3.');
+              setText(''); setMessage(result.duplicate ? 'This text is already stored.' : 'Text saved. Press Next to add questions.');
             })}>Save text</button>
           </div>}
         </>}
@@ -108,6 +109,6 @@ export default function Courses({ auth, topics, selected, onSelect, onChanged, o
           <ul>{usage.counters.map(c => <li key={c.scope}>{c.scope}: {c.used.toLocaleString()} used · resets {new Date(c.resets_at * 1000).toLocaleString()}</li>)}</ul>
         </>}
       </details>
-    </Step>
+    </Step>}
   </>;
 }

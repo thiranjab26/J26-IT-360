@@ -160,7 +160,36 @@ def local_available():
         return False
 
 
-def cloud_transcribe(content, suffix):
+def wav_bytes(audio):
+    """16 kHz mono 16-bit WAV of decoded audio, for the cloud transcriber."""
+    import io
+    import wave
+
+    import numpy as np
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SAMPLE_RATE)
+        w.writeframes((np.clip(audio, -1, 1) * 32767).astype(np.int16).tobytes())
+    return buffer.getvalue()
+
+
+def vocabulary_prompt(terms=()):
+    """The filler prompt plus up to 32 course words, so "float" is not heard as "bloat".
+
+    The words are woven into hesitant speech: on the P01 pilot track a plain word list cut the
+    fillers Groq kept from 28 to 21, while this style kept 36 (CrisperWhisper: 37).
+    """
+    words = [w for t in terms for w in t.split() if w.isalpha() and len(w) >= 5]
+    words = list(dict.fromkeys(w.lower() for w in words))[:32]
+    if not words:
+        return FILLER_PROMPT
+    return FILLER_PROMPT.rstrip(".") + ", uh, " + ", um, ".join(words) + "."
+
+
+def cloud_transcribe(content, suffix, terms=()):
     """Groq-hosted Whisper (OpenAI-compatible). Returns segments; raises ProviderUnavailable for local fallback."""
     import httpx
 
@@ -177,7 +206,7 @@ def cloud_transcribe(content, suffix):
             files={"file": ("answer" + suffix, content)},
             data={
                 "model": cfg.speech_model,
-                "prompt": FILLER_PROMPT,
+                "prompt": vocabulary_prompt(terms),
                 "response_format": "verbose_json",
                 "timestamp_granularities[]": ["segment", "word"],
                 "language": cfg.whisper_language or "en",
@@ -232,6 +261,13 @@ def deepgram_ready():
 # Code and maths said as words, so the voice reads "2 + 3 * 4" as "2 plus 3 times 4".
 # Keep in step with SPOKEN in frontend/src/features/viva/hooks/useSpeech.ts.
 SPOKEN = [
+    # Abbreviations and markdown first: "e.g." was read as "e dot g", "**word**" as "times times word".
+    (r"\*\*(.+?)\*\*", r"\1"),
+    (r"`", ""),
+    (r"(?i)\be\.g\.,?", "for example,"),
+    (r"(?i)\bi\.e\.,?", "that is,"),
+    (r"(?i)\betc\.", "and so on."),
+    (r"(?i)\bvs\.?(?=\s)", "versus"),
     (r"\bO\(\s*([^()]*?)\s*\)", r"O of \1"),
     (r"([A-Za-z0-9])\^2\b", r"\1 squared"),
     (r"([A-Za-z0-9])\^3\b", r"\1 cubed"),
@@ -246,6 +282,9 @@ SPOKEN = [
     (r"\s*\+\s*", " plus "),
     (r"(?<=[\d)])\s*/\s*(?=[\d(])", " divided by "),
     (r"(?<=\w)\s+-\s+(?=\w)", " minus "),
+    (r"(?<=[\s,(])-(?=[\s,?.)])", "minus"),  # a lone sign in a list: "+, -, *"
+    (r"(?<=[\s,(])/(?=[\s,?.)])", "divide"),
+    (r"(?<=[A-Za-z])/(?=[A-Za-z])", " or "),  # comparison/relational
     (r"\s*=\s*", " equals "),
     (r"([A-Za-z_]\w*)\[([^\]]+)\]", r"\1 at index \2"),
     (r"([A-Za-z_]\w*)\(\)", r"\1"),
@@ -260,7 +299,7 @@ def speakable(text):
     for _ in range(3):
         text = CALL.sub(r"\1 of \2", text)
     text = re.sub(r"(?<=[A-Za-z_])\.(?=[A-Za-z_])", " dot ", text)  # a.copy, not 7.5
-    return " ".join(text.split())
+    return re.sub(r"\s+([,?.!])", r"\1", " ".join(text.split()))
 
 
 def even_pitch(wav, target_hz):
@@ -387,7 +426,7 @@ def warm(texts):
     threading.Thread(target=run, daemon=True).start()
 
 
-def transcribe(content, suffix, live=None):
+def transcribe(content, suffix, live=None, terms=()):
     # Fail fast instead of queuing unlimited expensive inference requests.
     if not _inference_lock.acquire(blocking=False):
         raise HTTPException(
@@ -396,12 +435,12 @@ def transcribe(content, suffix, live=None):
             headers={"Retry-After": "5"},
         )
     try:
-        return _transcribe(content, suffix, live)
+        return _transcribe(content, suffix, live, terms)
     finally:
         _inference_lock.release()
 
 
-def _transcribe(content, suffix, live=None):
+def _transcribe(content, suffix, live=None, terms=()):
     """live: (transcript, provider) already streamed by Deepgram; only pauses are measured here."""
     started = time.monotonic()
     if not live and settings().speech_provider not in ("faster_whisper", "groq"):
@@ -431,7 +470,11 @@ def _transcribe(content, suffix, live=None):
             provider = live[1]
         elif cfg.speech_provider == "groq":
             try:
-                segments, provider = cloud_transcribe(content, suffix), "groq:" + cfg.speech_model
+                # Silence after the last word makes Whisper invent an ending ("Okay.", "Thank you."):
+                # send the audio only up to 0.6 s after the last speech. The start stays, so times still match.
+                end = intervals[-1]["end"] + int(0.6 * SAMPLE_RATE) if intervals else len(audio)
+                segments = cloud_transcribe(wav_bytes(audio[:end]), ".wav", terms)
+                provider = "groq:" + cfg.speech_model
             except ProviderUnavailable:
                 if not local_available():
                     raise
@@ -455,7 +498,7 @@ def _transcribe(content, suffix, live=None):
                 clip_timestamps=clip,
                 language=cfg.whisper_language or None,
                 beam_size=cfg.whisper_beam_size,
-                initial_prompt=FILLER_PROMPT,
+                initial_prompt=vocabulary_prompt(terms),
                 temperature=0,
                 condition_on_previous_text=False,
                 hallucination_silence_threshold=2.0,

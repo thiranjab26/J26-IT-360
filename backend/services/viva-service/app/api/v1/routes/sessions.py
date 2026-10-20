@@ -11,7 +11,7 @@ from fastapi import (
     HTTPException,
 )
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -500,8 +500,10 @@ def submit_answer(
         "action": action,
         "assessment": assessment,
         "input_mode": body.input_mode,
+        "spoken_transcript": body.spoken_transcript,
+        # Fillers and repeats are counted from what was heard, not from the cleaned text the student saw.
         "hesitation": hesitation(
-            body.transcript,
+            body.spoken_transcript or body.transcript,
             body.input_mode,
             body.response_latency_ms,
             body.audio_metrics.model_dump() if body.audio_metrics else None,
@@ -584,6 +586,16 @@ def finish_session(
     db.commit()
     background_tasks.add_task(deliver_review_notifications, session.id)
     return report_view(data)
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(session_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """The student or a lecturer removes a viva and everything recorded in it, for example a test run."""
+    session = owned(db, session_id, user)
+    for table in (Turn, Result, IntegrationEvent):
+        db.execute(delete(table).where(table.session_id == session_id))
+    db.delete(session)
+    db.commit()
 
 
 @router.get("/sessions/{session_id}/report")

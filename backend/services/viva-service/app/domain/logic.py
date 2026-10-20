@@ -2,6 +2,7 @@
 
 import re
 from statistics import mean
+from types import SimpleNamespace
 
 from app.db.tables import now, uid
 from app.domain import fluency
@@ -12,7 +13,7 @@ POLICY_VERSION = "c04-policy-1.6-misheard-viva"
 # 1.5: the fluency thresholds are the pilot profile (from the 10 PP1 students), not the literature.
 # 1.6: answers that stay below half the points after a follow-up are a knowledge gap, even when
 # the later answers are "I don't know".
-GAP_VERSION = "c04-gap-1.6-probed-low-coverage"
+GAP_VERSION = "c04-gap-1.8-pilot-word-signals"
 GAP_PROFILE = fluency.PILOT_PROFILE
 MIXED = "MIXED_INSUFFICIENT_EVIDENCE"
 KNOWLEDGE = "LIKELY_KNOWLEDGE_GAP"
@@ -37,7 +38,9 @@ def hesitation(transcript, input_mode, latency=None, audio=None):
             r"\b(?:maybe|perhaps|i think|i guess|i am not sure|i'm not sure)\b", transcript.lower()
         )
     )
-    restarts = len(re.findall(r"\b(?:i mean|sorry|let me start again)\b", transcript.lower()))
+    # 1.7: restarts are the research repair counts (repeats like "we, we", cut-off words, "sorry, I mean").
+    repair = fluency.repairs([SimpleNamespace(text=t) for t in transcript.split()])
+    restarts = repair["repetitions"] + repair["false_starts"] + repair["self_corrections"]
     spoken = input_mode == "speech"
     metrics = (audio or {}) if spoken else {}
     available = spoken and (latency is not None or any(v is not None for v in metrics.values()))
@@ -186,13 +189,30 @@ def fluency_flags(h):
     return fluency.flags(f, GAP_PROFILE)
 
 
+# Pilot cut-offs for the word signals (results/report.md, 17 Oct 2026, best cut-off on the 5 + 5
+# students), counted here from the live transcript, which hears fewer fillers than the study's CrisperWhisper.
+PILOT_FILLERS_PER_100_WORDS = 5.42  # filled pauses per 100 words, p = 0.016
+PILOT_REPAIRS_PER_MIN = 0.34  # repeats, false starts and self-corrections per minute, p = 0.139 (exploratory)
+
+
+def repairs_per_minute(h):
+    """Repairs per minute of speech; None under 10 s of speech, like the speed measures."""
+    seconds = (h.get("fluency") or {}).get("speaking_time_s") or 0
+    if seconds < fluency.MIN_PROFILE_SPEECH_S:
+        return None
+    return h.get("restart_count", 0) / (seconds / 60)
+
+
 HESITATION_SIGNALS = {
     # Speed and pausing, judged by the pilot thresholds (gap rules 1.5; 1.4 used the literature).
     # It replaces the prototype delay and pause thresholds of 1.3, which had no research basis.
     "fluency": lambda h: len(fluency_flags(h) or []) >= GAP_PROFILE["min_flags"],
-    # Prototype thresholds for the words; calibrate on pilot data before the main study.
-    "fillers": lambda h: h.get("fillers_per_100_words", 0) >= 8,
-    "restarts": lambda h: h.get("restart_count", 0) >= 2,
+    # 1.8: fillers and repairs use the pilot cut-offs; hedges were not measured in the pilot. The pilot
+    # rates come from whole vivas; one answer is short, so a single "um" or "sorry" never counts alone.
+    "fillers": lambda h: h.get("filler_count", 0) >= 2
+    and h.get("fillers_per_100_words", 0) >= PILOT_FILLERS_PER_100_WORDS,
+    "restarts": lambda h: h.get("restart_count", 0) >= 2
+    and (repairs_per_minute(h) or 0) >= PILOT_REPAIRS_PER_MIN,
     "hedges": lambda h: h.get("hedge_count", 0) >= 2,
 }
 
@@ -230,9 +250,17 @@ FLUENCY_THRESHOLD = (
 )
 SIGNAL_INFO = [  # report labels and thresholds, kept beside the tests they describe
     ("fluency", "Speed and pauses", FLUENCY_THRESHOLD),
-    ("fillers", "Filler words (um, uh)", "8 or more per 100 words"),
-    ("restarts", "Restarts (I mean, sorry)", "2 or more"),
-    ("hedges", "Hedges (maybe, I think)", "2 or more"),
+    (
+        "fillers",
+        "Filler words (um, uh)",
+        f"{PILOT_FILLERS_PER_100_WORDS:g} or more per 100 words (pilot cut-off), at least 2",
+    ),
+    (
+        "restarts",
+        "Repeats and restarts (we, we; sorry, I mean)",
+        f"{PILOT_REPAIRS_PER_MIN:g} or more per minute of speech (pilot cut-off, exploratory), at least 2",
+    ),
+    ("hedges", "Hedges (maybe, I think)", "2 or more (prototype; not measured in the pilot)"),
 ]
 SIGNAL_NAMES = {key: label for key, label, _ in SIGNAL_INFO}
 
@@ -260,13 +288,28 @@ def signal_details(turn):
     values = {
         "fluency": fluency_value(h),
         "fillers": f"{h.get('fillers_per_100_words', 0)} per 100 words",
-        "restarts": str(h.get("restart_count", 0)),
+        "restarts": f"{h.get('restart_count', 0)} ("
+        + (f"{rate:.2f} per minute)" if (rate := repairs_per_minute(h)) is not None else "under 10 s of speech)"),
         "hedges": str(h.get("hedge_count", 0)),
     }
     return [
         {"signal": label, "value": values[key], "threshold": threshold, "counted": key in counted}
         for key, label, threshold in SIGNAL_INFO
     ]
+
+
+def knows(assessment):
+    """1.7: 80% of the points or more shows the knowledge, even when one point got only half credit."""
+    return assessment["state"] in ("partial", "complete") and assessment["coverage"] >= 80
+
+
+def speaking_unclear(turns):
+    """1.8: difficulty heard in the speech, but only 51 to 79% of the points came through, so the
+    viva cannot say whether knowledge or explaining held the answer back. Shown to people; the
+    research category stays MIXED."""
+    answered = [t for t in turns if not t.get("skipped") and not t.get("clarification")]
+    best = max((t["assessment"]["coverage"] for t in answered), default=0)
+    return 50 < best < 80 and any(audible_hesitation(t) for t in answered)
 
 
 def differentiate(turns, condition="C"):
@@ -280,14 +323,10 @@ def differentiate(turns, condition="C"):
             else "This question was not reached."
         )
     first, last = evidence[0]["assessment"], evidence[-1]["assessment"]
-    shown = (
-        last["state"] == "complete"
-        and last["coverage"] >= 80
-        and not any(t.get("scaffolded", False) for t in evidence[1:])
-    )
+    shown = knows(last) and not any(t.get("scaffolded", False) for t in evidence[1:])
     if (
         condition == "C"
-        and first["state"] == "complete"
+        and knows(first)
         and shown
         and audible_hesitation(evidence[0])
     ):
@@ -296,7 +335,7 @@ def differentiate(turns, condition="C"):
             + ", ".join(SIGNAL_NAMES[s].lower() for s in hesitation_signals(evidence[0]))
             + "): the knowledge is there; explaining it was the hard part."
         )
-    if first["state"] == "complete":
+    if knows(first):
         return (
             MIXED,
             "The first answer covered the expected points. No weakness was found.",
@@ -321,22 +360,22 @@ def differentiate(turns, condition="C"):
     misconceptions = [set(t["assessment"]["misconceptions"]) for t in substantive]
     persistent = len(misconceptions) >= 2 and bool(misconceptions[-1] & misconceptions[-2])
     low_repeated = len(substantive) >= 2 and all(
-        t["assessment"]["coverage"] < 50
+        t["assessment"]["coverage"] <= 50
         and t["assessment"]["state"]
         in ("incorrect", "misconception_bearing", "partial", "superficial")
         for t in substantive[-2:]
     )
-    # 1.6: still below half the points after a follow-up, with at least one real attempt;
-    # answers that are all "I don't know" stay mixed.
-    probed_low = bool(substantive) and all(t["assessment"]["coverage"] < 50 for t in evidence)
+    # 1.6: still at most half the points after a follow-up (1.7: half credits can land exactly on 50),
+    # with at least one real attempt; answers that are all "I don't know" stay mixed.
+    probed_low = bool(substantive) and all(t["assessment"]["coverage"] <= 50 for t in evidence)
     if persistent:
         return KNOWLEDGE, "The same misunderstanding came back after the follow-up question."
     if low_repeated or probed_low:
         return (
             KNOWLEDGE,
-            "The answers stayed below half of the expected points, even after follow-up questions.",
+            "The answers stayed at or below half of the expected points, even after follow-up questions.",
         )
-    recovered = last["state"] == "complete" and last["coverage"] >= 80
+    recovered = knows(last)
     scaffolded = any(t.get("scaffolded", False) for t in evidence[1:])
     if recovered and scaffolded:
         return (
@@ -436,7 +475,22 @@ def result_label(report):
     # Every point reached, but only after follow-ups: not "not enough evidence".
     if concepts and all(c.get("final_state") == "complete" for c in concepts):
         return "REACHED_WITH_HELP"
-    clear = any(c["outcome"] != MIXED or c.get("no_weakness") for c in concepts)
+    if concepts and all(c.get("speaking_unclear") for c in concepts):
+        return "SPEAKING_DIFFICULTY_SEEN"
+    # One kind of gap and every other topic fine: name the gap, not "mixed". Speaking difficulty with
+    # unclear knowledge points the same way as a communication difficulty, so it does not mix with it.
+    gaps = {c["outcome"] for c in concepts if c["outcome"] != MIXED}
+
+    def settled(c):
+        return (
+            c["outcome"] != MIXED
+            or c.get("no_weakness")
+            or (c.get("speaking_unclear") and gaps == {COMMUNICATION})
+        )
+
+    if len(gaps) == 1 and all(settled(c) for c in concepts):
+        return gaps.pop()
+    clear = any(c["outcome"] != MIXED or c.get("no_weakness") or c.get("speaking_unclear") for c in concepts)
     return "MIXED_RESULTS" if clear else "NOT_ENOUGH_EVIDENCE"
 
 
@@ -490,7 +544,7 @@ def study_plan(concepts, needs, resources):
                 plan_item(
                     f"{name}: revise the {'point' if n == 1 else f'{n} points'} listed as missing "
                     "under this topic, then explain them out loud in your own words.",
-                    f"Your answers covered {round(c['rubric_coverage'])}% of the expected points.",
+                    f"Your answers covered {int(c['rubric_coverage'] + 0.5)}% of the expected points.",
                 )
             )
     items = items[:3]
@@ -542,7 +596,11 @@ def speaking_plan(concepts, hesitation):
             plan_item(
                 'When you need time to think, pause silently instead of saying "um" or "uh".',
                 f"You used about {fillers:.0f} filler words per 100 words"
-                + ("; the viva counts 8 or more as a sign of difficulty." if fillers >= 8 else "."),
+                + (
+                    f"; the viva counts {PILOT_FILLERS_PER_100_WORDS:g} or more as a sign of difficulty."
+                    if fillers >= PILOT_FILLERS_PER_100_WORDS
+                    else "."
+                ),
             )
         )
     seen = set()
@@ -570,9 +628,16 @@ def speaking_plan(concepts, hesitation):
         items.append(
             plan_item(
                 f"Practise explaining {helped['concept']} out loud in full sentences, using the technical terms.",
-                f"Your first answer to the {helped['concept']} question was "
-                f"{STATE_WORDS.get(helped['initial_state'], 'incomplete')}, but after a follow-up it was "
-                f"{STATE_WORDS.get(helped['final_state'], 'complete')}: you knew it, but explaining it took more help.",
+                (
+                    f"Your answer to the {helped['concept']} question covered the expected points, but it was "
+                    "slow and hesitant: you knew it; saying it out loud was the hard part."
+                )
+                if helped["initial_state"] == "complete" or helped.get("turn_count") == 1
+                else (
+                    f"Your first answer to the {helped['concept']} question was "
+                    f"{STATE_WORDS.get(helped['initial_state'], 'incomplete')}, but after a follow-up it was "
+                    f"{STATE_WORDS.get(helped['final_state'], 'complete')}: you knew it, but explaining it took more help."
+                ),
             )
         )
     if not items:
@@ -593,6 +658,12 @@ def build_report(session_id, data):
         for index, bank in enumerate(data["snapshots"]):
             turns = [t for t in data["turns"] if t["concept_index"] == index]
             outcome, reason = differentiate(turns, condition)
+            unclear = condition == "C" and outcome == MIXED and speaking_unclear(turns)
+            if unclear:
+                reason = (
+                    "Signs of speaking difficulty were heard, but only part of the expected points came "
+                    "through, so it is not clear whether knowledge or explaining held the answer back."
+                )
             outcomes.append(outcome)
             reasons.append(f"{bank['concept']}: {reason}")
             if condition == "C":
@@ -605,6 +676,7 @@ def build_report(session_id, data):
                         "concept": bank["concept"],
                         "outcome": outcome,
                         "explanation": reason,
+                        "speaking_unclear": unclear,
                         "no_weakness": outcome == MIXED
                         and bool(answered)
                         and answered[0]["assessment"]["state"] == "complete",

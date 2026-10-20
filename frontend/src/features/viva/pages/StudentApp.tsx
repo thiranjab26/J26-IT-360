@@ -72,9 +72,6 @@ export default function StudentApp() {
                 {tab("history", <HistoryIcon size={17} />, "My vivas")}
               </nav>
               <div className="sh-user">
-                <span className="sh-avatar" aria-hidden="true">
-                  {code.slice(0, 2).toUpperCase()}
-                </span>
                 <span className="sh-code">{code}</span>
                 <button className="sh-icon" aria-label="Sign out" title="Sign out" onClick={signOut}>
                   <LogOut size={17} />
@@ -85,7 +82,7 @@ export default function StudentApp() {
         </div>
       </header>
       <main id="main-content" className="sh-main">
-        <ErrorNotice message={error} onClose={() => setError("")} />
+        <ErrorNotice toast message={error} onClose={() => setError("")} />
         <div className="view-enter" key={report ? `report-${report.session_id}` : `${page}-${auth?.token ?? "guest"}`}>
           <Suspense fallback={<Skeleton rows={2} height={180} />}>
             {!auth ? (

@@ -331,6 +331,7 @@ export function useSpeech(
     const form = new FormData();
     form.append("audio", blob, blob.type.includes("mp4") ? "answer.mp4" : "answer.webm");
     if (liveTranscript) form.append("live_transcript", liveTranscript);
+    if (topicId) form.append("topic_id", topicId); // course words help the transcriber hear "float", not "bloat"
     try {
       const result = await api<{
         transcript: string; metrics: AudioMetrics; provider: string;

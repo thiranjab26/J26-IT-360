@@ -40,11 +40,11 @@ The day-by-day checklist is **[PP1-TODO.md](PP1-TODO.md)**.
 
 - [ ] Expert review of the question bank, rubrics, misconceptions and probes
 - [ ] Main study after the pilot (pilot and calibration moved to P1)
-- [ ] Measure transcription accuracy on a sample, including fillers and technical terms
+- [ ] Measure transcription accuracy on a sample, including fillers and technical terms (fillers done 19 Oct: Groq turbo kept 67% of CrisperWhisper fillers on 4 pilot students; technical terms still open)
 - [ ] Decide the unit of analysis (concept or session) and how to handle rare communication cases
 - [ ] Ethics: document cloud processing (Groq, Neon) and the consent wording
 - [ ] Collect feedback-usefulness ratings from students
-- [ ] Optional: topic vocabulary hints for Whisper (proposal 6, deferred)
+- [x] Topic vocabulary hints for Whisper: done 19 Oct (course words woven into the filler prompt; trailing silence trimmed 20 Oct)
 
 ## Known issues
 

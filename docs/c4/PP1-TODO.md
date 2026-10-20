@@ -203,8 +203,9 @@ Claude:
 
 - [x] Compare CrisperWhisper with Groq/local transcripts (filler counts) for your report. Done 17
       Oct on P01 to P10 except P04: local Whisper (with the filler prompt) found 20 fillers,
-      CrisperWhisper 303, so ordinary Whisper keeps about 7%. Groq not tested on study audio
-      (consent does not cover sending it to Groq).
+      CrisperWhisper 303, so ordinary Whisper keeps about 7%. Groq tested 19 Oct (the consent
+      lists Groq): `whisper-large-v3-turbo` kept 64 of 96 CrisperWhisper fillers (67%) on P01, P05,
+      P08 and P10; `whisper-large-v3` kept 61%, so the live viva stays on turbo.
 - [x] Counting check result (17 Oct, your pauses = Audacity labels minus 1): fillers within 1 of
       your count for 9 of 10 students (rho 0.98), repairs 8 of 10 (rho 0.75), pauses 8 of 10
       (rho 0.99). Tool counts more pauses for the two slowest speakers (P04, P05).
@@ -222,8 +223,8 @@ Claude:
 
 You:
 
-- [ ] Mon 19 Oct: show the system to your supervisor and collect ideas (system work finished first).
-- [ ] Slides (on hold until after the supervisor meeting) (outline in section 18 of the plan): the problem; why fillers alone are not enough;
+- [x] ~~Mon 19 Oct: show the system to your supervisor~~ Cancelled: the supervisor cannot meet before PP1.
+- [ ] Slides (started 20 Oct) (outline in section 18 of the plan): the problem; why fillers alone are not enough;
       research question and hypotheses; method; system demo; measures; literature vs pilot
       thresholds; results; limitations; PP2 plan.
 - [ ] Any PP1 progress-report text your batch requires (method and preliminary results).
@@ -248,7 +249,7 @@ Claude:
 
 ## Mon 19 Oct
 
-- [ ] Supervisor meeting (system shown, ideas collected).
+- [x] ~~Supervisor meeting~~ Cancelled (19 Oct).
 - [ ] Full dry run (Tue 20): give the whole presentation once with a timer, including the live
       system, to check the timing and catch problems.
 - [ ] Code freeze: commit and push (I give you the commands).

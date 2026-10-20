@@ -17,8 +17,12 @@ router = APIRouter()
 
 @router.post("/auth/participant", status_code=201)
 def register(body: ParticipantIn, db: Session = Depends(get_db)):
-    user = User(participant_code=body.participant_code, role="participant")
-    db.add(user)
+    # The same code always reopens the same account, so earlier vivas stay listed; "p00" and "P00" are one code.
+    code = body.participant_code.strip().upper()
+    user = db.scalar(select(User).where(User.participant_code == code, User.role == "participant").limit(1))
+    if user is None:
+        user = User(participant_code=code, role="participant")
+        db.add(user)
     return issue_token(db, user)
 
 

@@ -11,11 +11,12 @@ from app.db.repositories.materials import (
     validate_grounding,
 )
 from app.db.session import get_db
-from app.db.tables import Bank, Course, Material, User, uid
+from app.db.tables import Bank, Course, Material, Turn, User, uid
 from app.integrations.llm import generate
-from app.models.schemas import BankQuestion, GenerateIn, ReviewIn
+from app.models.schemas import BankQuestion, GenerateIn, QuestionContent, ReviewIn
 
 router = APIRouter()
+WRITTEN = "lecturer_written"
 
 
 @router.get("/bank")
@@ -53,6 +54,36 @@ def bank_generate(body: GenerateIn, user: User = Depends(admin), db: Session = D
         result.append(validated)
     db.commit()
     return {"items": result, "provider": provider}
+
+
+@router.post("/bank", status_code=201)
+def bank_write(body: dict, user: User = Depends(admin), db: Session = Depends(get_db)):
+    """A question the lecturer writes by hand; it waits for review like a generated one."""
+    item = {k: v for k, v in body.items() if k in QuestionContent.model_fields or k == "review_notes"}
+    item.update(id=uid(), status="draft", origin=WRITTEN, version=1)
+    item.setdefault("sources", [{"source": "Written by the lecturer"}])
+    try:
+        result = BankQuestion.model_validate(item).model_dump()
+    except ValueError:
+        raise HTTPException(422, "Question fields do not match the bank schema. Check rubric and follow-ups.") from None
+    valid_topic(result["topic_id"])
+    db.add(Bank(id=result["id"], topic_id=result["topic_id"], status="draft", data=result))
+    db.commit()
+    return result
+
+
+@router.delete("/bank/{question_id}", status_code=204)
+def bank_delete(question_id: str, user: User = Depends(admin), db: Session = Depends(get_db)):
+    bank = db.get(Bank, question_id)
+    if bank is None:
+        raise HTTPException(404, "Bank item not found.")
+    if bank.status == "approved":
+        raise HTTPException(409, "Approved questions cannot be deleted. Reject it first.")
+    # Reports keep pointing at the questions they asked.
+    if db.scalar(select(Turn.id).where(Turn.question_id == question_id).limit(1)):
+        raise HTTPException(409, "This question was used in a viva, so its reports still need it. Reject it instead.")
+    db.delete(bank)
+    db.commit()
 
 
 @router.put("/bank/{question_id}")
@@ -96,7 +127,8 @@ def bank_review(
     bank = db.get(Bank, question_id)
     if bank is None:
         raise HTTPException(404, "Bank item not found.")
-    if body.status == "approved" and db.get(Course, bank.topic_id):
+    # The lecturer's own questions need no quote from the material; generated ones must be grounded in it.
+    if body.status == "approved" and bank.data["origin"] != WRITTEN and db.get(Course, bank.topic_id):
         try:
             # Check against all immutable material chunks, including excerpts outside current retrieval.
             context = course_context(db, bank.topic_id, user.id)

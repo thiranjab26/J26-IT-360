@@ -144,7 +144,7 @@ export default function LecturerApp() {
           </div>
         </header>
         <main id="main-content" className="main-content">
-          <ErrorNotice message={error} onClose={() => setError("")} />
+          <ErrorNotice toast message={error} onClose={() => setError("")} />
           <div className="view-enter" key={report ? `report-${report.report.session_id}` : `${page}-${auth.token}`}>
             <Suspense fallback={<Skeleton rows={2} height={180} />}>
               {report ? (

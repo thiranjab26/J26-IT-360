@@ -8,8 +8,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev:frontend": "pnpm --filter frontend dev",
-    "dev:gateway": "pnpm --filter api-gateway dev",
+    "dev:frontend": "node api.js && pnpm --filter frontend dev",
+    "dev:gateway": "node api.js && pnpm --filter api-gateway dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "gen:types:auth": "openapi-typescript http://localhost:8001/openapi.json -o frontend/src/shared/api/generated/auth.d.ts",
@@ -19,6 +19,8 @@
     "gen:types:viva": "openapi-typescript http://localhost:8401/openapi.json -o frontend/src/shared/api/generated/viva.d.ts"
   },
   "devDependencies": {
+    "dotenv": "^8.2.0",
+    "node-fetch": "^3.3.2",
     "openapi-typescript": "^7.4.0"
   }
 }
