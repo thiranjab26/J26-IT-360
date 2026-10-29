@@ -45,7 +45,7 @@ from app.integrations.llm import (
     phrase_follow_up,
 )
 from app.integrations.notifications import deliver_review_notifications
-from app.models.schemas import AnswerIn, SessionIn
+from app.models.schemas import AnswerIn, ConsentIn, SessionIn
 
 router = APIRouter()
 
@@ -586,6 +586,20 @@ def finish_session(
     db.commit()
     background_tasks.add_task(deliver_review_notifications, session.id)
     return report_view(data)
+
+
+@router.post("/sessions/{session_id}/consent")
+def record_consent(
+    session_id: str, body: ConsentIn, user: User = Depends(participant), db: Session = Depends(get_db)
+):
+    """Saves that and when the student agreed to the data notice shown before the viva started."""
+    session = owned(db, session_id, user, write=True)
+    session.data = {
+        **session.data,
+        "consent": {"version": body.version, "input_mode": body.input_mode, "agreed_at": now()},
+    }
+    db.commit()
+    return {"agreed": True}
 
 
 @router.delete("/sessions/{session_id}", status_code=204)

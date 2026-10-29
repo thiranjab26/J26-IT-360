@@ -4,6 +4,8 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  FileText,
+  History,
   Keyboard,
   LogOut,
   MessagesSquare,
@@ -11,9 +13,12 @@ import {
   RotateCcw,
   Search,
   Send,
+  ShieldCheck,
   SkipForward,
   Snail,
+  Sparkles,
   Square,
+  Trash2,
   Volume2,
   X,
 } from "../components/icons";
@@ -66,14 +71,30 @@ const COMMANDS = [
   ["Stop the viva", "finish"],
 ] as const;
 
-function Commands() {
+/** Time since the viva started, counting up (a countdown would add pressure). Ticks on its own. */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const s = Math.max(0, Math.floor((now - since) / 1000));
   return (
-    <div className="st-commands" aria-label="Words you can say at any time">
+    <span className="st-rail-time" aria-label="Time in the viva">
+      <History size={16} /> {String(Math.floor(s / 60)).padStart(2, "0")}:{String(s % 60).padStart(2, "0")}
+    </span>
+  );
+}
+
+/** The same commands work spoken or typed: the service reads them from the answer text. */
+function Commands({ typed = false }: { typed?: boolean }) {
+  return (
+    <div className="st-commands" aria-label={`Words you can ${typed ? "type" : "say"} at any time`}>
       <span className="st-commands-head">
-        <Mic size={14} /> You can say
+        {typed ? <Keyboard size={14} /> : <Mic size={14} />} You can {typed ? "type" : "say"}
       </span>
       {COMMANDS.map(([say, does]) => (
-        <span className="st-command" key={say} title={`Say it, then submit: ${does}`}>
+        <span className="st-command" key={say} title={`${typed ? "Type" : "Say"} it, then submit: ${does}`}>
           <q>{say}</q>
           <small>{does}</small>
         </span>
@@ -340,10 +361,15 @@ function LiveSession({
     [audioEvidence, setAudioEvidence] = useState<{ metrics: AudioMetrics; latency: number | null; provider: string; text: string; command: SpokenCommand } | null>(null),
     [autoRead, setAutoRead] = useState(true),
     [finishConfirm, setFinishConfirm] = useState(false),
+    [quitConfirm, setQuitConfirm] = useState(false),
     [nodding, setNodding] = useState(false),
     [slow, setSlow] = useState(false),
     [showTurns, setShowTurns] = useState(false),
-    [ready, setReady] = useState(session.turns.length > 0);
+    [ready, setReady] = useState(session.turns.length > 0),
+    [startedAt, setStartedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (ready && !startedAt) setStartedAt(Date.now());
+  }, [ready]);
   const speech = useSpeech(
     auth.token,
     (text, metrics, latency, provider, _heard, command) => {
@@ -414,6 +440,47 @@ function LiveSession({
       const report = await api<Report>(`/sessions/${session.id}/finish`, auth.token, {});
       setSession(null);
       onReport(report);
+    } catch (e) {
+      onError(studentMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const [consentOpen, setConsentOpen] = useState(false),
+    [agreed, setAgreed] = useState(false);
+  const consentRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = consentRef.current;
+    if (consentOpen && d && !d.open) d.showModal();
+    if (!consentOpen && d?.open) d.close();
+  }, [consentOpen]);
+  // The viva starts only once the agreement is saved with it (version of the notice above).
+  async function agreeAndStart() {
+    speech.prime(); // inside the click, so the browser allows the audio
+    setBusy(true);
+    try {
+      await api(`/sessions/${session.id}/consent`, auth.token, { version: "c04-consent-1", input_mode: mode });
+      setConsentOpen(false);
+      setReady(true);
+    } catch (e) {
+      onError(studentMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  const quitRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const d = quitRef.current;
+    if (quitConfirm && d && !d.open) d.showModal();
+    if (!quitConfirm && d?.open) d.close();
+  }, [quitConfirm]);
+  // Leave without keeping anything: the viva and its answers are deleted (for a false start).
+  async function quit() {
+    setBusy(true);
+    speech.stopSpeaking();
+    try {
+      await api(`/sessions/${session.id}`, auth.token, undefined, "DELETE");
+      setSession(null);
     } catch (e) {
       onError(studentMessage(e));
     } finally {
@@ -492,6 +559,7 @@ function LiveSession({
           <p className="st-small st-muted">
             Question {Math.min(q?.ordinal || done, total)} of {total}
           </p>
+          {startedAt && <Elapsed since={startedAt} />}
         </div>
         <ol className="st-rail-steps">
           {Array.from({ length: total }, (_, i) => {
@@ -527,15 +595,35 @@ function LiveSession({
               </div>
             </div>
           ) : (
-            <div className="st-rail-actions">
-              <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setSession(null)}>
-                <LogOut size={15} /> Save &amp; leave
+            <>
+              <div className="st-rail-actions">
+                <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setSession(null)}>
+                  <LogOut size={15} /> Save &amp; leave
+                </button>
+                <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setFinishConfirm(true)}>
+                  Finish
+                </button>
+              </div>
+              <button className="st-link st-quit" disabled={locked} onClick={() => setQuitConfirm(true)}>
+                Quit without saving
               </button>
-              <button className="st-btn st-btn-ghost" disabled={locked} onClick={() => setFinishConfirm(true)}>
-                Finish
+            </>
+          )}
+          <dialog ref={quitRef} className="st-modal" aria-labelledby="quit-title" onClose={() => setQuitConfirm(false)}>
+            <button type="button" className="st-modal-close" aria-label="Close" onClick={() => setQuitConfirm(false)}>
+              <X size={18} />
+            </button>
+            <h3 id="quit-title">Quit without saving?</h3>
+            <p className="st-small st-muted">This viva and your answers are deleted. Nothing from it is kept.</p>
+            <div className="st-row st-modal-actions">
+              <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => setQuitConfirm(false)}>
+                Keep going
+              </button>
+              <button type="button" className="st-btn st-btn-danger st-btn-sm" disabled={busy} onClick={quit}>
+                Quit and delete
               </button>
             </div>
-          )}
+          </dialog>
         </div>
       </aside>
 
@@ -545,20 +633,62 @@ function LiveSession({
             <Examiner state="idle" voice={speech.voiceEvents} />
             <h2>Ready when you are.</h2>
             <p className="st-muted">
-              Your examiner will ask each question out loud. Find a quiet place, then allow microphone access when asked. During the viva
-              you can also say these on their own:
+              {mode === "speech"
+                ? "Your examiner will ask each question out loud. Find a quiet place, then allow microphone access when asked. During the viva you can also say these on their own:"
+                : "Your examiner will ask each question out loud; type your answers. During the viva you can also type these on their own:"}
             </p>
-            <Commands />
+            <Commands typed={mode !== "speech"} />
             {mode === "speech" && <MicCheck />}
-            <button
-              className="st-btn st-btn-primary"
-              onClick={() => {
-                speech.prime();
-                setReady(true);
-              }}
-            >
+            <button className="st-btn st-btn-primary" onClick={() => setConsentOpen(true)}>
               Start the viva <ArrowRight size={18} />
             </button>
+            <dialog ref={consentRef} className="st-modal st-consent-modal" aria-labelledby="consent-title" onClose={() => setConsentOpen(false)}>
+              <button type="button" className="st-modal-close" aria-label="Close" onClick={() => setConsentOpen(false)}>
+                <X size={18} />
+              </button>
+              <h3 id="consent-title">Before you start: how your viva data is used</h3>
+              <p className="st-consent-lead">Please read this before your viva begins.</p>
+              <div className="st-consent-rows">
+                {[
+                  ...(mode === "speech"
+                    ? [[Mic, "Your voice", "Sent to a secure speech service (Groq) to become text. The recording is not stored."] as const]
+                    : []),
+                  [
+                    FileText,
+                    "What we save",
+                    mode === "speech"
+                      ? "Your answers as text, how you spoke (pace, pauses, \u201cum\u201ds) and your results, for your report."
+                      : "Your answers and your results, for your report.",
+                  ] as const,
+                  [Sparkles, "AI marking", "Results say \u201clikely\u201d: guidance for learning, not a final grade."] as const,
+                  [ShieldCheck, "Your privacy", "You use only your participant code. Please do not say your name."] as const,
+                  [Trash2, "Your control", "Quit without saving deletes everything; delete finished vivas in My vivas."] as const,
+                  [History, "How long", "Kept until you delete it, or until the project ends (June 2027)."] as const,
+                ].map(([Icon, head, text]) => (
+                  <div className="st-consent-row" key={head}>
+                    <span className="st-consent-icon">
+                      <Icon size={17} />
+                    </span>
+                    <span>
+                      <strong>{head}</strong>
+                      <span>{text}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <label className="st-consent-check">
+                <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                <span>I have read this and agree to how my viva data is used.</span>
+              </label>
+              <div className="st-row st-modal-actions">
+                <button type="button" className="st-btn st-btn-ghost st-btn-sm" onClick={() => setConsentOpen(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="st-btn st-btn-primary st-btn-sm" disabled={!agreed || busy} onClick={agreeAndStart}>
+                  Agree and start
+                </button>
+              </div>
+            </dialog>
           </div>
         ) : q ? (
           <>
@@ -614,7 +744,7 @@ function LiveSession({
             <div className="st-viva-a">
               <div className="st-a-head">
                 <div className="st-eyebrow">Your answer</div>
-                <Commands />
+                <Commands typed={mode !== "speech"} />
               </div>
               {mode === "speech" && (
                 <div className={`st-recorder ${speech.recording ? "is-recording" : ""}`}>

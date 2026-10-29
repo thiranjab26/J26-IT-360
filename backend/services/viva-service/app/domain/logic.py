@@ -13,7 +13,7 @@ POLICY_VERSION = "c04-policy-1.6-misheard-viva"
 # 1.5: the fluency thresholds are the pilot profile (from the 10 PP1 students), not the literature.
 # 1.6: answers that stay below half the points after a follow-up are a knowledge gap, even when
 # the later answers are "I don't know".
-GAP_VERSION = "c04-gap-1.8-pilot-word-signals"
+GAP_VERSION = "c04-gap-1.10-pilot-signals-only"
 GAP_PROFILE = fluency.PILOT_PROFILE
 MIXED = "MIXED_INSUFFICIENT_EVIDENCE"
 KNOWLEDGE = "LIKELY_KNOWLEDGE_GAP"
@@ -207,13 +207,14 @@ HESITATION_SIGNALS = {
     # Speed and pausing, judged by the pilot thresholds (gap rules 1.5; 1.4 used the literature).
     # It replaces the prototype delay and pause thresholds of 1.3, which had no research basis.
     "fluency": lambda h: len(fluency_flags(h) or []) >= GAP_PROFILE["min_flags"],
-    # 1.8: fillers and repairs use the pilot cut-offs; hedges were not measured in the pilot. The pilot
-    # rates come from whole vivas; one answer is short, so a single "um" or "sorry" never counts alone.
+    # 1.8: fillers and repairs use the pilot cut-offs. The pilot rates come from whole vivas; one
+    # answer is short, so a single "um" or "sorry" never counts alone. 1.10: hedges ("maybe", "I think")
+    # left the decision: not measured in the pilot, and as likely to show doubt about the answer as a
+    # language difficulty. hedge_count is still stored.
     "fillers": lambda h: h.get("filler_count", 0) >= 2
     and h.get("fillers_per_100_words", 0) >= PILOT_FILLERS_PER_100_WORDS,
     "restarts": lambda h: h.get("restart_count", 0) >= 2
     and (repairs_per_minute(h) or 0) >= PILOT_REPAIRS_PER_MIN,
-    "hedges": lambda h: h.get("hedge_count", 0) >= 2,
 }
 
 
@@ -223,7 +224,7 @@ def hesitation_signals(turn):
     return [name for name, test in HESITATION_SIGNALS.items() if test(turn["hesitation"])]
 
 
-VERBAL_SIGNALS = ("fillers", "hedges", "restarts")
+VERBAL_SIGNALS = ("fillers", "restarts")
 
 
 def high_hesitation(turn):
@@ -260,7 +261,6 @@ SIGNAL_INFO = [  # report labels and thresholds, kept beside the tests they desc
         "Repeats and restarts (we, we; sorry, I mean)",
         f"{PILOT_REPAIRS_PER_MIN:g} or more per minute of speech (pilot cut-off, exploratory), at least 2",
     ),
-    ("hedges", "Hedges (maybe, I think)", "2 or more (prototype; not measured in the pilot)"),
 ]
 SIGNAL_NAMES = {key: label for key, label, _ in SIGNAL_INFO}
 
@@ -290,7 +290,6 @@ def signal_details(turn):
         "fillers": f"{h.get('fillers_per_100_words', 0)} per 100 words",
         "restarts": f"{h.get('restart_count', 0)} ("
         + (f"{rate:.2f} per minute)" if (rate := repairs_per_minute(h)) is not None else "under 10 s of speech)"),
-        "hedges": str(h.get("hedge_count", 0)),
     }
     return [
         {"signal": label, "value": values[key], "threshold": threshold, "counted": key in counted}
@@ -388,10 +387,13 @@ def differentiate(turns, condition="C"):
             and t["assessment"]["state"] in ("partial", "complete")
             for t in evidence[-2:]
         )
-        if repeated_recovery:
+        # 1.9: the recovery shows the knowledge; in the full condition C a communication result also
+        # needs difficulty heard in the speech, so a fluent student who only needed prompting reads as
+        # reached with help. Condition B (content and follow-ups only, no speech) keeps the old rule.
+        if repeated_recovery and (condition == "B" or any(audible_hesitation(t) for t in evidence)):
             return (
                 COMMUNICATION,
-                "The first answer was weak, but two follow-up questions that taught nothing brought out the full answer: the knowledge is there; explaining it was the hard part.",
+                "The first answer was weak, but two follow-up questions that taught nothing brought out the full answer, and the speech showed signs of difficulty: the knowledge is there; explaining it was the hard part.",
             )
         if condition == "C" and high_hesitation(evidence[0]):
             return (
@@ -473,7 +475,7 @@ def result_label(report):
         return report["outcome"]
     concepts = report.get("concepts", [])
     # Every point reached, but only after follow-ups: not "not enough evidence".
-    if concepts and all(c.get("final_state") == "complete" for c in concepts):
+    if concepts and all(c.get("final_state") == "complete" or c.get("rubric_coverage", 0) >= 80 for c in concepts):
         return "REACHED_WITH_HELP"
     if concepts and all(c.get("speaking_unclear") for c in concepts):
         return "SPEAKING_DIFFICULTY_SEEN"
@@ -569,12 +571,10 @@ def study_plan(concepts, needs, resources):
 SPEAKING_REASONS = {  # why each speaking step was chosen, in words a student follows
     "fluency": "In your first answer about {concept}, you spoke more slowly and paused for longer "
     "than students who find English vivas easy.",
-    "hedges": 'In your first answer about {concept}, you said words like "maybe" or "I think" {n} times.',
-    "restarts": 'In your first answer about {concept}, you started again {n} times ("I mean", "sorry").',
+    "restarts": "In your first answer about {concept}, you repeated words or started again: {n}.",
 }
 SPEAKING_STEPS = {
     "restarts": "Plan your first sentence before you speak, so you do not need to start again.",
-    "hedges": 'When you know the answer, say it directly, without "maybe" or "I think".',
     "fluency": "Practise explaining at an even pace: short sentences, with a short pause between them.",
 }
 
@@ -643,8 +643,9 @@ def speaking_plan(concepts, hesitation):
     if not items:
         items = [
             plan_item(
-                "Keep practising out loud: explain one idea for a minute without notes, a few times a week.",
-                "None of the speaking measures in this viva reached the levels the viva looks for.",
+                "Your speaking was clear in this viva. Keep it up: explain one idea out loud for a minute "
+                "without notes, a few times a week.",
+                "",  # nothing was flagged, so a friendly tip with no "why"
             )
         ]
     return items[:4]

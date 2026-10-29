@@ -156,7 +156,7 @@ def test_complete_initial_answer_explains_absence_of_weakness():
 def test_fluency_signal_uses_the_pilot_profile():
     from app.domain.logic import GAP_PROFILE, GAP_VERSION, hesitation_signals
 
-    assert GAP_VERSION == "c04-gap-1.8-pilot-word-signals"
+    assert GAP_VERSION == "c04-gap-1.10-pilot-signals-only"
     assert GAP_PROFILE["name"] == "pilot-2026-10"
     # Fluent by the literature (2.2 is above its 1.97) but slow by the pilot (below 2.53).
     between = dict(FLUENT, speech_rate_syll_s=2.2, articulation_rate_syll_s=3.3)
@@ -252,14 +252,14 @@ def test_plans_come_from_the_evidence_and_say_why():
     )
     reasons = " ".join(i["reason"] for i in spoken)
     assert "about 9 filler words per 100 words" in reasons and "5.42 or more" in reasons
-    assert '"I think" 3 times' in reasons and "5.2 seconds" in reasons
+    assert '"I think"' not in reasons and "5.2 seconds" in reasons  # hedges left the decision in 1.10
     assert (
-        len(spoken) == 4
-    )  # fillers, hedges, the slow start, then the follow-up help (capped at 4)
+        len(spoken) == 3
+    )  # fillers, the slow start, then the follow-up help (hedges left in 1.10)
     quiet = speaking_plan(
         concepts[:1], {"available": True, "fillers_per_100_words": 1, "response_latency_ms": 900}
     )
-    assert len(quiet) == 1 and quiet[0]["reason"].startswith("None of the speaking measures")
+    assert len(quiet) == 1 and quiet[0]["step"].startswith("Your speaking was clear") and quiet[0]["reason"] == ""
     assert speaking_plan(concepts, {"available": False})[0]["reason"].startswith(
         "You typed every answer"
     )
@@ -321,3 +321,11 @@ def test_speaking_difficulty_with_unclear_knowledge_joins_a_communication_headli
     assert result_label({"outcome": MIXED, "concepts": concepts}) == COMMUNICATION
     concepts[1] = {"outcome": KNOWLEDGE}
     assert result_label({"outcome": MIXED, "concepts": concepts}) == "MIXED_RESULTS"
+
+
+def test_gap_rules_1_9_recovery_needs_difficulty_heard():
+    fluent = lambda state, cov: {**evidence(state, cov), "hesitation": hesitation("a clear answer", "speech", 900, {})}  # noqa: E731
+    prompted = [fluent("superficial", 30), fluent("partial", 70), fluent("complete", 100)]
+    assert differentiate(prompted)[0] == MIXED  # fluent, only needed prompting: reached with help
+    heard = [evidence("superficial", 30), evidence("partial", 70), evidence("complete", 100)]
+    assert differentiate(heard)[0] == COMMUNICATION

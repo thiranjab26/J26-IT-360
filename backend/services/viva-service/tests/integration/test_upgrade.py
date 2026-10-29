@@ -439,3 +439,17 @@ def test_fillers_are_counted_from_the_spoken_transcript(client):
     turn = client.get(f"/api/v1/viva/sessions/{session['id']}", headers=headers).json()
     report_turns = turn.get("turns") or []
     assert report_turns and report_turns[0]["hesitation"]["filler_count"] == 3
+
+
+def test_consent_is_saved_with_the_viva(client):
+    from app.db.tables import VivaSession
+
+    headers = auth(client)
+    session = start(client, headers)
+    url = f"/api/v1/viva/sessions/{session['id']}/consent"
+    body = {"version": "c04-consent-1", "input_mode": "speech"}
+    assert client.post(url, headers=auth(client, code="P099"), json=body).status_code == 403
+    assert client.post(url, headers=headers, json=body).status_code == 200
+    with SessionLocal() as db:
+        consent = db.get(VivaSession, session["id"]).data["consent"]
+    assert consent["version"] == "c04-consent-1" and consent["agreed_at"]

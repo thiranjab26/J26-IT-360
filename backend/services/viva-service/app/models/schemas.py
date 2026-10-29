@@ -148,6 +148,13 @@ class BankQuestion(QuestionContent):
     version: int = Field(ge=1)
 
 
+class ConsentIn(StrictModel):
+    """The student agreed to how the viva uses their data (the popup text has its own version)."""
+
+    version: str = Field(min_length=1, max_length=40)
+    input_mode: Literal["text", "speech"]
+
+
 class ReviewIn(StrictModel):
     status: Literal["draft", "approved", "rejected"]
     review_notes: str | None = Field(default=None, max_length=4000)

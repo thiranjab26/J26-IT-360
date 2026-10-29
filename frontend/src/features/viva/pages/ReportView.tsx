@@ -312,7 +312,7 @@ export default function ReportView({
                       </table>
                       <p className="st-small st-muted" style={{ marginTop: 6 }}>
                         Speech signs only matter when the knowledge was shown. A communication difficulty needs 2 signs, one of them heard in
-                        the words (fillers, restarts or hedges): slow speech alone never decides it.
+                        the words (fillers, or repeats and restarts): slow speech alone never decides it.
                       </p>
                     </div>
                   )}

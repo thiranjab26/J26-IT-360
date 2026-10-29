@@ -84,7 +84,7 @@ export default function Welcome({ onSignedIn, onError }: { onSignedIn: (a: Auth)
           <label className="st-consent">
             <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} required />
             <span className="st-small">
-              I agree that my answers and their timing are saved so my lecturer can review them. I will not include personal information.
+              I agree that my answers, how I speak and my results are saved for my viva report and my lecturer. I will use only my participant code, never my name.
             </span>
           </label>
           <button className="st-btn st-btn-primary" disabled={!consent || code.trim().length < 3 || loading}>

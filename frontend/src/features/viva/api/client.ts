@@ -114,9 +114,9 @@ export function resultOf(r: { result?: string | null; strong?: boolean; strong_a
   return r.result || (r.strong || r.strong_answers ? "STRONG" : r.outcome === "MIXED_INSUFFICIENT_EVIDENCE" ? "MIXED_RESULTS" : r.outcome || "");
 }
 /** One concept's result: a mixed concept that ended complete was "reached with help". */
-export function conceptLabel(c: { outcome: string; no_weakness?: boolean; speaking_unclear?: boolean; final_state?: string | null }) {
+export function conceptLabel(c: { outcome: string; no_weakness?: boolean; speaking_unclear?: boolean; final_state?: string | null; rubric_coverage?: number }) {
   if (c.no_weakness) return "No gap identified";
   if (c.speaking_unclear) return "Speaking difficulty seen; knowledge unclear";
   if (c.outcome !== "MIXED_INSUFFICIENT_EVIDENCE") return gapLabels[c.outcome] || label(c.outcome);
-  return c.final_state === "complete" ? "Reached with help" : "Not enough evidence";
+  return c.final_state === "complete" || (c.rubric_coverage ?? 0) >= 80 ? "Reached with help" : "Not enough evidence";
 }

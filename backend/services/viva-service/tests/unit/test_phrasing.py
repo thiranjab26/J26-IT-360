@@ -332,10 +332,10 @@ def test_complete_but_hesitant_speech_is_communication_only_in_c():
         "assessment": {"state": "complete", "coverage": 100, "misconceptions": []},
         "input_mode": "speech",
         "hesitation": hesitation(
-            "um uh I think maybe um it is last in first out",
+            "um uh I think maybe um it is, it is last in, last in first out",
             "speech",
             4500,
-            {"total_pause_ms": 3000},
+            {"total_pause_ms": 3000, "fluency": {"speaking_time_s": 12}},
         ),
     }
     assert differentiate([turn], "C")[0] == "LIKELY_COMMUNICATION_DIFFICULTY"

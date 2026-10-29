@@ -2,21 +2,20 @@
 
 Plain answers to five questions: the gap rules, what is saved and why, how the next question is
 chosen, misheard words, and what the research is checking. Rule versions: gap rules
-`c04-gap-1.8-pilot-word-signals`, follow-up policy `c04-policy-1.6-misheard-viva`.
+`c04-gap-1.10-pilot-signals-only`, follow-up policy `c04-policy-1.6-misheard-viva`.
 
 ## 1. Gap rules 1.8
 
-### Per spoken answer: four signals
+### Per spoken answer: three signals (hedges left the decision in 1.10)
 
 | Signal | Fires when | From |
 |---|---|---|
 | Speed and pauses | 2 of 4 measures past the pilot cut-offs (speech rate < 2.53, articulation < 3.59, run < 5.73 syllables, mean pause > 682.5 ms), at least 10 s of speech | Pilot data |
 | Fillers (um, uh) | 5.42 or more per 100 words, and at least 2 | Pilot data |
 | Repeats and restarts | 0.34 or more per minute of speech, and at least 2 | Pilot data (exploratory) |
-| Hedges (maybe, I think) | 2 or more | Prototype |
 
-**Difficulty heard** = 2 or more signals, at least one heard in the words (fillers, repeats or
-hedges). Timing alone never counts.
+**Difficulty heard** = 2 or more signals, at least one heard in the words (fillers, or repeats
+and restarts). Timing alone never counts.
 
 **Knowledge shown** = 80% or more of the marking points (complete, or partial with one point half
 credited).
@@ -32,7 +31,7 @@ credited).
 | 5 | The same misconception in two answers in a row | **Likely knowledge gap** |
 | 6 | The last two real answers at most 50%, or every answer at most 50% with at least one real attempt | **Likely knowledge gap** |
 | 7 | Knowledge shown at the end, but only after a simpler question | Reached with help |
-| 8 | Weak first answer, then two follow-ups that taught nothing both reach 66% or more and the last 80% | **Likely communication difficulty** |
+| 8 | Weak first answer, then two follow-ups that taught nothing both reach 66% or more and the last 80%, **and difficulty heard in at least one answer** (1.9; without it: reached with help) | **Likely communication difficulty** |
 | 9 | Weak first answer, knowledge shown after one follow-up, difficulty heard in the first answer | **Likely communication difficulty** |
 | 10 | Anything else | Not enough evidence |
 
@@ -89,8 +88,8 @@ Two fixes (added 19 Oct 2026):
 
 **Research question.** When knowledge is controlled, which speech measures separate Sri Lankan
 students who have communication difficulty in English technical vivas from those who do not, and
-at what thresholds? (Supervisor's wording: how can communication difficulty be detected reliably in
-L2 English technical vivas, and which thresholds separate it from normal speech?)
+at what thresholds? (Supervisor's framing: is there a gap in technical communication for students
+with English as a second language? The pilot answers yes, and the thresholds detect it.)
 
 **The problem.** A normal viva sees a weak spoken answer and concludes "does not know". For a
 student answering in a second language, a weak answer can hide real knowledge. The two need
