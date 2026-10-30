@@ -39,6 +39,18 @@ export {
   type PresenceState,
 } from './core/events/types.js';
 export { isLoadStateEvent, validateLoadStateEvent } from './core/events/validate.js';
+// Optional second stream: mood, boredom, overload, head pose and a few raw
+// measures (INTEGRATION.md "Extra signals"). LoadStateEvent is unchanged.
+export {
+  EXTRAS_CHANNEL,
+  subscribeExtras,
+  validateExtraSignalsEvent,
+  type ExtraSignalsEvent,
+  type ExtrasBoredom,
+  type ExtrasMood,
+  type ExtrasMoodSource,
+  type ExtrasOverload,
+} from './core/events/extras.js';
 
 /**
  * No event for this long = no sensor (tab closed, crashed, never started):

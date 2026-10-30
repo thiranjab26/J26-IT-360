@@ -64,6 +64,7 @@ describe('public API module', () => {
     expect(Object.keys(signals).sort()).toEqual(
       [
         'AFFECT_STATES',
+        'EXTRAS_CHANNEL',
         'HEARTBEAT_MS',
         'LEVELS',
         'LOAD_STATE_CHANNEL',
@@ -81,6 +82,8 @@ describe('public API module', () => {
         'onPresenceChange',
         'onStrainChange',
         'subscribe',
+        'subscribeExtras',
+        'validateExtraSignalsEvent',
         'validateLoadStateEvent',
       ].sort(),
     );

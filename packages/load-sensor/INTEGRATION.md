@@ -163,6 +163,40 @@ toggle.onclick = () => (sensor.status === 'disabled' ? sensor.enable() : sensor.
 
 Options: `video` (preview element), `targetFps` (15), `useExpressionFeatures` (true; FR3 ablation), `heartbeatMs` (5000), `broadcast` (true), `classifier` (replaces heuristic-0), `strainStorage` (localStorage; `null` keeps totals in memory only), `cameraPolicy` (`'optional'`).
 
+## 8a. Optional extra signals (second stream)
+
+Added 30 Oct 2026. **Optional:** if you don't subscribe, nothing changes for you. `LoadStateEvent` above is unchanged. The extras travel on their own channel, `adaptlearn.c02.extras`, with the same delivery rules as §3 (same origin only, never over the network). One event is sent per finished second while sensing runs. Nothing is sent while sensing is off, and there is no heartbeat.
+
+```ts
+import { subscribeExtras } from '@adaptlearn/load-sensor/signals';
+
+const stop = subscribeExtras((x) => {
+  if (x.boredom === 'bored') tutor.offerChallenge(); // advisory only: a hand-picked rule
+  if (x.mood === 'frustrated') tutor.offerHint();
+});
+// later: stop();
+```
+
+| Field                                               | Type                                                                                                  | Meaning                                                                                                                                                            |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `kind`                                              | `'adaptlearn.c02.extras'`                                                                             | Identifies the stream.                                                                                                                                             |
+| `extras_version`                                    | `1`                                                                                                   | Version of this stream (separate from `schema_version`).                                                                                                           |
+| `timestamp`                                         | ISO 8601 UTC string                                                                                   | When it was sent.                                                                                                                                                  |
+| `status`                                            | same values as §5                                                                                     | The sensor's status at that moment.                                                                                                                                |
+| `mood`                                              | `drowsy` `happy` `surprised` `frustrated` `sad` `confused` `focused` `distracted` `neutral` or `null` | Apparent mood shown in C02's demo. `null` = no face.                                                                                                               |
+| `mood_source`                                       | `'model'` \| `'rules'` \| `null`                                                                      | Whether happy / surprised / frustrated / sad came from the trained expression model or the hand-picked rules. `null` with no mood or with expression features off. |
+| `boredom`                                           | `bored` `possibly_bored` `not_bored` `tired` or `null`                                                | Hand-picked rule, **not validated**. `null` = no estimate yet.                                                                                                     |
+| `overload`                                          | `overloaded` `working_hard` `manageable` or `null`                                                    | Hand-picked rule, **not validated**.                                                                                                                               |
+| `head_yaw_deg` / `head_pitch_deg` / `head_roll_deg` | number or `null`                                                                                      | Head angles of the latest frame in degrees, relative to the camera (not to the learner's neutral). `null` = no face.                                               |
+| `blinks_last_second`                                | number or `null`                                                                                      | Blinks completed in the last second.                                                                                                                               |
+| `eyes_closed_fraction`                              | 0..1 or `null`                                                                                        | Share of the last second's frames with the eyes closed.                                                                                                            |
+| `gaze_centred_fraction`                             | 0..1 or `null`                                                                                        | Share of the last second's frames with the gaze on the screen.                                                                                                     |
+
+- **Who publishes it.** C02's demo page publishes the extras, because the mood, boredom and overload readings are computed there. `createLoadSensor()` (§8) does not publish them yet.
+- **Validation.** `subscribeExtras` drops anything that isn't a valid version-1 extras event. As with the main event, arrays and objects are rejected, so no landmarks or pixels can travel here.
+- **Advisory only.** Only `mood` can come from a trained model (RAF-DB test macro-F1 0.570, measured on photos, not webcams). Everything else is a rule or a raw measure. Use it to offer things, not to make decisions on the learner's behalf.
+- You can see the live JSON on the C02 demo's **Performance** tab, in the card "Extra signals (optional stream)".
+
 ## 9. Privacy boundary
 
 All video is processed in the browser, and only the event above leaves the sensor. It carries labels, booleans and a few numbers. The validator rejects any event that carries an array or a nested object other than `meta`, so landmark or pixel data cannot get into one by mistake. `strain`'s day totals are six numbers in `localStorage` under `adaptlearn.c2.strain.v1`, and each new day overwrites the previous one.

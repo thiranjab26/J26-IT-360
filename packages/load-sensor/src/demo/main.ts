@@ -25,7 +25,7 @@ import {
   TfjsFaceMeshProvider,
   UnsupportedBackendError,
 } from '../core/landmarks/index.js';
-import { LoadStateHub, type SourceStatus } from '../core/events/index.js';
+import { ExtrasPublisher, LoadStateHub, type SourceStatus } from '../core/events/index.js';
 import { BoredomEstimator, OverloadEstimator } from '../core/heuristics/index.js';
 import { sourceForCamera } from '../core/sensor.js';
 import type { FrameSignals } from '../core/features/index.js';
@@ -39,6 +39,8 @@ import {
 import { BoredomPanel } from './boredom-panel.js';
 import { OverloadPanel } from './overload-panel.js';
 import { BreakPanel } from './break/break-panel.js';
+import { ExtrasCard } from './extras-card.js';
+import { buildExtrasEvent } from './extras.js';
 import { CalibrationPrompt } from './calibration-prompt.js';
 import { ConsentDialog, ConsentStore } from './consent.js';
 import { formatMs, LandmarkOverlay, StatsPanel } from './debug-overlay.js';
@@ -377,6 +379,9 @@ function mount(root: HTMLElement): void {
   // Development builds only: the recorder is tree-shaken out of production.
   const recorder = import.meta.env.DEV ? new FixtureRecorder() : null;
   const loadCard = new LoadStateCard(`${import.meta.env.BASE_URL}consumer.html`);
+  // Optional second stream for C01/C03/C04 (src/core/events/extras.ts); LoadStateEvent is unchanged.
+  const extrasCard = new ExtrasCard();
+  const extrasPublisher = new ExtrasPublisher();
 
   // ── Tabs: Camera | Signals ──
   const cameraPanel = el('section');
@@ -421,7 +426,7 @@ function mount(root: HTMLElement): void {
       recalibrate(settings.value.sensing.expressionFeatures);
     },
   });
-  perfPanel.append(perfHead, loadCard.element, perfGrid, quality.element);
+  perfPanel.append(perfHead, loadCard.element, extrasCard.element, perfGrid, quality.element);
   const breakPanel = new BreakPanel({
     requestSensing: () => {
       void requestSensing();
@@ -580,13 +585,27 @@ function mount(root: HTMLElement): void {
     });
     p.onSecond((s) => {
       signals.pushSecond(s);
-      moodPanel.update(mood.pushSecond(s), mood.history);
+      const moodReading = mood.pushSecond(s);
+      moodPanel.update(moodReading, mood.history);
       wellbeing.pushSecond(s);
       signals.setState(p.state);
       hub.pushSecond(s, p.state, p.window.classifiable ? p.window.toModelInput() : null);
       // After the hub, so this second's load and engagement are already published.
-      boredomPanel.update(boredom.update(s, hub.latest), hub.latest.status);
-      overloadPanel.update(overload.update(s, hub.latest), hub.latest.status);
+      const boredomReading = boredom.update(s, hub.latest);
+      const overloadReading = overload.update(s, hub.latest);
+      boredomPanel.update(boredomReading, hub.latest.status);
+      overloadPanel.update(overloadReading, hub.latest.status);
+      const extras = buildExtrasEvent({
+        status: hub.latest.status,
+        mood: moodReading,
+        boredom: boredomReading,
+        overload: overloadReading,
+        frame: latestSignals,
+        second: s,
+        now: new Date(),
+      });
+      extrasPublisher.publish(extras);
+      extrasCard.update(extras);
     });
     return p;
   }
@@ -857,6 +876,7 @@ function mount(root: HTMLElement): void {
     tracker.stop();
     camera.stop();
   });
+  // Not closed on pagehide: a bfcache restore would have no channel. The browser closes it on unload.
 
   async function enable(): Promise<void> {
     message = null;

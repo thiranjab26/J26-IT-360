@@ -362,6 +362,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 ### P7. Event schema 🧑
 
 - [ ] 🧑 A new `boredom` field (or any new field) needs C01/C03/C04 sign-off before it goes in `LoadStateEvent` (invariant 5)
+  - Owner decision 30 Oct: instead of new `LoadStateEvent` fields, a separate **optional extras stream** on `adaptlearn.c02.extras` (`src/core/events/extras.ts`, exported from `signals.ts` as `subscribeExtras`): mood + `mood_source` (model or rules), boredom, overload, head angles, blinks, eyes-closed and gaze-centred fractions, once per second. `LoadStateEvent` is unchanged, so no sign-off is needed; teammates who ignore it are unaffected. Primitives only (validator rejects arrays/objects, FR7). Published by the demo page, not yet by `createLoadSensor()`. Shown on the Performance tab ("Extra signals" card). Documented in `INTEGRATION.md` §8a. 9 unit tests; the privacy e2e now also checks the extras flowed during its zero-request 60 s window (passed 30 Oct). 🧑 Tell C01/C03/C04 it exists (one message).
   - Owner, 30 Oct: ask after C02's own part (P1–P8) is finished. Until then boredom stays display-only (demo panel), not in the event stream.
 
 ### P8. Boredom, engagement, confusion, frustration from DAiSEE (plan, 30 Oct)

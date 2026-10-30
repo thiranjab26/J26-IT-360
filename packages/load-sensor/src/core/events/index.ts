@@ -8,6 +8,24 @@ export {
 } from './broadcast.js';
 export { Emitter } from './emitter.js';
 export {
+  EXTRAS_BOREDOM,
+  EXTRAS_CHANNEL,
+  EXTRAS_KIND,
+  EXTRAS_MOODS,
+  EXTRAS_MOOD_SOURCES,
+  EXTRAS_OVERLOAD,
+  EXTRAS_VERSION,
+  ExtrasPublisher,
+  subscribeExtras,
+  validateExtraSignalsEvent,
+  type ExtraSignalsEvent,
+  type ExtrasBoredom,
+  type ExtrasMood,
+  type ExtrasMoodSource,
+  type ExtrasOverload,
+  type ExtrasValidationResult,
+} from './extras.js';
+export {
   LoadStateHub,
   type HubEvents,
   type HubTimers,

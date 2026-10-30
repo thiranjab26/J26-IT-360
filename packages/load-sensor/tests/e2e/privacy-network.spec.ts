@@ -78,6 +78,8 @@ test.describe('no network traffic while sensing (NFR2)', () => {
       .map((r) => r.request.url())
       .filter((u) => new URL(u).origin !== origin);
 
+    // The optional extras stream was publishing during the same silent window.
+    await expect(page.getByTestId('extras-json')).toContainText('"kind": "adaptlearn.c02.extras"');
     await page.getByTestId('disable').click();
     await expect(page.getByTestId('live-tracks')).toHaveText('0');
     await context.close(); // writes the HAR
