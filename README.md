@@ -4,11 +4,11 @@ Personalized learning intelligence platform for higher education. Final-year gro
 
 | Component | Owner | Service | Frontend feature | Port |
 |---|---|---|---|---|
-| C1 Adaptive Curriculum Engine | TBD | `backend/services/curriculum-service` | `features/curriculum` | 8101 |
-| C2 Cognitive Load Detection | TBD | `backend/services/load-service` | `features/cognitive-load` | 8201 |
-| C3 VeriTutor (faithfulness-verified AI tutor) | TBD | `backend/services/tutor-service` | `features/tutor` | 8301 |
-| C4 Intelligent Viva System | TBD | `backend/services/viva-service` | `features/viva` | 8401 |
-| Shared (leader) | TBD | `api-gateway`, `auth-service` | `features/auth`, `shared/` | 8080, 8001 |
+| C1 Adaptive Curriculum Engine | IT23265110 | `backend/services/curriculum-service` | `features/curriculum` | 8101 |
+| C2 Cognitive Load Detection | IT23267190 | `backend/services/load-service` | `features/cognitive-load` | 8201 |
+| C3 VeriTutor (faithfulness-verified AI tutor) | IT23252622 | `backend/services/tutor-service` | `features/tutor` | 8301 |
+| C4 Intelligent Viva System | IT23212022 | `backend/services/viva-service` | `features/viva` | 8401 |
+| Shared (leader) | IT23252622 | `api-gateway`, `auth-service` | `features/auth`, `shared/` | 8080, 8001 |
 
 Full design: [docs/architecture.md](docs/architecture.md). Start here: [docs/onboarding.md](docs/onboarding.md).
 
