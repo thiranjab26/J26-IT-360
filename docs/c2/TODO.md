@@ -62,7 +62,11 @@ Preparation material for every item below (question lists, request text, checkli
   - Config names confirmed in face-landmarks-detection 1.0.6: `detectorModelUrl`, `landmarkModelUrl`. Output normalised to a flat `Float32Array` (478×3, x/width, y/height, z/width) — no per-frame object allocation. `FaceResult.score` is `number | null` (ARCHITECTURE.md §3 updated): the tfjs runtime filters by face presence internally but does not return the score. `staticImageMode: false` so the detector only re-runs when tracking is lost. TF.js loads lazily in `init()`. All asset URLs pass `resolveSameOriginAsset()` (`src/core/model-loader.ts`), which refuses cross-origin URLs before anything is fetched. `@mediapipe/face_mesh`/`face_detection` (peer deps for the unused mediapipe runtime) are aliased to a throwing stub in `vite.config.ts`: they do not bundle as ESM under Vite 8 and default to cdn.jsdelivr.net. The bundle still contains the library's unused tfhub.dev default constants; a unit test asserts both URLs are always overridden. TF.js packages are modular (`tfjs-core`, `-converter`, `-backend-webgl`, `-backend-wasm`, all 4.22.0) so the cpu backend is never registered.
 - [x] Backend selection: webgl → wasm; refuse plain cpu with `status: "unsupported"`
   - `selectBackend()` (`src/core/landmarks/backend.ts`) also rejects a backend if TF.js reports a different one after `setBackend`. Failure throws `UnsupportedBackendError` (listing each reason); the demo shows it, A5 maps it to `status: "unsupported"`.
-- [ ] **Bug found 30 Oct (P1): the WASM fallback probably cannot run the attention mesh.** The landmark model (`refineLandmarks: true`) contains int32 `BatchMatMulV2` ops (SpatialTransformer), and tfjs-backend-wasm 4.22.0 throws "BatchMatMul for non non-float32 tensors not yet supported". Seen in Node; not yet confirmed in a browser. If it holds, a device without WebGL selects `wasm`, init succeeds and every `estimate()` throws. Next: reproduce in Chromium with `backends: ['wasm']`, then decide: fail at init with `status: "unsupported"` (honest), or a different fallback. Also check what the e2e tests cover.
+- [x] **Bug found 30 Oct (P1): the WASM fallback could not run the attention mesh.** The landmark model (`refineLandmarks: true`) contains int32 `BatchMatMulV2` ops (SpatialTransformer), and tfjs-backend-wasm 4.22.0 throws "BatchMatMul for non non-float32 tensors not yet supported". Reproduced in Chromium (dev server, `backends: ['wasm']`, one AFLW2000 face): WASM threw on the frame, WebGL found the face. So a device without WebGL selected `wasm`, reported "Sensing is on" and never produced landmarks. The e2e WASM test (`csp.spec.ts`) missed it because its fake camera shows no face, so the landmark model never runs.
+  - Fix: `src/core/landmarks/wasm-int-matmul.ts`, called in `TfjsFaceMeshProvider` after the WASM import. It wraps the WASM BatchMatMul kernel: int32 operands are cast to float32, multiplied and cast back, which is exact below 2^24 (the operands are pixel indices). Float32 inputs use the original kernel unchanged. Unit test on the real WASM backend in Node (`tests/unit/landmarks/wasm-int-matmul.test.ts`): unpatched throws, patched is exact, no tensor leak, float path unchanged.
+  - After the fix, same face in Chromium: WASM finds it; max |WASM − WebGL| = 0.00043 (normalised, about 0.2 px on 450 px).
+  - Still open: an e2e test with a real face on the WASM path needs a face clip as fake camera (see the A7 🧑 item about recording one).
+- [ ] **Pre-existing e2e failure (found 30 Oct, not caused by the WASM fix):** in `camera-landmarks.spec.ts` (2 tests) and `csp.spec.ts` ("…cog-admin and benchmark"), clicking `consent-accept` leaves `consent-dialog` open. Fails the same with the WASM fix reverted. Probably from a recent change to the consent/demo flow (`313c5ea` or `ffee835`). Privacy-network and the CSP WASM test pass.
 - [x] Skip-frame scheduling (never queue), target 15 fps
   - `FrameGate` (`camera/frame-gate.ts`) + `LandmarkTracker` (`landmarks/landmark-tracker.ts`). One inference in flight; rate cap on frame time with 20 % early tolerance so 30 fps camera jitter still gives 15 fps (not 10). Counts dropped-busy vs dropped-rate separately. Adaptive rate (15→12→10) is not wired yet: needs bench numbers (A7).
 - [x] Debug overlay: draw landmarks, show fps, backend, frame time p50/p95
@@ -294,15 +298,21 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
   - The Kaggle `train_test_split_ALL.csv` also puts 1,600 AFLW2000 images in "train". Ignored: AFLW2000 is test-only under the standard protocol. 300W-LP keeps that file's train/val split. 🧑 Check in P3 whether it is subject-disjoint.
 - [ ] Report the face-found rate per dataset (from the summaries). Trial on the first 240 items: RAF-DB 97.9 %, ExpW 94.2 %, FER2013 91.3 %, AFLW2000 88.8 %, 300W-LP 79.6 %. 300W-LP and AFLW include near-profile poses, where FaceMesh also fails in the app. P3 must report pose error only on faces it found, and say how many large-pose faces that drops.
 - [ ] Parity: the app runs this model on WebGL, extraction on cpu. Compare landmarks for a handful of dataset images in the browser vs `extract-landmarks`; expect float-rounding differences only.
+  - 1 image so far (AFLW2000 `image00002.jpg`, Chromium WebGL vs `aflw2000.npy` row 0): mean |Δ| 5.5e-4, max 3.3e-3 (normalised; 0.25 px mean, 1.5 px max on 450 px). Larger than WASM vs WebGL on the same image (max 4.3e-4), so most of it is probably the JPEG decoder (jpeg-js vs Chrome), not the backend. Not confirmed; needs more images.
 
 ### P2. Features from landmarks
 
-- [ ] `scripts/landmarks-to-features.ts` (Node): reads the `.npz`/JSON landmarks and runs the **TypeScript** feature code, so Python never re-implements a feature (CLAUDE.md "one source of truth"). Same item as C1's last one.
-- [ ] Decide the input for each model: raw normalised landmarks, existing features, or both. 🧑 Confirm with supervisor if it changes the method.
+- [x] `scripts/landmarks-to-features.ts` (Node): reads the `.npy` landmarks and runs the **TypeScript** feature code, so Python never re-implements a feature (CLAUDE.md "one source of truth"). Same item as C1's last one.
+  - `pnpm landmarks-to-features <dataset>` writes `<dataset>.signals.npy` [N, 13] (`computeFrameSignals`, which includes the geometric yaw/pitch/roll baseline), `.mesh_camera.npy` and `.mesh_face.npy` [N, 1434], and `.features.json` (column names, feature `code_hash`). A row gets all three or none, so every model is trained and tested on the same rows. Aspect is 1 (every extractor crop is square).
+  - Bug caught while building it (30 Oct): the first `.npy` reader used `Buffer#slice(...).buffer`, which in Node is the whole file including the header, so rows came out shifted by 32 values (AFLW: 200 "found" rows looked like NaN). Fixed (copy into a fresh buffer) with a unit test that reads from a pooled Buffer. The `.npy` files themselves were never wrong.
+- [x] Decide the input for each model: raw normalised landmarks, existing features, or both. 🧑 Confirm with supervisor if it changes the method.
+  - Chosen 30 Oct (owner to confirm with supervisor): all 478 points, centred between the eyes and divided by the inter-ocular distance (`src/core/features/mesh-input.ts`, unit-tested with synthetic faces). Head pose uses the `camera` frame (rotation kept, it is the target). Expression uses the `face` frame (rotated into `faceAxes`, so the same expression reads the same at any head turn). The same function will run in the browser, so there is no train/serve skew. `feature_spec.json` regenerated (`code_hash` changed because `src/core/features` changed; the per-second feature list itself did not change).
 
 ### P3. Head-pose model [FR2]
 
 - [ ] Train on 300W-LP, test on AFLW2000-3D (the standard protocol, so the numbers compare with published papers)
+  - Script ready: `research/c2-load/training/head_pose.py` (geometric vs ridge vs MLP on the same test rows; ±99° filter; sign convention taken from 300W-LP train, never from the test set). `--dry-run` passes on AFLW halves (code check only). Waits for the 300W-LP extraction.
+  - Test-set hygiene, for the method section: the first version of both dry runs printed metrics on test data (head pose: 5 epochs on AFLW halves; expression: a 3-epoch model scored once on RAF-DB test). Nothing was chosen from those numbers. Both dry runs now never print test metrics; the real runs touch each test set once.
 - [ ] Report mean absolute error in degrees for yaw, pitch and roll, against the current geometric solver on the same test images
 - [ ] Decide: replace the geometric solver only if the trained model is measurably better. Record the numbers either way.
 
@@ -311,11 +321,16 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 - [ ] Train on RAF-DB train (+ ExpW, + FER+ if P1 kept it); test on the RAF-DB official test split
 - [ ] Report accuracy, **macro-F1** (Fear and Disgust are small classes) and the confusion matrix
 - [ ] Compare against the current hand-picked expression rules on the same test images
+  - Not possible as stated: the rules in `src/demo/mood.ts` score each learner against their own 30 s calibration baseline (z-scores), and single dataset photos have no baseline. Recorded in `expression.py`'s docstring. 🧑 Decide what to say in the report: the comparison can only be made in the pilot study (B), on real sessions.
 - [ ] Mood = Positive / Neutral / Negative, grouped from the 7 expressions. Report its accuracy too.
+  - Decided 30 Oct (owner): Happy → Positive; Neutral and **Surprise** → Neutral (surprise can be good or bad); Sad/Anger/Fear/Disgust → Negative. `expression.py` reports mood accuracy, macro-F1 and confusion from the 7-class predictions.
+  - Decided 30 Oct (owner): the trained expression model goes into the **demo mood panel only** (Signals tab), replacing the hand-picked happy/surprised/sad/frustrated rules, with a switch back to the rules for the ablation. Nothing in the event stream changes (no sign-off needed).
 
 ### P5. Ship in the browser
 
 - [ ] Export both models to TF.js under `public/models/` (same-origin, invariant 3); Python/JS parity within 1e-4
+  - Browser side ready: `MeshModel` (`src/core/classifier/mesh-model.ts`): lazy `loadGraphModel` from a same-origin URL (`resolveSameOriginAsset`), input from the same `meshInput()` as training, output length checked at load, every tensor disposed (unit-tested with doubles). Smoke model checked in Chromium (dev server, temporary copy, since removed): max |browser − Keras| = 2.35e-6 on WebGL and on WASM.
+  - Tooling ready: `python export.py head_pose|expression` → `public/models/head-pose/` or `expression/` (graph model + `meta.json` with input, output, classes and test numbers from the results file) and a parity fixture in `research/c2-load/results/parity/` (gitignored: derived from licensed data); then `pnpm model-parity <dir> <fixture>`. Refuses to export a dry-run result.
 - [ ] Replace the heuristics behind a switch; the old rules stay selectable for the ablation [FR3]
 - [ ] Wrap inference in `tf.tidy`; re-run bench (NFR1 ≤ 300 ms) and the privacy e2e test
 - [ ] Regenerate `feature_spec.json` if any feature changed
@@ -344,9 +359,11 @@ Can start on your own dry-run data before B3 finishes.
 
 - [x] `training/requirements.txt` with pinned versions; legacy Keras (`TF_USE_LEGACY_KERAS=1`)
   - Done in Milestone P0 (WSL2, TensorFlow 2.19.0); see the notes there.
-- [ ] Round-trip smoke test **before any real training**: build the tiny model → export → load in TF.js → parity within 1e-4. If this fails, switch to training in TF.js under Node.
+- [x] Round-trip smoke test **before any real training**: build the tiny model → export → load in TF.js → parity within 1e-4. If this fails, switch to training in TF.js under Node.
+  - 30 Oct: `python export.py --smoke` (untrained dense model of the head-pose shape, 1434 → 3) → TF.js graph model → `pnpm model-parity`: 32 rows, max |TF.js − Keras| = 1.07e-6, PASS. Graph format because the app already has `@tensorflow/tfjs-converter` (`loadGraphModel`); no `tfjs-layers` dependency needed. The 1D-CNN + GRU still needs its own round trip when it exists (GRU ops in the graph converter).
 - [ ] Loader for session exports → windows `[T, F]` + labels + participant id, reading `feature_spec.json`
-- [ ] `scripts/landmarks-to-features.ts` (Node) for any public dataset landmarks
+- [x] `scripts/landmarks-to-features.ts` (Node) for any public dataset landmarks
+  - Done in P2.
 
 ### C2. Baselines and model [FR4]
 
