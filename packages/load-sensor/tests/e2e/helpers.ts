@@ -27,5 +27,17 @@ export async function acceptConsent(page: Page): Promise<void> {
   const dialog = page.getByTestId('consent-dialog');
   await expect(dialog).toBeVisible();
   await page.getByTestId('consent-accept').click();
-  await expect(dialog).toBeHidden();
+  // Closed, not "hidden": the dialog fades out over 0.26 s (styles.css), and
+  // until the fade's end is processed it keeps its box (display: block,
+  // opacity 0), which Playwright counts as visible. Agree starts the face model
+  // load at once, which can block the main thread for seconds on a busy
+  // machine, so toBeHidden() failed at random (30 Oct 2026, 2 of 4 runs under
+  // full CPU load) although the dialog had closed and the camera was starting.
+  await expect(dialog).not.toHaveAttribute('open');
+  // ...and it closed as "agree", not as a decline (a click that missed the
+  // button lands on the backdrop, which declines): the switch turns on as soon
+  // as the camera starts. Longer timeout for the same busy-machine reason.
+  await expect(page.getByTestId('sensing-switch')).toHaveAttribute('aria-checked', 'true', {
+    timeout: 15_000,
+  });
 }
