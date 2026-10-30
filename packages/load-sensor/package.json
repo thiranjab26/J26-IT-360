@@ -28,7 +28,8 @@
     "feature-spec": "tsx scripts/feature-spec.ts",
     "extract-landmarks": "tsx scripts/extract-landmarks.ts",
     "landmarks-to-features": "tsx scripts/landmarks-to-features.ts",
-    "model-parity": "tsx scripts/model-parity.ts"
+    "model-parity": "tsx scripts/model-parity.ts",
+    "daisee-to-features": "tsx scripts/daisee-to-features.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
