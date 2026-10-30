@@ -59,7 +59,9 @@ def export(model, out_dir: Path, fixture_inputs: np.ndarray, meta: dict) -> None
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("model", nargs="?", choices=("head_pose", "expression"))
+    # expression_tuned: the validation-tuned second pass (expression_tune.py); it
+    # ships to the same public/models/expression/ folder as the first run would.
+    parser.add_argument("model", nargs="?", choices=("head_pose", "expression", "expression_tuned"))
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
     common.set_seed()
@@ -96,16 +98,19 @@ def main() -> None:
         rows = np.flatnonzero(data.has_features & (data.splits == "test"))[:PARITY_ROWS]
         inputs = data.mesh_face[rows]
         meta = {
-            "model": "expression_mlp",
+            "model": f"{args.model}_mlp",
             "input": "meshInput(mesh, 'face'), float32 [batch, 1434] (src/core/features/mesh-input.ts)",
             "output": "softmax probabilities over classes",
             "classes": results["classes"],
             "training_mix": results["chosen_mix"],
             "test_rafdb": {k: results["test_raf"][k] for k in ("accuracy", "macro_f1", "n")},
         }
+        if results.get("second_pass"):
+            meta["test_use_note"] = results["test_use_note"]
     meta["feature_code_hash"] = results["feature_code_hash"]
     meta["results_file"] = f"research/c2-load/results/{args.model}.json"
-    export(model, PACKAGE / "public" / "models" / args.model.replace("_", "-"), inputs, meta)
+    folder = "head-pose" if args.model == "head_pose" else "expression"
+    export(model, PACKAGE / "public" / "models" / folder, inputs, meta)
 
 
 if __name__ == "__main__":

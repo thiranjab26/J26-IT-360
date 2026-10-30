@@ -98,6 +98,35 @@ def expression_section(r: dict) -> list[str]:
     return out
 
 
+def tuned_section(r: dict, first: dict | None) -> list[str]:
+    t, fp = r["test_raf"], r["test_ferplus_privatetest"]
+    labels = list(r["classes"])
+    confusion_figure(t["confusion"]["rows_truth_cols_pred"], labels, "Expression (tuned), RAF-DB test",
+                     FIGURES / "expression_tuned_confusion_rafdb.png")
+    out = ["## Expression, second pass (P4, tuned on validation)", "",
+           f"**Test-set use:** {r['test_use_note']}", "",
+           f"Protocol: {r['protocol']}.", "",
+           "| Mix | Hidden | Dropout | Standardise | Val macro-F1 | Val accuracy | Train acc (last) |",
+           "|---|---|---|---|---|---|---|"]
+    for tr in r["trials"]:
+        out.append(f"| {' + '.join(tr['mix'])} | {tr['hidden']} | {tr['dropout']} | {tr['standardise']} | "
+                   f"{tr['val']['macro_f1']:.3f} | {tr['val']['accuracy']:.3f} | {tr['training']['train_accuracy_last']:.3f} |")
+    c = r["chosen"]
+    out += ["", f"Chosen on validation: {' + '.join(c['mix'])}, hidden {c['hidden']}, dropout {c['dropout']}, "
+            f"standardise {c['standardise']}.", "",
+            "| Test set | n | Accuracy | Macro-F1 | Mood accuracy | Mood macro-F1 |", "|---|---|---|---|---|---|"]
+    if first:
+        f = first["test_raf"]
+        out.append(f"| RAF-DB test, first run | {f['n']} | {f['accuracy']:.3f} | {f['macro_f1']:.3f} | "
+                   f"{f['mood']['accuracy']:.3f} | {f['mood']['macro_f1']:.3f} |")
+    out += [f"| RAF-DB test, tuned | {t['n']} | {t['accuracy']:.3f} | {t['macro_f1']:.3f} | {t['mood']['accuracy']:.3f} | {t['mood']['macro_f1']:.3f} |",
+            f"| FER+ PrivateTest, tuned | {fp['n']} | {fp['accuracy']:.3f} | {fp['macro_f1']:.3f} | {fp['mood']['accuracy']:.3f} | {fp['mood']['macro_f1']:.3f} |",
+            "", "Per-class F1, RAF-DB test, tuned:", "", "| " + " | ".join(labels) + " |", "|" + "---|" * len(labels),
+            "| " + " | ".join(f"{t['f1_per_class'][k]:.3f}" for k in labels) + " |", "",
+            "![Expression confusion, tuned](figures/expression_tuned_confusion_rafdb.png)", ""]
+    return out
+
+
 def main() -> None:
     FIGURES.mkdir(parents=True, exist_ok=True)
     lines = ["# C2 trained models: results", "",
@@ -107,9 +136,12 @@ def main() -> None:
         lines += head_pose_section(hp)
     if ex:
         lines += expression_section(ex)
+    tuned = load("expression_tuned")
+    if tuned:
+        lines += tuned_section(tuned, ex)
     if not hp and not ex:
         raise SystemExit("no results yet: run head_pose.py and/or expression.py first")
-    hashes = {r["feature_code_hash"] for r in (hp, ex) if r}
+    hashes = {r["feature_code_hash"] for r in (hp, ex, tuned) if r}
     lines += [f"Feature code hash: {', '.join(sorted(hashes))}", ""]
     path = common.RESULTS / "report.md"
     path.write_text("\n".join(lines))
