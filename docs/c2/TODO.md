@@ -355,6 +355,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 **Why.** The PP1 panel's point applies here too: `boredom` (`src/core/heuristics/boredom.ts`), `engagement` and the `affect` states come from hand-picked rules. DAiSEE has people's ratings of exactly these states for webcam video of students in e-learning, which is the app's setting.
 
 **Facts (checked 30 Oct, `C:\datasets\daisee\DAiSEE`):**
+
 - 9,068 clips (8,232 `.avi`, 836 `.mp4`), 640×480, 30 fps, 10 s (300 frames; a few slightly longer): the same resolution as the app's camera.
 - Official splits are subject-disjoint: Train 70 people, Validation 22, Test 21, none shared.
 - Labels: 0–3 per state, in `Labels/{Train,Validation,Test}Labels.csv`, 8,571 clips with a label (5,358 / 1,429 / 1,784), every one with a file. Use these split files. `AllLabels.csv` disagrees with them (415 extra ids, 61 missing); not used. 497 clips have no label; not used.
@@ -363,12 +364,14 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 - The current boredom rule cannot be scored on DAiSEE: it needs 60 s and 5 min windows and a 30 s calibration, and the clips are 10 s. As with expression, the comparison with the rules can only be made in the pilot study (B).
 
 **Decisions needed 🧑 (recommendation first):**
-1. **Frame rate for extraction.** (a) 15 fps, the app's own rate, so blinks and the per-second features mean the same as in the app; about 1.36 M frames. (b) 5 fps; about 0.45 M frames, but blinks (80–500 ms) are mostly missed, so blink features would differ from the app's. Recommended: (a), *if* step 3's speed-up works; otherwise (b) and drop blink features for this model.
+
+1. **Frame rate for extraction.** (a) 15 fps, the app's own rate, so blinks and the per-second features mean the same as in the app; about 1.36 M frames. (b) 5 fps; about 0.45 M frames, but blinks (80–500 ms) are mostly missed, so blink features would differ from the app's. Recommended: (a), _if_ step 3's speed-up works; otherwise (b) and drop blink features for this model.
 2. **Label levels.** Recommended: Boredom 0 / 1 / 2–3 → `not_bored` / `possibly_bored` / `bored` (the app's own states); Engagement 0–1 / 2 / 3 → Low / Medium / High; Confusion and Frustration 0 vs ≥ 1 → absent / present (levels 2–3 are too rare to learn).
 3. **Speed: run P8 extraction in Ubuntu (WSL) with `@tensorflow/tfjs-node`** (native TensorFlow; Smart App Control does not apply in WSL). Same model files and settings as adapter A, in a separate `research/c2-load/video-extract/` package so nothing changes for the app or teammates. Also video tracking mode (`staticImageMode: false`, as the app runs), which skips the face detector between frames. Both untested here: measure on 20 clips first. Without them, CPU TF.js at about 9 frames/s would need about 14 h at 5 fps and about 42 h at 15 fps.
 4. **Model input.** Recommended: run each clip's landmarks through the app's own `FeaturePipeline` (TypeScript), so the model sees the same per-second feature vectors as the cognitive-load model and the app (one source of truth). Open point: the pipeline's z-scores need a 30 s calibration and a clip is 10 s. Options: (i) treat each person's clips in id order as one session and calibrate on the first 30 s; (ii) use raw per-second features with no per-person baseline. Recommended: (ii) first (no assumption about clip order), (i) as a second experiment if clip ids prove consecutive.
 
 **Steps (after the decisions):**
+
 - [ ] P8.1 Measure extraction speed on 20 clips for each option in decision 3; pick; record numbers here.
 - [ ] P8.2 Video extractor: decode clips, sample at the chosen rate, run adapter A's model, write landmarks + frame timestamps per clip (no pixels saved). Resumable, like `extract-landmarks`.
 - [ ] P8.3 Per-second features per clip via the TypeScript `FeaturePipeline` (decision 4); regenerate `feature_spec.json` only if a feature changes.
