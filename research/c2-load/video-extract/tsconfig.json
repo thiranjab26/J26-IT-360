@@ -1,0 +1,18 @@
+{
+  // Type-checks the extractor together with the app files it imports, inside
+  // the WSL work copy that run.sh builds (same relative layout as the repo).
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "allowImportingTsExtensions": false,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["research/c2-load/video-extract/src", "research/c2-load/video-extract/test"]
+}

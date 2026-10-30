@@ -376,7 +376,10 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 **Steps (after the decisions):**
 
 - [ ] P8.1 Measure extraction speed on 20 clips for each option in decision 3; pick; record numbers here.
-- [ ] P8.2 Video extractor: decode clips, sample at the chosen rate, run adapter A's model, write landmarks + frame timestamps per clip (no pixels saved). Resumable, like `extract-landmarks`.
+- [x] P8.2 Video extractor: decode clips, sample at the chosen rate, run adapter A's model, write landmarks + frame timestamps per clip (no pixels saved). Resumable, like `extract-landmarks`.
+  - `research/c2-load/video-extract/` (README there), run with `run.sh` in WSL: ffmpeg (`fps` filter) → raw RGB → the app's model files and `createDetector` settings, video mode (`staticImageMode: false`, detector reset per clip) → per-clip `.npy` + `.json`. Only the 8,570 labelled clips (official split files) minus the corrupt one. 4 unit tests (frame splitting, label parsing, clip listing); `tsc` strict passes.
+  - Problems met and fixed (30 Oct): tfjs-node 4.22.0 fails on Node 24 (`util.isNullOrUndefined` was removed in Node 23), so the package uses Node 22.23.4 LTS (`~/.local/node22`, checksum-verified). tfjs-node has no `Transform` kernel (`tf.image.transform`); added, mapped onto TensorFlow's `ImageProjectiveTransformV3` (`src/tfjs-node-transform.ts`). Listing 9,068 folders over `/mnt/c` took about 2.5 min per process, so the parent lists once and the workers read `clips.json`.
+  - Correctness on the first 2 clips (300 frames at 15 fps): a face in every frame; tensors flat at 1,157; tfjs-node vs TF.js `cpu` max |Δ| = 0.0003 px. Speed not measured yet (the image extraction held the CPU at 100 %): that is P8.1.
 - [ ] P8.3 Per-second features per clip via the TypeScript `FeaturePipeline` (decision 4); regenerate `feature_spec.json` only if a feature changes.
 - [ ] P8.4 Baselines: majority class, and random forest on clip summary statistics. Then a small GRU over the 10 per-second vectors. Train on Train, choose on Validation, test once on Test. Macro-F1, confusion matrices, per state.
 - [ ] P8.5 Export to TF.js + parity check (as P5). Display-only in the demo panels (owner rule: nothing new in `LoadStateEvent` until C02's part is done and C01/C03/C04 agree).

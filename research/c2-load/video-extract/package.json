@@ -1,0 +1,27 @@
+{
+  "name": "c2-video-extract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "C02 P8: offline landmark extraction from DAiSEE videos with the app's own FaceMesh model. Runs in WSL only; see README.md.",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "@mediapipe/face_detection": "0.4.1646425229",
+    "@mediapipe/face_mesh": "0.4.1633559619",
+    "@tensorflow-models/face-detection": "1.0.3",
+    "@tensorflow-models/face-landmarks-detection": "1.0.6",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
+    "@tensorflow/tfjs-converter": "4.22.0",
+    "@tensorflow/tfjs-core": "4.22.0",
+    "@tensorflow/tfjs-node": "4.22.0"
+  },
+  "devDependencies": {
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "4.22.0",
+    "@types/node": "22.20.4",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}
