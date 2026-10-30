@@ -291,7 +291,8 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 
 ### P1. Landmark extraction (offline, never shipped)
 
-- [ ] Extract landmarks for every dataset to `C:\datasets\landmarks\<dataset>.npy` + `.csv` + `.summary.json`. No images are copied or saved. **Running since 30 Oct** (log: `C:\datasets\landmarks\extract.log`).
+- [x] Extract landmarks for every dataset to `C:\datasets\landmarks\<dataset>.npy` + `.csv` + `.summary.json`. No images are copied or saved. **Running since 30 Oct** (log: `C:\datasets\landmarks\extract.log`).
+  - Done 30 Oct 13:11 to 21:34, all five exit 0, 267,469 images, compute about 8 h 20 min.
   - Decided 30 Oct (owner): use the app's own model (adapter A), not MediaPipe FaceLandmarker in Python, so the reported accuracy is measured on the same landmarks the app produces. (MediaPipe 1.2.0 also no longer has the legacy `mp.solutions.face_mesh`.)
   - `pnpm extract-landmarks <dataset>` (`scripts/extract-landmarks.ts` + `-lib.ts`, unit-tested). Same model files and `createDetector` settings as `TfjsFaceMeshProvider`, models read from disk, `staticImageMode: true` (images are independent). Worker processes (default 12), resumable: rerun the same command after a stop.
   - Runs on the TF.js **cpu** backend in Node (about 0.39 s per image per core). WASM cannot run this model: see the A3 item on the WASM fallback. New dev dependencies, never shipped: `jpeg-js` 0.4.4 (pure-JS JPEG decoder) and `@tensorflow/tfjs-backend-cpu` 4.22.0 (already in the tree via the WebGL backend).
@@ -299,7 +300,8 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
   - Crop margin trial (first 240 items, found rate): RAF-DB 97.5 % / 97.9 % / 97.1 % and ExpW 94.2 % / 94.2 % / 94.6 % at margin 0.10 / 0.25 / 0.40. Within one image of each other, so 0.25 stays.
   - The Kaggle `train_test_split_ALL.csv` also puts 1,600 AFLW2000 images in "train". Ignored: AFLW2000 is test-only under the standard protocol. 300W-LP keeps that file's train/val split. Checked 30 Oct: it is subject-disjoint (2,227 train vs 557 val subjects, 0 shared; 3,271 vs 566 source photos, 0 shared; flipped copies stay with their original), so validation measures unseen people.
   - Decided 30 Oct (owner): use the full 300W-LP (122,450 images incl. the flipped copies), the standard protocol, rather than the 61k originals to finish about 2 h sooner.
-- [ ] Report the face-found rate per dataset (from the summaries). Trial on the first 240 items: RAF-DB 97.9 %, ExpW 94.2 %, FER2013 91.3 %, AFLW2000 88.8 %, 300W-LP 79.6 %. 300W-LP and AFLW include near-profile poses, where FaceMesh also fails in the app. P3 must report pose error only on faces it found, and say how many large-pose faces that drops.
+- [x] Report the face-found rate per dataset (from the summaries). Trial on the first 240 items: RAF-DB 97.9 %, ExpW 94.2 %, FER2013 91.3 %, AFLW2000 88.8 %, 300W-LP 79.6 %. 300W-LP and AFLW include near-profile poses, where FaceMesh also fails in the app. P3 must report pose error only on faces it found, and say how many large-pose faces that drops.
+  - Final, 30 Oct: RAF-DB 14,886 / 15,339 (97.0 %), FER2013 32,116 / 35,887 (89.5 %), ExpW 81,277 / 91,793 (88.5 %), AFLW2000 1,760 / 2,000 (88.0 %), 300W-LP 94,458 / 122,450 (77.1 %).
 - [ ] Parity: the app runs this model on WebGL, extraction on cpu. Compare landmarks for a handful of dataset images in the browser vs `extract-landmarks`; expect float-rounding differences only.
   - 1 image so far (AFLW2000 `image00002.jpg`, Chromium WebGL vs `aflw2000.npy` row 0): mean |Δ| 5.5e-4, max 3.3e-3 (normalised; 0.25 px mean, 1.5 px max on 450 px). Larger than WASM vs WebGL on the same image (max 4.3e-4), so most of it is probably the JPEG decoder (jpeg-js vs Chrome), not the backend. Not confirmed; needs more images.
 
@@ -324,32 +326,35 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 
 ### P4. Expression model [FR3]
 
-- [ ] Train on RAF-DB train (+ ExpW, + FER+ if P1 kept it); test on the RAF-DB official test split
+- [x] Train on RAF-DB train (+ ExpW, + FER+ if P1 kept it); test on the RAF-DB official test split
   - First run, 30 Oct (`expression.py`, `results/expression.json`): validation macro-F1 by mix RAF 0.390 / RAF+ExpW 0.320 / RAF+ExpW+FER+ 0.223, so RAF alone was chosen (the other sets hurt, probably because their photos look different). **RAF-DB test** (2,983 of 3,068 faces found): accuracy **0.542**, macro-F1 **0.398**; per class F1 happy 0.76, surprise 0.60, neutral 0.59, anger 0.34, fear 0.24, disgust 0.18, sad 0.08. Mood (3 classes) accuracy 0.651, macro-F1 0.634. FER+ PrivateTest: accuracy 0.539, macro-F1 0.360, mood accuracy 0.642. Found faces: RAF-DB 97.0 %, ExpW 88.5 %, FER2013 89.5 %.
   - The model underfitted (training accuracy 0.46, no higher than validation). Owner decision: tune on validation only, then test once more and report both test numbers (`expression_tune.py`, `results/expression_tuned.json`).
   - Second pass, 30 Oct (`expression_tune.py`): 12-setting grid on RAF-DB train (hidden 256-128 / 512-256 / 512-256-128 × dropout 0.1 / 0.3 × standardise no / yes), chosen on validation macro-F1 only. Standardising the inputs was the fix: validation macro-F1 0.546–0.578 with it, 0.330–0.512 without. Best: hidden 256-128, dropout 0.3, standardised (validation 0.578); the same setting with + ExpW scored lower (0.525), so RAF alone again. **RAF-DB test** (same 2,983 faces): accuracy **0.654**, macro-F1 **0.570** (first run 0.542 / 0.398); per-class F1 happy 0.79, surprise 0.71, neutral 0.65, anger 0.54, sad 0.51, fear 0.42, disgust 0.38. Mood accuracy 0.719, macro-F1 0.715. FER+ PrivateTest: accuracy 0.530, macro-F1 0.432. **The RAF-DB test set has been used twice**; the report (`report.py`) states this and gives both runs.
-- [ ] Report accuracy, **macro-F1** (Fear and Disgust are small classes) and the confusion matrix
+- [x] Report accuracy, **macro-F1** (Fear and Disgust are small classes) and the confusion matrix
 - [ ] Compare against the current hand-picked expression rules on the same test images
   - Not possible as stated: the rules in `src/demo/mood.ts` score each learner against their own 30 s calibration baseline (z-scores), and single dataset photos have no baseline. Recorded in `expression.py`'s docstring. 🧑 Decide what to say in the report: the comparison can only be made in the pilot study (B), on real sessions.
-- [ ] Mood = Positive / Neutral / Negative, grouped from the 7 expressions. Report its accuracy too.
+- [x] Mood = Positive / Neutral / Negative, grouped from the 7 expressions. Report its accuracy too.
   - Decided 30 Oct (owner): Happy → Positive; Neutral and **Surprise** → Neutral (surprise can be good or bad); Sad/Anger/Fear/Disgust → Negative. `expression.py` reports mood accuracy, macro-F1 and confusion from the 7-class predictions.
   - Decided 30 Oct (owner): the trained expression model goes into the **demo mood panel only** (Signals tab), replacing the hand-picked happy/surprised/sad/frustrated rules, with a switch back to the rules for the ablation. Nothing in the event stream changes (no sign-off needed).
 
 ### P5. Ship in the browser
 
-- [ ] Export both models to TF.js under `public/models/` (same-origin, invariant 3); Python/JS parity within 1e-4
+- [x] Export both models to TF.js under `public/models/` (same-origin, invariant 3); Python/JS parity within 1e-4
+  - Both exported 30 Oct with parity PASS (expression 1.79e-7, head pose 7.63e-6). Head pose not wired (P3 decision).
   - Browser side ready: `MeshModel` (`src/core/classifier/mesh-model.ts`): lazy `loadGraphModel` from a same-origin URL (`resolveSameOriginAsset`), input from the same `meshInput()` as training, output length checked at load, every tensor disposed (unit-tested with doubles). Smoke model checked in Chromium (dev server, temporary copy, since removed): max |browser − Keras| = 2.35e-6 on WebGL and on WASM.
   - Tooling ready: `python export.py head_pose|expression` → `public/models/head-pose/` or `expression/` (graph model + `meta.json` with input, output, classes and test numbers from the results file) and a parity fixture in `research/c2-load/results/parity/` (gitignored: derived from licensed data); then `pnpm model-parity <dir> <fixture>`. Refuses to export a dry-run result.
   - Expression exported 30 Oct (`python export.py expression_tuned` → `public/models/expression/`, 1.6 MB, standardisation built in as the first layer). Parity on 32 RAF-DB test rows: max |TF.js − Keras| = 1.79e-7 (tolerance 1e-4), PASS. Owner decision, 30 Oct: RAF-DB-derived weights stay local only (licence: non-commercial research). `public/models/expression/` and `head-pose/` are gitignored; a clone without them falls back to the hand-picked rules.
-- [ ] Replace the heuristics behind a switch; the old rules stay selectable for the ablation [FR3]
+- [x] Replace the heuristics behind a switch; the old rules stay selectable for the ablation [FR3]
   - Expression → mood panel wired (30 Oct, waits for the trained model file): `MoodEstimator.setExpressionSource('model' | 'rules')`, demo switch "Trained expression model" (`settings.sensing.expressionModel`, default on). In model mode happy / surprised / frustrated (= anger + disgust) / sad come from the model's probabilities averaged over the same frames and 4 s window, shown at ≥ `MOOD_CONFIG.modelShow` (0.5, **(tune)**); drowsy, confused, focused and distracted keep their rules (not among the 7 classes). If `public/models/expression/` is missing, the panel says "hand-picked rules" and uses them. 5 unit tests. The model is loaded after the face model, on the same backend.
   - Head pose: not wired (owner decision 30 Oct, see P3).
 - [ ] Wrap inference in `tf.tidy`; re-run bench (NFR1 ≤ 300 ms) and the privacy e2e test
-- [ ] Regenerate `feature_spec.json` if any feature changed
+- [x] Regenerate `feature_spec.json` if any feature changed
+  - Nothing to regenerate: no feature code changed (`feature_spec.json` code hash unchanged).
 
 ### P6. Evidence for the report
 
-- [ ] One script regenerates every P3/P4 table and figure from the landmark files
+- [x] One script regenerates every P3/P4 table and figure from the landmark files
+  - Done 30 Oct: `report.py` writes `results/report.md` and the confusion figures from the results JSON files.
 - [ ] Short write-up: datasets, protocol, numbers, limitations (e.g. posed vs. natural faces, webcam vs. photo)
 
 ### P7. Event schema 🧑
