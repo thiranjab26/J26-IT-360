@@ -370,6 +370,8 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 3. **Speed: run P8 extraction in Ubuntu (WSL) with `@tensorflow/tfjs-node`** (native TensorFlow; Smart App Control does not apply in WSL). Same model files and settings as adapter A, in a separate `research/c2-load/video-extract/` package so nothing changes for the app or teammates. Also video tracking mode (`staticImageMode: false`, as the app runs), which skips the face detector between frames. Both untested here: measure on 20 clips first. Without them, CPU TF.js at about 9 frames/s would need about 14 h at 5 fps and about 42 h at 15 fps.
 4. **Model input.** Recommended: run each clip's landmarks through the app's own `FeaturePipeline` (TypeScript), so the model sees the same per-second feature vectors as the cognitive-load model and the app (one source of truth). Open point: the pipeline's z-scores need a 30 s calibration and a clip is 10 s. Options: (i) treat each person's clips in id order as one session and calibrate on the first 30 s; (ii) use raw per-second features with no per-person baseline. Recommended: (ii) first (no assumption about clip order), (i) as a second experiment if clip ids prove consecutive.
 
+**Decided 30 Oct (owner), all as recommended:** 15 fps if the speed-up makes it practical, else 5 fps without blink features; labels grouped as in decision 2; build and measure the WSL `tfjs-node` extractor on 20 clips first; raw per-second features first, per-person session calibration later as an experiment.
+
 **Steps (after the decisions):**
 
 - [ ] P8.1 Measure extraction speed on 20 clips for each option in decision 3; pick; record numbers here.
