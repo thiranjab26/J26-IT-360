@@ -3,6 +3,21 @@ import { MESH_INPUT_LENGTH, meshInput, type MeshFrame } from '../features/mesh-i
 import { resolveSameOriginAsset } from '../model-loader.js';
 
 /**
+ * Output order of the expression model. Must equal `CLASSES` in
+ * research/c2-load/training/expression.py (a unit test reads that file).
+ */
+export const EXPRESSION_CLASSES = [
+  'neutral',
+  'happy',
+  'sad',
+  'surprise',
+  'fear',
+  'disgust',
+  'anger',
+] as const;
+export type ExpressionClass = (typeof EXPRESSION_CLASSES)[number];
+
+/**
  * Self-hosted trained models over the face mesh (TODO P3/P4/P5), written by
  * research/c2-load/training/export.py. Paths are relative to `modelBaseUrl`.
  */

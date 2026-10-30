@@ -24,6 +24,11 @@ export interface DemoSettings {
     readonly featurePoints: boolean;
     /** FR3 ablation switch. Changing it restarts calibration. */
     readonly expressionFeatures: boolean;
+    /**
+     * Mood panel: expression moods from the trained model (TODO P5); off = the
+     * hand-picked rules (ablation). Falls back to the rules if the model is missing.
+     */
+    readonly expressionModel: boolean;
     /** Show the apparent-mood card on the Signals tab. Display only. */
     readonly showMood: boolean;
     /** Moods switched off: never shown, the next matching mood shows instead. */
@@ -66,6 +71,7 @@ export const DEFAULT_SETTINGS: DemoSettings = {
     targetFps: 15,
     featurePoints: false,
     expressionFeatures: true,
+    expressionModel: true,
     showMood: true,
     hiddenMoods: [],
   },
@@ -103,6 +109,7 @@ export function sanitizeSettings(raw: unknown): DemoSettings {
       targetFps: num(s.targetFps, d.sensing.targetFps, LIMITS.targetFps),
       featurePoints: bool(s.featurePoints, d.sensing.featurePoints),
       expressionFeatures: bool(s.expressionFeatures, d.sensing.expressionFeatures),
+      expressionModel: bool(s.expressionModel, d.sensing.expressionModel),
       showMood: bool(s.showMood, d.sensing.showMood),
       hiddenMoods: moodList(s.hiddenMoods),
     },

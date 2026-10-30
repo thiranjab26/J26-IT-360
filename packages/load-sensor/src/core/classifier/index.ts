@@ -15,4 +15,10 @@ export {
   type SmoothedLoad,
 } from './smoothing.js';
 export { LOAD_CLASSES, type LoadClassifier, type LoadProbabilities } from './types.js';
-export { MESH_MODELS, MeshModel, type MeshModelSpec } from './mesh-model.js';
+export {
+  EXPRESSION_CLASSES,
+  MESH_MODELS,
+  MeshModel,
+  type ExpressionClass,
+  type MeshModelSpec,
+} from './mesh-model.js';

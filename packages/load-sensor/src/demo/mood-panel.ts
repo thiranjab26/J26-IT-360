@@ -86,7 +86,7 @@ const LEGEND: readonly Mood[] = [
 ];
 
 interface EvidenceRow {
-  readonly key: keyof MoodEvidence;
+  readonly key: Exclude<keyof MoodEvidence, 'model'>;
   readonly label: string;
   /** 'z' = centred bar over ±3 (baseline in the middle); 'share' = 0..100 %. */
   readonly kind: 'z' | 'share';
@@ -224,9 +224,11 @@ export class MoodPanel {
       r.strength >= 0.75 ? 'strong' : r.strength >= 0.4 ? 'clear' : 'slight';
     this.#status.textContent = !r.expression
       ? 'Expression features off (FR3): eyes and gaze only'
-      : r.calibrating
-        ? 'Learning your neutral face… expression moods start after the baseline'
-        : 'Live';
+      : r.source === 'model'
+        ? 'Live · expressions from the trained model'
+        : r.calibrating
+          ? 'Learning your neutral face… expression moods start after the baseline'
+          : 'Live · expressions from hand-picked rules';
     this.#status.dataset.tone = !r.expression || r.calibrating ? 'warn' : 'live';
 
     for (const row of EVIDENCE) {

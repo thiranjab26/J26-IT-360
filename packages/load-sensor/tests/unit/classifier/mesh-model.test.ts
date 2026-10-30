@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { MESH_MODELS, MeshModel } from '../../../src/core/classifier/mesh-model.js';
+import {
+  EXPRESSION_CLASSES,
+  MESH_MODELS,
+  MeshModel,
+} from '../../../src/core/classifier/mesh-model.js';
 import { MESH_INPUT_LENGTH } from '../../../src/core/features/mesh-input.js';
 import { CrossOriginAssetError } from '../../../src/core/model-loader.js';
 
@@ -94,6 +98,17 @@ describe('MeshModel (TODO P5: trained mesh models in the browser)', () => {
     mocks.setOutputLength(5);
     await expect(MeshModel.load(MESH_MODELS.expression)).rejects.toThrow(/5 outputs, expected 7/);
     expect(mocks.model.dispose).toHaveBeenCalled();
+  });
+
+  it('expression classes are in the same order as the Python training code', async () => {
+    const { readFile } = await import('node:fs/promises');
+    const py = await readFile(
+      new URL('../../../../../research/c2-load/training/expression.py', import.meta.url),
+      'utf8',
+    );
+    const tuple = /^CLASSES = \(([^)]*)\)/m.exec(py)?.[1] ?? '';
+    const names = [...tuple.matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+    expect(names).toEqual([...EXPRESSION_CLASSES]);
   });
 
   it('returns null for a degenerate mesh without running the model', async () => {

@@ -19,6 +19,7 @@
 
 import './styles.css';
 import { Camera, type CameraStatus } from '../core/camera/index.js';
+import { MESH_MODELS, MeshModel } from '../core/classifier/index.js';
 import {
   LandmarkTracker,
   TfjsFaceMeshProvider,
@@ -328,8 +329,37 @@ function mount(root: HTMLElement): void {
   expressionSwitch.root.title =
     'FR3 ablation: off zeroes mouth-open and lip-thickness. Changing it restarts calibration.';
   signals.toolbar.prepend(expressionSwitch.root);
+  const expressionModelSwitch = toggle(
+    'Trained expression model',
+    'toggle-expression-model',
+    settings.value.sensing.expressionModel,
+  );
+  expressionModelSwitch.root.title =
+    'Mood panel: happy / surprised / frustrated / sad from the trained model. Off = hand-picked rules (ablation).';
+  signals.toolbar.prepend(expressionModelSwitch.root);
   // Apparent mood (display only; not in the event stream or the model input).
   const mood = new MoodEstimator(settings.value.sensing.expressionFeatures);
+  mood.setExpressionSource(settings.value.sensing.expressionModel ? 'model' : 'rules');
+  // Trained expression model (TODO P5), loaded after the face model; null until
+  // then, or for good if its files are missing (the mood then uses the rules).
+  let expressionModel: MeshModel | null = null;
+  let expressionModelLoad: Promise<void> | null = null;
+  function loadExpressionModel(): void {
+    expressionModelLoad ??= MeshModel.load(
+      MESH_MODELS.expression,
+      `${import.meta.env.BASE_URL}models/`,
+    ).then(
+      (model) => {
+        expressionModel = model;
+      },
+      (error: unknown) => {
+        console.warn(
+          'Trained expression model not available; the mood panel uses the rules.',
+          error,
+        );
+      },
+    );
+  }
   const moodPanel = new MoodPanel();
   signals.mountAfterKpis(moodPanel.element);
   moodPanel.element.hidden = !settings.value.sensing.showMood;
@@ -576,6 +606,9 @@ function mount(root: HTMLElement): void {
   expressionSwitch.input.addEventListener('change', () => {
     settings.update({ sensing: { expressionFeatures: expressionSwitch.input.checked } });
   });
+  expressionModelSwitch.input.addEventListener('change', () => {
+    settings.update({ sensing: { expressionModel: expressionModelSwitch.input.checked } });
+  });
 
   /** Starts a fresh baseline: after a feature-definition change, or on request. */
   function recalibrate(useExpressionFeatures: boolean): void {
@@ -604,6 +637,8 @@ function mount(root: HTMLElement): void {
     overlay.featurePoints = s.sensing.featurePoints;
     tracker.targetFps = s.sensing.targetFps;
     moodPanel.element.hidden = !s.sensing.showMood;
+    expressionModelSwitch.input.checked = s.sensing.expressionModel;
+    mood.setExpressionSource(s.sensing.expressionModel ? 'model' : 'rules');
     mood.setHidden(s.sensing.hiddenMoods);
     moodPanel.setHidden(s.sensing.hiddenMoods);
     if (s.sensing.expressionFeatures !== prev.sensing.expressionFeatures) {
@@ -698,6 +733,10 @@ function mount(root: HTMLElement): void {
       aspect,
       signals: landmarks ? latestSignals : null,
       eyesClosed: latestEyesClosed,
+      expression:
+        landmarks && expressionModel && settings.value.sensing.expressionModel
+          ? expressionModel.predict({ landmarks, aspect })
+          : null,
     });
     recorder?.push(sample.tMs, landmarks, aspect);
   });
@@ -831,6 +870,8 @@ function mount(root: HTMLElement): void {
       try {
         await provider.init();
         modelState = 'ready';
+        // After init: the expression model runs on the backend the face model chose.
+        loadExpressionModel();
       } catch (error) {
         modelState = 'failed';
         modelFailure = error instanceof UnsupportedBackendError ? 'unsupported' : 'error';

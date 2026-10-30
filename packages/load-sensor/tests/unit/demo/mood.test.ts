@@ -2,6 +2,7 @@ import { MEDIAPIPE_FACE_MESH_KEYPOINTS_BY_CONTOUR as CONTOURS } from '@tensorflo
 import { describe, expect, it } from 'vitest';
 import { computeFrameSignals } from '../../../src/core/features/frame-signals.js';
 import { FEATURE_COUNT, FEATURE_INDEX as I } from '../../../src/core/features/spec.js';
+import { EXPRESSION_CLASSES } from '../../../src/core/classifier/mesh-model.js';
 import type { NormalisedSecond } from '../../../src/core/window/index.js';
 import {
   LEFT_MOUTH_CORNER,
@@ -260,5 +261,71 @@ describe('mood estimator', () => {
       m.pushSecond(second(at, { phase: 'calibrating' }));
     }
     expect(hold(m, at, 8, { smile: 0.12, mouthWidth: 1.1 }).mood).not.toBe('happy');
+  });
+});
+
+describe('mood estimator with the trained expression model (TODO P5)', () => {
+  /** Model output in EXPRESSION_CLASSES order: neutral, happy, sad, surprise, fear, disgust, anger. */
+  const probs = (p: Partial<Record<(typeof EXPRESSION_CLASSES)[number], number>>): Float32Array =>
+    Float32Array.from(EXPRESSION_CLASSES, (c) => p[c] ?? 0);
+
+  /** Like hold(), with a model output on every frame. A neutral face, so the rules alone see nothing. */
+  function holdModel(m: MoodEstimator, from: number, seconds: number, expression: Float32Array) {
+    let t = from;
+    for (let k = 0; k < seconds; k += 1, t += 1) {
+      for (let f = 0; f < 15; f += 1) m.pushFrame({ ...frame({}), expression });
+      m.pushSecond(second(t));
+    }
+    return { reading: m.reading, t };
+  }
+
+  it("shows the model's expression mood once it leads for the confirm time", () => {
+    const { m, t } = calibrated();
+    m.setExpressionSource('model');
+    const { reading } = holdModel(m, t, 6, probs({ happy: 0.8, neutral: 0.2 }));
+    expect(reading?.mood).toBe('happy');
+    expect(reading?.source).toBe('model');
+    expect(reading?.evidence.model?.happy).toBeCloseTo(0.8);
+  });
+
+  it('maps surprise, anger + disgust and sad to their moods', () => {
+    for (const [p, mood] of [
+      [probs({ surprise: 0.7, neutral: 0.3 }), 'surprised'],
+      [probs({ anger: 0.3, disgust: 0.3, neutral: 0.4 }), 'frustrated'],
+      [probs({ sad: 0.6, neutral: 0.4 }), 'sad'],
+    ] as const) {
+      const { m, t } = calibrated();
+      m.setExpressionSource('model');
+      expect(holdModel(m, t, 6, p).reading?.mood).toBe(mood);
+    }
+  });
+
+  it('stays neutral when no expression reaches the threshold, and fear has no mood', () => {
+    const { m, t } = calibrated();
+    m.setExpressionSource('model');
+    const r = holdModel(m, t, 6, probs({ fear: 0.9, neutral: 0.1 })).reading;
+    expect(r?.mood).toBe('neutral');
+    expect(holdModel(m, t + 6, 6, probs({ happy: 0.4, neutral: 0.6 })).reading?.mood).toBe(
+      'neutral',
+    );
+  });
+
+  it('uses the rules when set to rules (ablation) or when no model output arrives', () => {
+    const { m, t } = calibrated();
+    // Source 'rules': a model output saying happy is ignored on a neutral face.
+    expect(holdModel(m, t, 6, probs({ happy: 0.9 })).reading?.mood).not.toBe('happy');
+    expect(m.reading?.source).toBe('rules');
+    // Source 'model' but no model loaded: the rules still work.
+    m.setExpressionSource('model');
+    const r = hold(m, t + 6, 8, { smile: 0.12, mouthWidth: 1.1 });
+    expect(r.mood).toBe('happy');
+    expect(m.reading?.source).toBe('rules');
+  });
+
+  it('is off with the FR3 expression switch', () => {
+    const m = new MoodEstimator(false);
+    m.setExpressionSource('model');
+    for (let t = 0; t < 20; t += 1) m.pushSecond(second(t, { phase: 'calibrating' }));
+    expect(holdModel(m, 20, 6, probs({ happy: 0.9 })).reading?.mood).not.toBe('happy');
   });
 });

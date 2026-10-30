@@ -2,6 +2,7 @@ import { FEATURE_INDEX as I } from '../core/features/spec.js';
 import type { FrameSignals } from '../core/features/frame-signals.js';
 import { midpoint, point, type FaceMesh } from '../core/features/geometry.js';
 import { EngagementEstimator, HEURISTIC_CONFIG } from '../core/heuristics/index.js';
+import { EXPRESSION_CLASSES, type ExpressionClass } from '../core/classifier/mesh-model.js';
 import { Hysteresis } from '../core/classifier/smoothing.js';
 import type { NormalisedSecond } from '../core/window/index.js';
 
@@ -48,6 +49,17 @@ import type { NormalisedSecond } from '../core/window/index.js';
  * A mood that is showing needs less evidence to stay than it needed to start
  * (MOOD_CONFIG.keep), so a reading near a threshold does not flip back and
  * forth.
+ *
+ * Trained model (TODO P4/P5, the PP1 panel's request): with the expression
+ * source set to 'model' and the model loaded, happy / surprised / frustrated /
+ * sad come from the trained expression model (src/core/classifier/mesh-model.ts)
+ * instead of the z-score rules: its class probabilities are averaged over the
+ * same frames and window, and a mood shows when its probability reaches
+ * MOOD_CONFIG.modelShow. frustrated = anger + disgust (brows down, lips
+ * pressed or raised: the closest of the 7 classes). Fear has no mood here.
+ * drowsy, confused, focused and distracted are not expressions of those 7
+ * classes and keep their rules. Source 'rules' is the ablation; if the model
+ * is missing the rules are used.
  */
 
 export type Mood =
@@ -91,6 +103,13 @@ export const MOOD_CONFIG = Object.freeze({
   furrowZ: 1.5,
   pressZ: 1.5,
   confusedRaiseZ: 2,
+  /**
+   * Trained model: mean class probability over the expression window needed
+   * to show an expression mood. 0.5 means the model puts more weight on that
+   * expression than on all others together. The keep factor applies as for
+   * the rules (0.35 to stay). (tune) on pilot data.
+   */
+  modelShow: 0.5,
   /**
    * While a mood is showing, its thresholds are multiplied by this (a Schmitt
    * trigger): it stays until the evidence falls clearly below the entry level.
@@ -168,7 +187,12 @@ export interface MoodFrame {
   > | null;
   /** Eyes closed in this frame (blink detector); such frames are skipped. */
   readonly eyesClosed?: boolean;
+  /** Trained expression model output for this frame, in EXPRESSION_CLASSES order; null/absent if not run. */
+  readonly expression?: Float32Array | null;
 }
+
+/** Where the four expression moods come from. */
+export type ExpressionSource = 'model' | 'rules';
 
 /** Face measures the mood scores against its own baseline, all in IOD. */
 const MEASURES = ['lift', 'width', 'browRaise', 'browGap', 'lipThick', 'mouthOpen'] as const;
@@ -189,6 +213,8 @@ export interface MoodEvidence {
   readonly tiredEvents: number;
   /** Engagement score over the last 10 s (0..1). */
   readonly onScreen: number | null;
+  /** Trained model: mean class probabilities over the expression window; null when the rules are used. */
+  readonly model: Readonly<Record<ExpressionClass, number>> | null;
 }
 
 export interface MoodReading {
@@ -202,6 +228,8 @@ export interface MoodReading {
   readonly calibrating: boolean;
   /** Expression rules are switched on (FR3). */
   readonly expression: boolean;
+  /** Where happy / surprised / frustrated / sad came from this second. */
+  readonly source: ExpressionSource;
 }
 
 export interface MoodSegment {
@@ -215,6 +243,8 @@ interface SecondRow {
   readonly valid: boolean;
   /** Mean face measures over the usable frames of this second; null if none. */
   readonly m: Measures | null;
+  /** Mean trained-model probabilities over the usable frames of this second; null if none. */
+  readonly p: Float32Array | null;
   readonly closed: number;
   readonly tired: number;
   readonly engagement: number;
@@ -222,7 +252,9 @@ interface SecondRow {
 
 export class MoodEstimator {
   #expression: boolean;
+  #source: ExpressionSource = 'rules';
   #frames: Measures[] = [];
+  #probFrames: Float32Array[] = [];
   #base: Measures[] = [];
   #baseline: { mid: Measures; sd: Measures } | null = null;
   #lastPhase: NormalisedSecond['phase'] | null = null;
@@ -255,6 +287,16 @@ export class MoodEstimator {
   }
 
   /**
+   * Trained model or hand-picked rules for the expression moods (ablation
+   * switch). The baseline is kept; only the shown mood restarts.
+   */
+  setExpressionSource(source: ExpressionSource): void {
+    if (source === this.#source) return;
+    this.#source = source;
+    this.#gate = new Hysteresis<Mood>(MOOD_CONFIG.confirm);
+  }
+
+  /**
    * Moods switched off in the admin panel: their rule is skipped, so the next
    * matching rule wins (at worst "neutral"). "no-face" cannot be hidden.
    * A hidden mood that is showing now is replaced on the next second, without
@@ -274,6 +316,11 @@ export class MoodEstimator {
     if (Math.abs(s.yaw) > MOOD_CONFIG.maxYawDeg || Math.abs(s.pitch) > MOOD_CONFIG.maxPitchDeg) {
       return;
     }
+    // Same usable frames as the rules (face, eyes open, head roughly frontal).
+    const p = f.expression;
+    if (p?.length === EXPRESSION_CLASSES.length && p.every(Number.isFinite)) {
+      this.#probFrames.push(p);
+    }
     const mesh = { landmarks: f.landmarks, aspect: f.aspect };
     const m: Measures = {
       lift: mouthCornerLift(mesh, s.iod),
@@ -290,6 +337,8 @@ export class MoodEstimator {
   pushSecond(s: NormalisedSecond): MoodReading {
     const m = this.#frames.length > 0 ? meanMeasures(this.#frames) : null;
     this.#frames = [];
+    const p = this.#probFrames.length > 0 ? meanVectors(this.#probFrames) : null;
+    this.#probFrames = [];
 
     // Face baseline: the same calibration seconds as the pipeline's own baseline.
     if (s.phase === 'calibrating') {
@@ -309,6 +358,7 @@ export class MoodEstimator {
       startMs: s.startMs,
       valid: s.valid,
       m,
+      p,
       closed: s.raw[I.eyes_closed_fraction] ?? 0,
       tired: a.longClosures + a.yawns + a.nods,
       engagement: EngagementEstimator.secondScore(s),
@@ -320,7 +370,7 @@ export class MoodEstimator {
     );
     while (this.#rows.length > keep) this.#rows.shift();
 
-    const { mood, strength, evidence } = this.#classify(s.valid);
+    const { mood, strength, evidence, source } = this.#classify(s.valid);
     const shown = this.#gate.update(mood);
     const endMs = s.startMs + 1000;
     if (shown !== this.#shown) {
@@ -342,12 +392,14 @@ export class MoodEstimator {
       evidence,
       calibrating: this.#expression && !this.#zReady(),
       expression: this.#expression,
+      source,
     };
     return this.#reading;
   }
 
   reset(): void {
     this.#frames = [];
+    this.#probFrames = [];
     this.#base = [];
     this.#baseline = null;
     this.#lastPhase = null;
@@ -362,7 +414,12 @@ export class MoodEstimator {
     return this.#baseline !== null;
   }
 
-  #classify(valid: boolean): { mood: Mood; strength: number; evidence: MoodEvidence } {
+  #classify(valid: boolean): {
+    mood: Mood;
+    strength: number;
+    evidence: MoodEvidence;
+    source: ExpressionSource;
+  } {
     const c = MOOD_CONFIG;
     const drowsyRows = this.#rows.slice(-c.drowsyWindowSeconds).filter((r) => r.valid);
     const eyesClosed = drowsyRows.length > 0 ? mean(drowsyRows.map((r) => r.closed)) : null;
@@ -378,6 +435,15 @@ export class MoodEstimator {
     // Mean of a measure over the expression window, as z against the baseline.
     const z = (k: Measure, sign = 1): number | null =>
       useExpr ? (sign * (mean(recent.map((r) => r[k])) - b.mid[k])) / b.sd[k] : null;
+    // Trained model: needs no baseline, only probabilities in the window.
+    const recentP = this.#rows
+      .slice(-c.expressionWindowSeconds)
+      .flatMap((r) => (r.valid && r.p ? [r.p] : []));
+    const probs =
+      this.#expression && this.#source === 'model' && recentP.length > 0
+        ? meanVectors(recentP)
+        : null;
+    const source: ExpressionSource = probs ? 'model' : 'rules';
     const evidence: MoodEvidence = {
       smile: z('lift'),
       mouthWidth: z('width'),
@@ -388,9 +454,15 @@ export class MoodEstimator {
       eyesClosed,
       tiredEvents,
       onScreen,
+      model: probs
+        ? (Object.fromEntries(EXPRESSION_CLASSES.map((name, i) => [name, probs[i] ?? 0])) as Record<
+            ExpressionClass,
+            number
+          >)
+        : null,
     };
 
-    if (!valid) return { mood: 'no-face', strength: 1, evidence };
+    if (!valid) return { mood: 'no-face', strength: 1, evidence, source };
     // Threshold scale: the mood already showing needs less to stay (MOOD_CONFIG.keep).
     const k = (mood: Mood): number => (this.#shown === mood ? c.keep : 1);
     const on = (mood: Mood): boolean => !this.#hidden.has(mood);
@@ -407,30 +479,55 @@ export class MoodEstimator {
         mood: 'drowsy',
         strength: Math.max(byClosed, over(tiredEvents, c.drowsyEvents)),
         evidence,
+        source,
       };
     }
     const e = evidence;
-    if (on('happy') && e.smile !== null && e.mouthWidth !== null) {
-      if (e.smile >= c.smileZ * k('happy') && e.mouthWidth >= c.smileWidthZ * k('happy')) {
-        return { mood: 'happy', strength: over(e.smile, c.smileZ), evidence };
+    const pm = evidence.model;
+    if (pm) {
+      // Trained model, same order as the rules below.
+      const expressionMoods: readonly [Mood, number][] = [
+        ['happy', pm.happy],
+        ['surprised', pm.surprise],
+        ['frustrated', pm.anger + pm.disgust],
+        ['sad', pm.sad],
+      ];
+      for (const [mood, p] of expressionMoods) {
+        if (on(mood) && p >= c.modelShow * k(mood)) {
+          return { mood, strength: over(p, c.modelShow), evidence, source };
+        }
       }
-    }
-    if (on('surprised') && e.browRaise !== null && e.mouthOpen !== null) {
-      if (
-        e.browRaise >= c.surpriseBrowZ * k('surprised') &&
-        e.mouthOpen >= c.surpriseMouthZ * k('surprised')
-      ) {
-        return { mood: 'surprised', strength: over(e.browRaise, c.surpriseBrowZ), evidence };
+    } else {
+      if (on('happy') && e.smile !== null && e.mouthWidth !== null) {
+        if (e.smile >= c.smileZ * k('happy') && e.mouthWidth >= c.smileWidthZ * k('happy')) {
+          return { mood: 'happy', strength: over(e.smile, c.smileZ), evidence, source };
+        }
       }
-    }
-    if (on('frustrated') && e.browFurrow !== null && e.lipPress !== null) {
-      if (e.browFurrow >= c.furrowZ * k('frustrated') && e.lipPress >= c.pressZ * k('frustrated')) {
-        return { mood: 'frustrated', strength: over(e.browFurrow, c.furrowZ), evidence };
+      if (on('surprised') && e.browRaise !== null && e.mouthOpen !== null) {
+        if (
+          e.browRaise >= c.surpriseBrowZ * k('surprised') &&
+          e.mouthOpen >= c.surpriseMouthZ * k('surprised')
+        ) {
+          return {
+            mood: 'surprised',
+            strength: over(e.browRaise, c.surpriseBrowZ),
+            evidence,
+            source,
+          };
+        }
       }
-    }
-    if (on('sad') && e.smile !== null && e.mouthWidth !== null) {
-      if (e.smile <= c.sadCornerZ * k('sad') && e.mouthWidth <= c.sadMaxWidthZ) {
-        return { mood: 'sad', strength: over(-e.smile, -c.sadCornerZ), evidence };
+      if (on('frustrated') && e.browFurrow !== null && e.lipPress !== null) {
+        if (
+          e.browFurrow >= c.furrowZ * k('frustrated') &&
+          e.lipPress >= c.pressZ * k('frustrated')
+        ) {
+          return { mood: 'frustrated', strength: over(e.browFurrow, c.furrowZ), evidence, source };
+        }
+      }
+      if (on('sad') && e.smile !== null && e.mouthWidth !== null) {
+        if (e.smile <= c.sadCornerZ * k('sad') && e.mouthWidth <= c.sadMaxWidthZ) {
+          return { mood: 'sad', strength: over(-e.smile, -c.sadCornerZ), evidence, source };
+        }
       }
     }
     if (on('confused') && e.browFurrow !== null && e.browRaise !== null) {
@@ -439,7 +536,7 @@ export class MoodEstimator {
         e.browRaise >= c.confusedRaiseZ * k('confused')
       ) {
         const s = Math.max(over(e.browFurrow, c.furrowZ), over(e.browRaise, c.confusedRaiseZ));
-        return { mood: 'confused', strength: s, evidence };
+        return { mood: 'confused', strength: s, evidence, source };
       }
     }
     const focusedAt = c.focusedScore - (this.#shown === 'focused' ? c.engagementBand : 0);
@@ -449,6 +546,7 @@ export class MoodEstimator {
         mood: 'focused',
         strength: clamp01((onScreen - c.focusedScore) / (1 - c.focusedScore) + 0.4),
         evidence,
+        source,
       };
     }
     if (on('distracted') && onScreen !== null && onScreen < distractedAt) {
@@ -456,19 +554,29 @@ export class MoodEstimator {
         mood: 'distracted',
         strength: clamp01(1 - onScreen / c.distractedScore + 0.4),
         evidence,
+        source,
       };
     }
-    // Neutral: strong when every expression signal is quiet.
+    // Neutral: strong when every expression signal is quiet (model: its neutral probability).
     const loud = [e.smile, e.browRaise, e.browFurrow, e.lipPress].reduce<number>(
       (m, v) => Math.max(m, v === null ? 0 : Math.abs(v)),
       0,
     );
-    return { mood: 'neutral', strength: clamp01(1 - loud / 2), evidence };
+    const strength = pm ? clamp01(pm.neutral) : clamp01(1 - loud / 2);
+    return { mood: 'neutral', strength, evidence, source };
   }
 }
 
 function mean(v: readonly number[]): number {
   return v.reduce((a, b) => a + b, 0) / v.length;
+}
+
+function meanVectors(rows: readonly Float32Array[]): Float32Array {
+  const out = new Float32Array(rows[0]?.length ?? 0);
+  for (const r of rows)
+    for (let i = 0; i < out.length; i += 1) out[i] = (out[i] ?? 0) + (r[i] ?? 0);
+  for (let i = 0; i < out.length; i += 1) out[i] = (out[i] ?? 0) / rows.length;
+  return out;
 }
 
 function meanMeasures(rows: readonly Measures[]): Measures {
