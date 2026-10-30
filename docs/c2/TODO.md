@@ -323,6 +323,8 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 ### P4. Expression model [FR3]
 
 - [ ] Train on RAF-DB train (+ ExpW, + FER+ if P1 kept it); test on the RAF-DB official test split
+  - First run, 30 Oct (`expression.py`, `results/expression.json`): validation macro-F1 by mix RAF 0.390 / RAF+ExpW 0.320 / RAF+ExpW+FER+ 0.223, so RAF alone was chosen (the other sets hurt, probably because their photos look different). **RAF-DB test** (2,983 of 3,068 faces found): accuracy **0.542**, macro-F1 **0.398**; per class F1 happy 0.76, surprise 0.60, neutral 0.59, anger 0.34, fear 0.24, disgust 0.18, sad 0.08. Mood (3 classes) accuracy 0.651, macro-F1 0.634. FER+ PrivateTest: accuracy 0.539, macro-F1 0.360, mood accuracy 0.642. Found faces: RAF-DB 97.0 %, ExpW 88.5 %, FER2013 89.5 %.
+  - The model underfitted (training accuracy 0.46, no higher than validation). Owner decision: tune on validation only, then test once more and report both test numbers (`expression_tune.py`, `results/expression_tuned.json`).
 - [ ] Report accuracy, **macro-F1** (Fear and Disgust are small classes) and the confusion matrix
 - [ ] Compare against the current hand-picked expression rules on the same test images
   - Not possible as stated: the rules in `src/demo/mood.ts` score each learner against their own 30 s calibration baseline (z-scores), and single dataset photos have no baseline. Recorded in `expression.py`'s docstring. 🧑 Decide what to say in the report: the comparison can only be made in the pilot study (B), on real sessions.
