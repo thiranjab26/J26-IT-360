@@ -27,6 +27,8 @@ vi.mock('@tensorflow/tfjs-core', () => ({
   ready: () => Promise.resolve(),
   memory: () => ({ numTensors: 7 }),
   browser: { fromPixels: mocks.fromPixels },
+  // No WASM kernels registered in the double, so the int32 MatMul patch is a no-op here.
+  getKernel: () => undefined,
 }));
 vi.mock('@tensorflow/tfjs-backend-webgl', () => ({}));
 vi.mock('@tensorflow/tfjs-backend-wasm', () => ({ setWasmPaths: mocks.setWasmPaths }));

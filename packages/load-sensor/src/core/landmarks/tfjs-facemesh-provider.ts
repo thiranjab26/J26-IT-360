@@ -2,6 +2,7 @@ import { resolveSameOriginAsset } from '../model-loader.js';
 import { DEFAULT_BACKEND_ORDER, selectBackend, type InferenceBackend } from './backend.js';
 import { keypointsToLandmarks } from './keypoints.js';
 import type { FaceResult, LandmarkProvider, VideoFrameSource } from './types.js';
+import { patchWasmIntBatchMatMul } from './wasm-int-matmul.js';
 
 /**
  * Self-hosted asset layout, written by `pnpm fetch-models` (scripts/fetch-models.ts).
@@ -138,6 +139,8 @@ export class TfjsFaceMeshProvider implements LandmarkProvider {
     ]);
     // Must precede the first setBackend('wasm'); the binaries are served by us.
     wasm.setWasmPaths(wasmPrefix);
+    // Without this the WASM fallback throws on every frame with a face.
+    patchWasmIntBatchMatMul(tf);
 
     this.#tf = tf;
     this.#backend = await selectBackend(tf, this.#backends);
