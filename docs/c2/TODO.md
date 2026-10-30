@@ -62,6 +62,7 @@ Preparation material for every item below (question lists, request text, checkli
   - Config names confirmed in face-landmarks-detection 1.0.6: `detectorModelUrl`, `landmarkModelUrl`. Output normalised to a flat `Float32Array` (478×3, x/width, y/height, z/width) — no per-frame object allocation. `FaceResult.score` is `number | null` (ARCHITECTURE.md §3 updated): the tfjs runtime filters by face presence internally but does not return the score. `staticImageMode: false` so the detector only re-runs when tracking is lost. TF.js loads lazily in `init()`. All asset URLs pass `resolveSameOriginAsset()` (`src/core/model-loader.ts`), which refuses cross-origin URLs before anything is fetched. `@mediapipe/face_mesh`/`face_detection` (peer deps for the unused mediapipe runtime) are aliased to a throwing stub in `vite.config.ts`: they do not bundle as ESM under Vite 8 and default to cdn.jsdelivr.net. The bundle still contains the library's unused tfhub.dev default constants; a unit test asserts both URLs are always overridden. TF.js packages are modular (`tfjs-core`, `-converter`, `-backend-webgl`, `-backend-wasm`, all 4.22.0) so the cpu backend is never registered.
 - [x] Backend selection: webgl → wasm; refuse plain cpu with `status: "unsupported"`
   - `selectBackend()` (`src/core/landmarks/backend.ts`) also rejects a backend if TF.js reports a different one after `setBackend`. Failure throws `UnsupportedBackendError` (listing each reason); the demo shows it, A5 maps it to `status: "unsupported"`.
+- [ ] **Bug found 30 Oct (P1): the WASM fallback probably cannot run the attention mesh.** The landmark model (`refineLandmarks: true`) contains int32 `BatchMatMulV2` ops (SpatialTransformer), and tfjs-backend-wasm 4.22.0 throws "BatchMatMul for non non-float32 tensors not yet supported". Seen in Node; not yet confirmed in a browser. If it holds, a device without WebGL selects `wasm`, init succeeds and every `estimate()` throws. Next: reproduce in Chromium with `backends: ['wasm']`, then decide: fail at init with `status: "unsupported"` (honest), or a different fallback. Also check what the e2e tests cover.
 - [x] Skip-frame scheduling (never queue), target 15 fps
   - `FrameGate` (`camera/frame-gate.ts`) + `LandmarkTracker` (`landmarks/landmark-tracker.ts`). One inference in flight; rate cap on frame time with 20 % early tolerance so 30 fps camera jitter still gives 15 fps (not 10). Counts dropped-busy vs dropped-rate separately. Adaptive rate (15→12→10) is not wired yet: needs bench numbers (A7).
 - [x] Debug overlay: draw landmarks, show fps, backend, frame time p50/p95
@@ -257,13 +258,92 @@ Blocked on ethics clearance.
 
 ---
 
+## Milestone P — Trained expression, mood and head-pose models (PP1 panel feedback)
+
+**Why.** At PP1 the panel objected that mood, boredom, facial expression and head pose come from a "predefined model": hand-picked rules and thresholds in `src/core/heuristics/estimators.ts` and the geometric solver in `src/core/features/head-pose.ts`. This milestone replaces them with models trained on public datasets and reports measured accuracy. The landmark-only design stays: every model here takes landmarks or features, never pixels, so nothing changes for privacy (invariant 1). The hand-picked rules are kept as the ablation baseline, not deleted.
+
+Does not depend on Milestone B, so it can run while the study is being prepared.
+
+**Datasets** are in `C:\datasets\`, outside the repo and outside OneDrive, because their licences forbid redistribution (invariant 7). Unpack log: `C:\datasets\unpack.log`.
+
+| Folder | Use | State |
+|---|---|---|
+| `300w-lp/` | Head pose: train | 310k files, unpacked |
+| `aflw2000-3d/` | Head pose: test | 2,000 images + `.mat` pose |
+| `raf-db/` | Expression: main test set (official split, train 12,271 / test 3,068) | unpacked 30 Oct |
+| `expw/` | Expression: extra training data (whole photos, crop by face box) | 91,793 labels |
+| `fer2013/` | Expression: FER+ labels (`fer2013new.csv`) on the 48×48 FER2013 faces | unpacked |
+| `daisee/` | Boredom/engagement clips (P8 only) | **partial**: CRC error, 8,232 of ~9,068 clips; re-download before P8 |
+
+### P0. Plan and environment
+
+- [x] Add this milestone to TODO.md
+- [x] Python 3.11 venv + `research/c2-load/training/requirements.txt` with pinned versions (also covers C1's first item). Setup steps: `research/c2-load/training/README.md`.
+  - **Windows Python is blocked:** Smart App Control is on (`VerifiedAndReputablePolicyState = 1`) and refuses to load the DLLs of TensorFlow, MediaPipe, pandas and `sklearn.ensemble` ("An Application Control policy has blocked this file", Code Integrity event 3077). Turning it off cannot be undone without reinstalling Windows. Decided 30 Oct: train in **WSL2 Ubuntu 24.04**, venv at `~/venvs/c2-training` (outside OneDrive).
+  - TensorFlow is 2.19.0, not the newest 2.21.0: `tensorflowjs` 4.22.0 needs `tensorflow-decision-forests`, whose newest release pins `tensorflow==2.19.0`. That in turn forces numpy 2.1.3 and protobuf 5, and `ydf` must be held at 0.15.0 (0.16 needs protobuf 6 and breaks `import tensorflowjs`). Each pin is explained in `requirements.txt`; the full set is in `requirements.lock.txt`.
+  - Checked: all libraries import, and a tiny `tf_keras` Conv1D + GRU model exports to TF.js (`model.json` + one weights shard). TF.js-side load and parity are still C1's round-trip item. CPU only.
+
+### P1. Landmark extraction (offline, never shipped)
+
+- [ ] Extract landmarks for every dataset to `C:\datasets\landmarks\<dataset>.npy` + `.csv` + `.summary.json`. No images are copied or saved. **Running since 30 Oct** (log: `C:\datasets\landmarks\extract.log`).
+  - Decided 30 Oct (owner): use the app's own model (adapter A), not MediaPipe FaceLandmarker in Python, so the reported accuracy is measured on the same landmarks the app produces. (MediaPipe 1.2.0 also no longer has the legacy `mp.solutions.face_mesh`.)
+  - `pnpm extract-landmarks <dataset>` (`scripts/extract-landmarks.ts` + `-lib.ts`, unit-tested). Same model files and `createDetector` settings as `TfjsFaceMeshProvider`, models read from disk, `staticImageMode: true` (images are independent). Worker processes (default 12), resumable: rerun the same command after a stop.
+  - Runs on the TF.js **cpu** backend in Node (about 0.39 s per image per core). WASM cannot run this model: see the A3 item on the WASM fallback. New dev dependencies, never shipped: `jpeg-js` 0.4.4 (pure-JS JPEG decoder) and `@tensorflow/tfjs-backend-cpu` 4.22.0 (already in the tree via the WebGL backend).
+  - Input: RAF-DB and ExpW are cropped around the dataset's face box with a 0.25 margin per side, resampled to 256 px. 300W-LP and AFLW2000 (450×450, face centred) are used whole. FER2013 (48×48) is upscaled to 192 px.
+  - Crop margin trial (first 240 items, found rate): RAF-DB 97.5 % / 97.9 % / 97.1 % and ExpW 94.2 % / 94.2 % / 94.6 % at margin 0.10 / 0.25 / 0.40. Within one image of each other, so 0.25 stays.
+  - The Kaggle `train_test_split_ALL.csv` also puts 1,600 AFLW2000 images in "train". Ignored: AFLW2000 is test-only under the standard protocol. 300W-LP keeps that file's train/val split. 🧑 Check in P3 whether it is subject-disjoint.
+- [ ] Report the face-found rate per dataset (from the summaries). Trial on the first 240 items: RAF-DB 97.9 %, ExpW 94.2 %, FER2013 91.3 %, AFLW2000 88.8 %, 300W-LP 79.6 %. 300W-LP and AFLW include near-profile poses, where FaceMesh also fails in the app. P3 must report pose error only on faces it found, and say how many large-pose faces that drops.
+- [ ] Parity: the app runs this model on WebGL, extraction on cpu. Compare landmarks for a handful of dataset images in the browser vs `extract-landmarks`; expect float-rounding differences only.
+
+### P2. Features from landmarks
+
+- [ ] `scripts/landmarks-to-features.ts` (Node): reads the `.npz`/JSON landmarks and runs the **TypeScript** feature code, so Python never re-implements a feature (CLAUDE.md "one source of truth"). Same item as C1's last one.
+- [ ] Decide the input for each model: raw normalised landmarks, existing features, or both. 🧑 Confirm with supervisor if it changes the method.
+
+### P3. Head-pose model [FR2]
+
+- [ ] Train on 300W-LP, test on AFLW2000-3D (the standard protocol, so the numbers compare with published papers)
+- [ ] Report mean absolute error in degrees for yaw, pitch and roll, against the current geometric solver on the same test images
+- [ ] Decide: replace the geometric solver only if the trained model is measurably better. Record the numbers either way.
+
+### P4. Expression model [FR3]
+
+- [ ] Train on RAF-DB train (+ ExpW, + FER+ if P1 kept it); test on the RAF-DB official test split
+- [ ] Report accuracy, **macro-F1** (Fear and Disgust are small classes) and the confusion matrix
+- [ ] Compare against the current hand-picked expression rules on the same test images
+- [ ] Mood = Positive / Neutral / Negative, grouped from the 7 expressions. Report its accuracy too.
+
+### P5. Ship in the browser
+
+- [ ] Export both models to TF.js under `public/models/` (same-origin, invariant 3); Python/JS parity within 1e-4
+- [ ] Replace the heuristics behind a switch; the old rules stay selectable for the ablation [FR3]
+- [ ] Wrap inference in `tf.tidy`; re-run bench (NFR1 ≤ 300 ms) and the privacy e2e test
+- [ ] Regenerate `feature_spec.json` if any feature changed
+
+### P6. Evidence for the report
+
+- [ ] One script regenerates every P3/P4 table and figure from the landmark files
+- [ ] Short write-up: datasets, protocol, numbers, limitations (e.g. posed vs. natural faces, webcam vs. photo)
+
+### P7. Event schema 🧑
+
+- [ ] 🧑 A new `boredom` field (or any new field) needs C01/C03/C04 sign-off before it goes in `LoadStateEvent` (invariant 5)
+
+### P8. Boredom (later)
+
+- [ ] Re-download DAiSEE (current copy is partial)
+- [ ] Boredom model on DAiSEE landmark sequences; compare with `src/core/heuristics/boredom.ts`
+
+---
+
 ## Milestone C — Model training and evaluation
 
 Can start on your own dry-run data before B3 finishes.
 
 ### C1. Training environment
 
-- [ ] `training/requirements.txt` with pinned versions; legacy Keras (`TF_USE_LEGACY_KERAS=1`)
+- [x] `training/requirements.txt` with pinned versions; legacy Keras (`TF_USE_LEGACY_KERAS=1`)
+  - Done in Milestone P0 (WSL2, TensorFlow 2.19.0); see the notes there.
 - [ ] Round-trip smoke test **before any real training**: build the tiny model → export → load in TF.js → parity within 1e-4. If this fails, switch to training in TF.js under Node.
 - [ ] Loader for session exports → windows `[T, F]` + labels + participant id, reading `feature_spec.json`
 - [ ] `scripts/landmarks-to-features.ts` (Node) for any public dataset landmarks
@@ -321,7 +401,7 @@ Can start on your own dry-run data before B3 finishes.
 
 ## Parking lot (not now)
 
-- Separate emotion-recognition model
+- ~~Separate emotion-recognition model~~ moved to Milestone P (PP1 panel feedback)
 - WebGPU backend
 - Per-user online adaptation of the classifier
 - Regression output (continuous load) instead of three classes

@@ -1,0 +1,31 @@
+# C2 offline training (not shipped). Python 3.11, run inside WSL2 Ubuntu 24.04.
+# Windows Smart App Control blocks TensorFlow/MediaPipe DLLs on the dev laptop,
+# so training runs in WSL2; see research/c2-load/training/README.md.
+#
+# Install:  python3.11 -m venv ~/venvs/c2-training
+#           ~/venvs/c2-training/bin/pip install -r requirements.txt
+# Run with: TF_USE_LEGACY_KERAS=1 (CLAUDE.md: legacy Keras 2 for the TF.js converter)
+#
+# TensorFlow is held at 2.19.0, not the newest 2.21.0: tensorflowjs 4.22.0
+# requires tensorflow-decision-forests, whose newest release (1.12.0) pins
+# tensorflow==2.19.0 exactly. Do not upgrade one without the others.
+# requirements.lock.txt holds the full resolved set from `pip freeze`.
+
+tensorflow==2.19.0
+tf-keras==2.19.0
+tensorflowjs==4.22.0
+tensorflow-decision-forests==1.12.0
+# tensorflow-decision-forests pulls ydf unpinned (>=0.11.0). ydf 0.16.x is
+# built against protobuf 6.31, but tensorflow 2.19.0 caps protobuf below 6, so
+# `import tensorflowjs` dies with a protobuf VersionError. 0.15.0 is the newest
+# ydf that imports with protobuf 5.
+ydf==0.15.0
+protobuf==5.29.6
+mediapipe==1.2.0
+# tensorflow 2.19.0 requires numpy < 2.2.
+numpy==2.1.3
+scipy==1.17.1
+scikit-learn==1.9.1
+pandas==3.1.0
+opencv-python-headless==5.0.0.93
+matplotlib==3.11.2

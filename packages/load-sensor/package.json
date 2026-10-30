@@ -25,15 +25,18 @@
     "evidence": "tsx scripts/evidence.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "fetch-models": "tsx scripts/fetch-models.ts",
-    "feature-spec": "tsx scripts/feature-spec.ts"
+    "feature-spec": "tsx scripts/feature-spec.ts",
+    "extract-landmarks": "tsx scripts/extract-landmarks.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.63.0",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
     "@types/node": "22.20.4",
     "eslint": "10.12.0",
     "eslint-config-prettier": "10.1.8",
     "globals": "17.13.0",
+    "jpeg-js": "0.4.4",
     "prettier": "3.9.9",
     "tsx": "4.23.15",
     "typescript": "5.9.3",
