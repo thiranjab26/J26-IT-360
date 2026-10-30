@@ -350,10 +350,33 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 - [ ] 🧑 A new `boredom` field (or any new field) needs C01/C03/C04 sign-off before it goes in `LoadStateEvent` (invariant 5)
   - Owner, 30 Oct: ask after C02's own part (P1–P8) is finished. Until then boredom stays display-only (demo panel), not in the event stream.
 
-### P8. Boredom (later)
+### P8. Boredom, engagement, confusion, frustration from DAiSEE (plan, 30 Oct)
 
-- [x] ~~Re-download DAiSEE~~ Not needed (checked 30 Oct): every listed clip is present; only `2100552061.avi` is corrupt and is excluded.
-- [ ] Boredom model on DAiSEE landmark sequences; compare with `src/core/heuristics/boredom.ts`
+**Why.** The PP1 panel's point applies here too: `boredom` (`src/core/heuristics/boredom.ts`), `engagement` and the `affect` states come from hand-picked rules. DAiSEE has people's ratings of exactly these states for webcam video of students in e-learning, which is the app's setting.
+
+**Facts (checked 30 Oct, `C:\datasets\daisee\DAiSEE`):**
+- 9,068 clips (8,232 `.avi`, 836 `.mp4`), 640×480, 30 fps, 10 s (300 frames; a few slightly longer): the same resolution as the app's camera.
+- Official splits are subject-disjoint: Train 70 people, Validation 22, Test 21, none shared.
+- Labels: 0–3 per state, in `Labels/{Train,Validation,Test}Labels.csv`, 8,571 clips with a label (5,358 / 1,429 / 1,784), every one with a file. Use these split files. `AllLabels.csv` disagrees with them (415 extra ids, 61 missing); not used. 497 clips have no label; not used.
+- Labels are very unbalanced. Train: Boredom 0/1/2/3 = 2,433 / 1,696 / 1,073 / 156; Engagement = 34 / 213 / 2,617 / 2,494; Confusion = 3,616 / 1,245 / 431 / 66; Frustration = 4,183 / 941 / 191 / 43. So macro-F1 (not accuracy), and collapsing levels (decision 2).
+- `2100552061.avi` failed the unpack CRC check but OpenCV decodes 300/300 frames with one damaged block. Exclude it (1 clip; simplest to defend).
+- The current boredom rule cannot be scored on DAiSEE: it needs 60 s and 5 min windows and a 30 s calibration, and the clips are 10 s. As with expression, the comparison with the rules can only be made in the pilot study (B).
+
+**Decisions needed 🧑 (recommendation first):**
+1. **Frame rate for extraction.** (a) 15 fps, the app's own rate, so blinks and the per-second features mean the same as in the app; about 1.36 M frames. (b) 5 fps; about 0.45 M frames, but blinks (80–500 ms) are mostly missed, so blink features would differ from the app's. Recommended: (a), *if* step 3's speed-up works; otherwise (b) and drop blink features for this model.
+2. **Label levels.** Recommended: Boredom 0 / 1 / 2–3 → `not_bored` / `possibly_bored` / `bored` (the app's own states); Engagement 0–1 / 2 / 3 → Low / Medium / High; Confusion and Frustration 0 vs ≥ 1 → absent / present (levels 2–3 are too rare to learn).
+3. **Speed: run P8 extraction in Ubuntu (WSL) with `@tensorflow/tfjs-node`** (native TensorFlow; Smart App Control does not apply in WSL). Same model files and settings as adapter A, in a separate `research/c2-load/video-extract/` package so nothing changes for the app or teammates. Also video tracking mode (`staticImageMode: false`, as the app runs), which skips the face detector between frames. Both untested here: measure on 20 clips first. Without them, CPU TF.js at about 9 frames/s would need about 14 h at 5 fps and about 42 h at 15 fps.
+4. **Model input.** Recommended: run each clip's landmarks through the app's own `FeaturePipeline` (TypeScript), so the model sees the same per-second feature vectors as the cognitive-load model and the app (one source of truth). Open point: the pipeline's z-scores need a 30 s calibration and a clip is 10 s. Options: (i) treat each person's clips in id order as one session and calibrate on the first 30 s; (ii) use raw per-second features with no per-person baseline. Recommended: (ii) first (no assumption about clip order), (i) as a second experiment if clip ids prove consecutive.
+
+**Steps (after the decisions):**
+- [ ] P8.1 Measure extraction speed on 20 clips for each option in decision 3; pick; record numbers here.
+- [ ] P8.2 Video extractor: decode clips, sample at the chosen rate, run adapter A's model, write landmarks + frame timestamps per clip (no pixels saved). Resumable, like `extract-landmarks`.
+- [ ] P8.3 Per-second features per clip via the TypeScript `FeaturePipeline` (decision 4); regenerate `feature_spec.json` only if a feature changes.
+- [ ] P8.4 Baselines: majority class, and random forest on clip summary statistics. Then a small GRU over the 10 per-second vectors. Train on Train, choose on Validation, test once on Test. Macro-F1, confusion matrices, per state.
+- [ ] P8.5 Export to TF.js + parity check (as P5). Display-only in the demo panels (owner rule: nothing new in `LoadStateEvent` until C02's part is done and C01/C03/C04 agree).
+- [ ] P8.6 Report section via `report.py`, including what DAiSEE cannot show (10 s clips, posed setting, label noise, no comparison with the rules).
+
+**Time (estimates, not measured):** decisions + P8.1 about 2 h; extractor about 3 h; extraction 5–40 h depending on decisions 1 and 3; features + training + export about 3 h.
 
 ---
 
