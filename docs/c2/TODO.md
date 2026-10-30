@@ -319,7 +319,8 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
   - Test-set hygiene, for the method section: the first version of both dry runs printed metrics on test data (head pose: 5 epochs on AFLW halves; expression: a 3-epoch model scored once on RAF-DB test). Nothing was chosen from those numbers. Both dry runs now never print test metrics; the real runs touch each test set once.
 - [x] Report mean absolute error in degrees for yaw, pitch and roll, against the current geometric solver on the same test images
   - Run 30 Oct (`head_pose.py`, `results/head_pose.json`, 20 min): 300W-LP train 80,713 / val 13,743 faces (94,458 of 122,450 images had a face found by the app's FaceMesh); AFLW2000-3D test 1,750 of 2,000 (240 no face, 10 outside ±99°). MAE yaw / pitch / roll / mean: **geometric 6.05° / 6.08° / 6.09° / 6.08°**, ridge 6.43° / 5.83° / 4.25° / 5.50°, **MLP 5.78° / 5.64° / 3.95° / 5.12°**. The MLP is lowest in every |yaw| band too (0–30°: 3.39 vs 3.80; 30–60°: 6.76 vs 8.71; 60–99°: 15.72 vs 18.97). Exported to `public/models/head-pose/` (local only, gitignored); parity max |TF.js − Keras| = 7.63e-6, PASS.
-- [ ] Decide: replace the geometric solver only if the trained model is measurably better. Record the numbers either way.
+- [x] Decide: replace the geometric solver only if the trained model is measurably better. Record the numbers either way.
+  - Decided 30 Oct (owner): **report only, keep the geometric solver.** The MLP is better (5.12° vs 6.08° mean MAE), but the weights stay local (licence), and putting a local-only model inside the feature pipeline would make load features differ between machines. The comparison is reported as evidence that the geometric solver was checked against a trained model. Head pose is therefore not wired into the demo (P5).
 
 ### P4. Expression model [FR3]
 
@@ -342,7 +343,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
   - Expression exported 30 Oct (`python export.py expression_tuned` → `public/models/expression/`, 1.6 MB, standardisation built in as the first layer). Parity on 32 RAF-DB test rows: max |TF.js − Keras| = 1.79e-7 (tolerance 1e-4), PASS. Owner decision, 30 Oct: RAF-DB-derived weights stay local only (licence: non-commercial research). `public/models/expression/` and `head-pose/` are gitignored; a clone without them falls back to the hand-picked rules.
 - [ ] Replace the heuristics behind a switch; the old rules stay selectable for the ablation [FR3]
   - Expression → mood panel wired (30 Oct, waits for the trained model file): `MoodEstimator.setExpressionSource('model' | 'rules')`, demo switch "Trained expression model" (`settings.sensing.expressionModel`, default on). In model mode happy / surprised / frustrated (= anger + disgust) / sad come from the model's probabilities averaged over the same frames and 4 s window, shown at ≥ `MOOD_CONFIG.modelShow` (0.5, **(tune)**); drowsy, confused, focused and distracted keep their rules (not among the 7 classes). If `public/models/expression/` is missing, the panel says "hand-picked rules" and uses them. 5 unit tests. The model is loaded after the face model, on the same backend.
-  - Head pose: not wired until P3 shows whether it beats the geometric solver.
+  - Head pose: not wired (owner decision 30 Oct, see P3).
 - [ ] Wrap inference in `tf.tidy`; re-run bench (NFR1 ≤ 300 ms) and the privacy e2e test
 - [ ] Regenerate `feature_spec.json` if any feature changed
 
