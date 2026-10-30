@@ -348,6 +348,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 ### P7. Event schema 🧑
 
 - [ ] 🧑 A new `boredom` field (or any new field) needs C01/C03/C04 sign-off before it goes in `LoadStateEvent` (invariant 5)
+  - Owner, 30 Oct: ask after C02's own part (P1–P8) is finished. Until then boredom stays display-only (demo panel), not in the event stream.
 
 ### P8. Boredom (later)
 
