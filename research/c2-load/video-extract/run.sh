@@ -27,7 +27,7 @@ rsync -a --delete "$REPO/packages/load-sensor/public/models/facemesh/" \
   "$WORK/packages/load-sensor/public/models/facemesh/"
 # -p keeps the source timestamps, so package.json only looks newer than the
 # install stamp when it really changed (plain cp reinstalled on every run).
-cp -p "$HERE/package.json" "$HERE/tsconfig.json" "$WORK/"
+cp -p "$HERE/package.json" "$HERE/tsconfig.wsl.json" "$WORK/"
 
 cd "$WORK"
 if [ ! -f node_modules/.install-stamp ] || [ package.json -nt node_modules/.install-stamp ]; then
@@ -47,7 +47,7 @@ case "${1:-}" in
     exec node --import tsx --test research/c2-load/video-extract/test/*.test.ts
     ;;
   typecheck)
-    exec npx tsc -p tsconfig.json
+    exec npx tsc -p tsconfig.wsl.json
     ;;
   *)
     exec node --import tsx research/c2-load/video-extract/src/extract-video.ts "$@"

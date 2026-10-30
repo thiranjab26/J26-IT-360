@@ -1,6 +1,8 @@
 {
   // Type-checks the extractor together with the app files it imports, inside
   // the WSL work copy that run.sh builds (same relative layout as the repo).
+  // Not named tsconfig.json: the paths only resolve from the work copy's root,
+  // so in the repo the editor would report "No inputs were found".
   "compilerOptions": {
     "target": "ES2023",
     "module": "NodeNext",
