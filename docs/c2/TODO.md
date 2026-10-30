@@ -314,10 +314,11 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 
 ### P3. Head-pose model [FR2]
 
-- [ ] Train on 300W-LP, test on AFLW2000-3D (the standard protocol, so the numbers compare with published papers)
+- [x] Train on 300W-LP, test on AFLW2000-3D (the standard protocol, so the numbers compare with published papers)
   - Script ready: `research/c2-load/training/head_pose.py` (geometric vs ridge vs MLP on the same test rows; ±99° filter; sign convention taken from 300W-LP train, never from the test set). `--dry-run` passes on AFLW halves (code check only). Waits for the 300W-LP extraction.
   - Test-set hygiene, for the method section: the first version of both dry runs printed metrics on test data (head pose: 5 epochs on AFLW halves; expression: a 3-epoch model scored once on RAF-DB test). Nothing was chosen from those numbers. Both dry runs now never print test metrics; the real runs touch each test set once.
-- [ ] Report mean absolute error in degrees for yaw, pitch and roll, against the current geometric solver on the same test images
+- [x] Report mean absolute error in degrees for yaw, pitch and roll, against the current geometric solver on the same test images
+  - Run 30 Oct (`head_pose.py`, `results/head_pose.json`, 20 min): 300W-LP train 80,713 / val 13,743 faces (94,458 of 122,450 images had a face found by the app's FaceMesh); AFLW2000-3D test 1,750 of 2,000 (240 no face, 10 outside ±99°). MAE yaw / pitch / roll / mean: **geometric 6.05° / 6.08° / 6.09° / 6.08°**, ridge 6.43° / 5.83° / 4.25° / 5.50°, **MLP 5.78° / 5.64° / 3.95° / 5.12°**. The MLP is lowest in every |yaw| band too (0–30°: 3.39 vs 3.80; 30–60°: 6.76 vs 8.71; 60–99°: 15.72 vs 18.97). Exported to `public/models/head-pose/` (local only, gitignored); parity max |TF.js − Keras| = 7.63e-6, PASS.
 - [ ] Decide: replace the geometric solver only if the trained model is measurably better. Record the numbers either way.
 
 ### P4. Expression model [FR3]
