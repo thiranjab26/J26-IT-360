@@ -279,7 +279,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 | `raf-db/` | Expression: main test set (official split, train 12,271 / test 3,068) | unpacked 30 Oct |
 | `expw/` | Expression: extra training data (whole photos, crop by face box) | 91,793 labels |
 | `fer2013/` | Expression: FER+ labels (`fer2013new.csv`) on the 48×48 FER2013 faces | unpacked |
-| `daisee/` | Boredom/engagement clips (P8 only) | **partial**: CRC error, 8,232 of ~9,068 clips; re-download before P8 |
+| `daisee/` | Boredom/engagement clips (P8 only) | complete: 9,068 clips (Train 5,482 / Validation 1,720 / Test 1,866, .avi and .mp4), 8,925 labelled. One clip failed the unpack CRC check (`Train/210055/2100552061/2100552061.avi`): drop it and say so. (An earlier count of 8,232 looked at .avi only.) |
 
 ### P0. Plan and environment
 
@@ -351,7 +351,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 
 ### P8. Boredom (later)
 
-- [ ] Re-download DAiSEE (current copy is partial)
+- [x] ~~Re-download DAiSEE~~ Not needed (checked 30 Oct): every listed clip is present; only `2100552061.avi` is corrupt and is excluded.
 - [ ] Boredom model on DAiSEE landmark sequences; compare with `src/core/heuristics/boredom.ts`
 
 ---
