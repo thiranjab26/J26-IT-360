@@ -357,6 +357,8 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 
 ### P8. Boredom, engagement, confusion, frustration from DAiSEE (plan, 30 Oct)
 
+**Deferred (owner decision, 30 Oct):** not needed for any FR/NFR, and the landmark extraction alone is estimated at about 14–42 h of compute (not measured; P8.1 not run). Boredom and engagement stay the hand-picked rules in `src/core/heuristics/`, described in the report as unvalidated heuristics, with a DAiSEE-trained model as future work and a check against self-reports in the pilot study (B). The extractor (P8.2) and the feature and training code (P8.3, P8.4) are kept, ready if this is picked up again.
+
 **Why.** The PP1 panel's point applies here too: `boredom` (`src/core/heuristics/boredom.ts`), `engagement` and the `affect` states come from hand-picked rules. DAiSEE has people's ratings of exactly these states for webcam video of students in e-learning, which is the app's setting.
 
 **Facts (checked 30 Oct, `C:\datasets\daisee\DAiSEE`):**
