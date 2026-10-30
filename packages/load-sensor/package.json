@@ -26,7 +26,9 @@
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "fetch-models": "tsx scripts/fetch-models.ts",
     "feature-spec": "tsx scripts/feature-spec.ts",
-    "extract-landmarks": "tsx scripts/extract-landmarks.ts"
+    "extract-landmarks": "tsx scripts/extract-landmarks.ts",
+    "landmarks-to-features": "tsx scripts/landmarks-to-features.ts",
+    "model-parity": "tsx scripts/model-parity.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

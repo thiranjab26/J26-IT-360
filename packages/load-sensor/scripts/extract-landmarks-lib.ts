@@ -135,6 +135,35 @@ export function npyHeader(shape: readonly number[]): Uint8Array {
   return header;
 }
 
+/**
+ * Reads a .npy file written by `npyHeader` (v1.0, little-endian float32, C
+ * order). Throws on anything else rather than misreading it.
+ */
+export function readNpyF32(bytes: Uint8Array): { shape: number[]; data: Float32Array } {
+  const magic = [0x93, 0x4e, 0x55, 0x4d, 0x50, 0x59];
+  if (!magic.every((b, i) => bytes[i] === b) || bytes[6] !== 1)
+    throw new Error('not a v1 .npy file');
+  const headerLength = (bytes[8] ?? 0) | ((bytes[9] ?? 0) << 8);
+  const dict = new TextDecoder().decode(bytes.subarray(10, 10 + headerLength));
+  if (!dict.includes("'descr': '<f4'") || !dict.includes("'fortran_order': False")) {
+    throw new Error(`unsupported .npy header: ${dict.trim()}`);
+  }
+  const shapeText = /'shape': \(([^)]*)\)/.exec(dict)?.[1] ?? '';
+  const shape = shapeText
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
+    .map(Number);
+  const count = shape.reduce((a, b) => a * b, 1);
+  const start = 10 + headerLength;
+  if (bytes.byteLength - start !== count * 4) throw new Error('.npy size does not match its shape');
+  // Copy into a fresh buffer: a Float32Array view needs 4-byte alignment, and
+  // Node's Buffer#slice returns a view whose .buffer is the whole file.
+  const data = new Float32Array(count);
+  new Uint8Array(data.buffer).set(bytes.subarray(start));
+  return { shape, data };
+}
+
 /** CSV field, quoted only when needed. */
 export function csvField(value: string | number): string {
   const s = String(value);

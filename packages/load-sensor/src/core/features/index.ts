@@ -20,6 +20,7 @@ export {
 export { computeFrameSignals, type FrameSignals } from './frame-signals.js';
 export type { FaceMesh, Vec3 } from './geometry.js';
 export { faceAxes, headPose, poseFromAxes, type FaceAxes, type HeadPoseDeg } from './head-pose.js';
+export { MESH_INPUT_LENGTH, meshInput, type MeshFrame } from './mesh-input.js';
 export * as LANDMARKS from './landmark-indices.js';
 export { FEATURE_LANDMARKS } from './landmark-indices.js';
 export {

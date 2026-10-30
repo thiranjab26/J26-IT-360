@@ -4,6 +4,7 @@ import {
   npyHeader,
   parseExpwLine,
   parseRafBox,
+  readNpyF32,
   resampleCrop,
   squareCrop,
 } from '../../../scripts/extract-landmarks-lib.js';
@@ -68,6 +69,20 @@ describe('extract-landmarks-lib (TODO P1)', () => {
       /^\{'descr': '<f4', 'fortran_order': False, 'shape': \(2, 478, 3\), \} *\n$/,
     );
     expect(new TextDecoder().decode(npyHeader([5]).subarray(10))).toContain("'shape': (5,)");
+  });
+
+  it('readNpyF32 reads back what npyHeader wrote, also from a Node Buffer', () => {
+    const values = Float32Array.from([1.5, -2, NaN, 4, 5, 6]);
+    const file = Buffer.concat([npyHeader([2, 3]), new Uint8Array(values.buffer)]);
+    // A Buffer that is a view into a larger allocation, like readFile can return.
+    const pooled = Buffer.concat([Buffer.alloc(13, 0xff), file]).subarray(13);
+    for (const bytes of [file, pooled, new Uint8Array(file)]) {
+      const { shape, data } = readNpyF32(bytes);
+      expect(shape).toEqual([2, 3]);
+      expect(Array.from(data)).toEqual([1.5, -2, NaN, 4, 5, 6]);
+    }
+    expect(readNpyF32(Buffer.concat([npyHeader([4]), new Uint8Array(16)])).shape).toEqual([4]);
+    expect(() => readNpyF32(file.subarray(0, file.length - 4))).toThrow(/size/);
   });
 
   it('parses ExpW label lines (top left right bottom order) and RAF-DB boxes', () => {
