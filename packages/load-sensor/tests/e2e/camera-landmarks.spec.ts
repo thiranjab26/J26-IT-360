@@ -135,7 +135,7 @@ test('camera permission denied is reported, not thrown (A2)', async ({ browser }
     });
   });
   await page.goto('/');
-  await turnSensingOn(page);
+  await turnSensingOn(page, { expectCameraOn: false });
   await expect(page.getByTestId('camera-status')).toHaveText('permission_denied');
   await expect(page.getByTestId('sensor-status')).toContainText('permission was denied');
   await expect(page.getByTestId('enable')).toBeEnabled();

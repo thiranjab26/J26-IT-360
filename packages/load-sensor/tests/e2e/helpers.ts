@@ -5,9 +5,14 @@ import { expect, type Page } from '@playwright/test';
  * privacy notice, agree. A fresh browser context has no consent on record,
  * so the notice always shows the first time.
  */
-export async function turnSensingOn(page: Page): Promise<void> {
+export async function turnSensingOn(page: Page, options: ConsentOptions = {}): Promise<void> {
   await page.getByTestId('enable').click();
-  await acceptConsent(page);
+  await acceptConsent(page, options);
+}
+
+interface ConsentOptions {
+  /** False when the camera is meant to fail (permission denied), so the switch stays off. */
+  expectCameraOn?: boolean;
 }
 
 /**
@@ -23,7 +28,10 @@ export async function waitForOfflineReady(page: Page): Promise<void> {
 }
 
 /** Agrees to the notice that some other control (sidebar switch, Break game) opened. */
-export async function acceptConsent(page: Page): Promise<void> {
+export async function acceptConsent(
+  page: Page,
+  { expectCameraOn = true }: ConsentOptions = {},
+): Promise<void> {
   const dialog = page.getByTestId('consent-dialog');
   await expect(dialog).toBeVisible();
   await page.getByTestId('consent-accept').click();
@@ -37,6 +45,7 @@ export async function acceptConsent(page: Page): Promise<void> {
   // ...and it closed as "agree", not as a decline (a click that missed the
   // button lands on the backdrop, which declines): the switch turns on as soon
   // as the camera starts. Longer timeout for the same busy-machine reason.
+  if (!expectCameraOn) return;
   await expect(page.getByTestId('sensing-switch')).toHaveAttribute('aria-checked', 'true', {
     timeout: 15_000,
   });
