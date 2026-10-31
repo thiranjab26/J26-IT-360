@@ -194,7 +194,7 @@ const stop = subscribeExtras((x) => {
 
 - **Who publishes it.** Both C02's demo page and `createLoadSensor()` (§8, since 31 Oct 2026). From `createLoadSensor()`, `mood` and `mood_source` are always `null`, because only the demo page computes mood. Every other field is the same. The camera page can also read them with `sensor.on('extras', cb)`, and can keep them off the channel with `broadcastExtras: false`.
 - **Validation.** `subscribeExtras` drops anything that isn't a valid version-1 extras event. As with the main event, arrays and objects are rejected, so no landmarks or pixels can travel here.
-- **Advisory only.** Only `mood` can come from a trained model (RAF-DB test macro-F1 0.570, measured on photos, not webcams). Everything else is a rule or a raw measure. Use it to offer things, not to make decisions on the learner's behalf.
+- **Advisory only.** Only `mood` can come from a trained model (RAF-DB test macro-F1 0.584, measured on photos, not webcams). Everything else is a rule or a raw measure. Use it to offer things, not to make decisions on the learner's behalf.
 - You can see the live JSON on the C02 demo's **Performance** tab, in the card "Extra signals (optional stream)".
 
 ## 9. Privacy boundary

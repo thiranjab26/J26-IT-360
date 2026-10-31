@@ -61,7 +61,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     # expression_tuned: the validation-tuned second pass (expression_tune.py); it
     # ships to the same public/models/expression/ folder as the first run would.
-    parser.add_argument("model", nargs="?", choices=("head_pose", "expression", "expression_tuned"))
+    # expression_clean: the third pass on re-extracted RAF-DB landmarks (31 Oct), same folder.
+    parser.add_argument(
+        "model", nargs="?", choices=("head_pose", "expression", "expression_tuned", "expression_clean")
+    )
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
     common.set_seed()

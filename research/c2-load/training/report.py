@@ -127,6 +127,39 @@ def tuned_section(r: dict, first: dict | None) -> list[str]:
     return out
 
 
+def clean_section(r: dict, earlier: list[tuple[str, dict]]) -> list[str]:
+    t = r["test_raf"]
+    labels = list(r["classes"])
+    confusion_figure(t["confusion"]["rows_truth_cols_pred"], labels, "Expression (clean landmarks), RAF-DB test",
+                     FIGURES / "expression_clean_confusion_rafdb.png")
+    out = ["## Expression, third pass (P4, re-extracted landmarks)", "",
+           "The 30 Oct landmark files carried state from the previous image (face-landmarks-detection "
+           "`staticImageMode` bug, found by `pnpm landmark-parity`; docs/c2/TODO.md P1). RAF-DB was re-extracted "
+           "with `detector.reset()` before every image and the same grid was rerun.", "",
+           f"**Test-set use:** {r['test_use_note']}", "",
+           f"Protocol: {r['protocol']}.", "",
+           "| Mix | Hidden | Dropout | Standardise | Val macro-F1 | Val accuracy | Train acc (last) |",
+           "|---|---|---|---|---|---|---|"]
+    for tr in r["trials"]:
+        out.append(f"| {' + '.join(tr['mix'])} | {tr['hidden']} | {tr['dropout']} | {tr['standardise']} | "
+                   f"{tr['val']['macro_f1']:.3f} | {tr['val']['accuracy']:.3f} | {tr['training']['train_accuracy_last']:.3f} |")
+    c = r["chosen"]
+    out += ["", f"Chosen on validation: {' + '.join(c['mix'])}, hidden {c['hidden']}, dropout {c['dropout']}, "
+            f"standardise {c['standardise']}.", "",
+            "| RAF-DB test | Landmarks | n | Accuracy | Macro-F1 | Mood accuracy | Mood macro-F1 |",
+            "|---|---|---|---|---|---|---|"]
+    for name, e in earlier:
+        f = e["test_raf"]
+        out.append(f"| {name} | 30 Oct (affected) | {f['n']} | {f['accuracy']:.3f} | {f['macro_f1']:.3f} | "
+                   f"{f['mood']['accuracy']:.3f} | {f['mood']['macro_f1']:.3f} |")
+    out += [f"| clean rerun | 31 Oct (fixed) | {t['n']} | {t['accuracy']:.3f} | {t['macro_f1']:.3f} | "
+            f"{t['mood']['accuracy']:.3f} | {t['mood']['macro_f1']:.3f} |",
+            "", "Per-class F1, RAF-DB test, clean rerun:", "", "| " + " | ".join(labels) + " |", "|" + "---|" * len(labels),
+            "| " + " | ".join(f"{t['f1_per_class'][k]:.3f}" for k in labels) + " |", "",
+            "![Expression confusion, clean](figures/expression_clean_confusion_rafdb.png)", ""]
+    return out
+
+
 def main() -> None:
     FIGURES.mkdir(parents=True, exist_ok=True)
     lines = ["# C2 trained models: results", "",
@@ -139,9 +172,13 @@ def main() -> None:
     tuned = load("expression_tuned")
     if tuned:
         lines += tuned_section(tuned, ex)
+    clean = load("expression_clean")
+    if clean:
+        earlier = [(n, r) for n, r in (("first run", ex), ("tuned", tuned)) if r]
+        lines += clean_section(clean, earlier)
     if not hp and not ex:
         raise SystemExit("no results yet: run head_pose.py and/or expression.py first")
-    hashes = {r["feature_code_hash"] for r in (hp, ex, tuned) if r}
+    hashes = {r["feature_code_hash"] for r in (hp, ex, tuned, clean) if r}
     lines += [f"Feature code hash: {', '.join(sorted(hashes))}", ""]
     path = common.RESULTS / "report.md"
     path.write_text("\n".join(lines))

@@ -16,10 +16,22 @@ on RAF-DB train; the best setting is then also trained on RAF-DB + ExpW, and
 the better of the two on validation is kept.
 
   TF_USE_LEGACY_KERAS=1 python expression_tune.py   # writes results/expression_tuned.json + model
+
+Third pass, `--clean` (owner decision, 31 Oct 2026): the 30 Oct landmark
+files carried state from the previous image (face-landmarks-detection
+staticImageMode bug, docs/c2/TODO.md P1). RAF-DB was re-extracted with the
+fix; this reruns the same grid on it, chosen on validation only, and tests
+once. ExpW and FER+ were not re-extracted, so the +ExpW trial and the FER+
+test are skipped rather than mixing clean and affected landmarks. Writes
+results/expression_clean.json + model; the earlier results stay untouched.
+The RAF-DB test set has then been used three times; the report says so.
+
+  TF_USE_LEGACY_KERAS=1 python expression_tune.py --clean
 """
 
 from __future__ import annotations
 
+import argparse
 import itertools
 import os
 import time
@@ -74,6 +86,10 @@ def fit(x_tr, y_tr, x_va, y_va, hidden, dropout, standardise):
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--clean", action="store_true", help="third pass on the re-extracted RAF-DB (see docstring)")
+    clean = parser.parse_args().clean
+    name = "expression_clean" if clean else "expression_tuned"
     started = time.time()
     raf_d, raf_y = ex.raf()
     ok = raf_d.has_features & (raf_y >= 0)
@@ -93,33 +109,49 @@ def main() -> None:
         if best is None or val["macro_f1"] > best["val"]["macro_f1"]:
             best = {**cfg, "val": val, "model": model}
 
-    ex_d, ex_y = ex.expw()
-    ex_rows = np.flatnonzero(ex_d.has_features & (ex_y >= 0))
-    x_mix = np.concatenate([x_tr, ex_d.mesh_face[ex_rows]])
-    y_mix = np.concatenate([y_tr, ex_y[ex_rows]])
-    model, val, info = fit(x_mix, y_mix, x_va, y_va, tuple(best["hidden"]), best["dropout"], best["standardise"])
-    cfg = {"mix": ["raf", "expw"], "hidden": best["hidden"], "dropout": best["dropout"], "standardise": best["standardise"]}
-    trials.append({**cfg, "val": val, "training": info})
-    print(f"raf+expw with the best setting: val macro-F1 {val['macro_f1']:.3f}", flush=True)
-    if val["macro_f1"] > best["val"]["macro_f1"]:
-        best = {**cfg, "val": val, "model": model}
+    if not clean:
+        ex_d, ex_y = ex.expw()
+        ex_rows = np.flatnonzero(ex_d.has_features & (ex_y >= 0))
+        x_mix = np.concatenate([x_tr, ex_d.mesh_face[ex_rows]])
+        y_mix = np.concatenate([y_tr, ex_y[ex_rows]])
+        model, val, info = fit(x_mix, y_mix, x_va, y_va, tuple(best["hidden"]), best["dropout"], best["standardise"])
+        cfg = {"mix": ["raf", "expw"], "hidden": best["hidden"], "dropout": best["dropout"], "standardise": best["standardise"]}
+        trials.append({**cfg, "val": val, "training": info})
+        print(f"raf+expw with the best setting: val macro-F1 {val['macro_f1']:.3f}", flush=True)
+        if val["macro_f1"] > best["val"]["macro_f1"]:
+            best = {**cfg, "val": val, "model": model}
 
     chosen = best.pop("model")
     test = ex.scores(chosen.predict(raf_d.mesh_face[te_rows], verbose=0).argmax(1), raf_y[te_rows])
-    fp_d, fp_y = ex.ferplus()
-    fp_rows = np.flatnonzero(fp_d.has_features & (fp_y >= 0) & (fp_d.splits == "PrivateTest"))
-    fer = ex.scores(chosen.predict(fp_d.mesh_face[fp_rows], verbose=0).argmax(1), fp_y[fp_rows])
-    print(f"chosen {best}: RAF-DB test macro-F1 {test['macro_f1']:.3f} accuracy {test['accuracy']:.3f}; "
-          f"FER+ PrivateTest macro-F1 {fer['macro_f1']:.3f}", flush=True)
+    fer = None
+    fp_used = 0
+    if not clean:
+        fp_d, fp_y = ex.ferplus()
+        fp_rows = np.flatnonzero(fp_d.has_features & (fp_y >= 0) & (fp_d.splits == "PrivateTest"))
+        fer = ex.scores(chosen.predict(fp_d.mesh_face[fp_rows], verbose=0).argmax(1), fp_y[fp_rows])
+        fp_used = int(len(fp_rows))
+    print(f"chosen {best}: RAF-DB test macro-F1 {test['macro_f1']:.3f} accuracy {test['accuracy']:.3f}"
+          + (f"; FER+ PrivateTest macro-F1 {fer['macro_f1']:.3f}" if fer else ""), flush=True)
 
     summary = {
         "second_pass": True,
-        "test_use_note": "RAF-DB test used twice: first run (expression.json) and this validation-tuned run.",
+        "clean_rerun": clean,
+        "test_use_note": (
+            "RAF-DB test used three times: expression.json, expression_tuned.json (both on landmarks affected by "
+            "the staticImageMode state bug) and this run on re-extracted landmarks."
+            if clean
+            else "RAF-DB test used twice: first run (expression.json) and this validation-tuned run."
+        ),
         "classes": ex.CLASSES,
-        "protocol": "grid on stratified 10% of RAF-DB train (macro-F1); best also tried with +ExpW; test once more",
+        "protocol": (
+            "grid on stratified 10% of RAF-DB train (macro-F1), re-extracted landmarks; +ExpW trial and FER+ test "
+            "skipped (not re-extracted); test once"
+            if clean
+            else "grid on stratified 10% of RAF-DB train (macro-F1); best also tried with +ExpW; test once more"
+        ),
         "feature_code_hash": raf_d.feature_code_hash,
         "counts": {"raf_train": int(len(tr_rows)), "raf_val": int(len(va_rows)), "raf_test_used": int(len(te_rows)),
-                   "raf_test_total": int((raf_d.splits == "test").sum()), "ferplus_privatetest_used": int(len(fp_rows))},
+                   "raf_test_total": int((raf_d.splits == "test").sum()), "ferplus_privatetest_used": fp_used},
         "trials": trials,
         "chosen": best,
         "chosen_mix": best["mix"],
@@ -127,10 +159,10 @@ def main() -> None:
         "test_ferplus_privatetest": fer,
         "seconds": round(time.time() - started),
     }
-    path = common.write_result("expression_tuned", summary)
-    model_dir = common.RESULTS / "models" / "expression_tuned"
+    path = common.write_result(name, summary)
+    model_dir = common.RESULTS / "models" / name
     model_dir.mkdir(parents=True, exist_ok=True)
-    chosen.save(model_dir / "expression_tuned_mlp.h5")
+    chosen.save(model_dir / f"{name}_mlp.h5")
     print(f"wrote {path} and {model_dir}")
 
 
