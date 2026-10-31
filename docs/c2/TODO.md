@@ -242,14 +242,27 @@ Blocked on ethics clearance.
 
 ### B1. Study runner (build flag `STUDY_MODE`)
 
-- [ ] Participant code entry (`P01`…`P08`), consent confirmation step
-- [ ] Rest/baseline block (also serves as calibration)
-- [ ] Three programming task blocks (Easy / Medium / Hard) plus an Underload block (repetitive, very easy; for boredom, §8b), ≥ 5 min each, order from a counterbalancing table
-- [ ] NASA-TLX form after each block (six subscales, 0–100); store raw subscale scores; plus a boredom self-report item (§8b)
-- [ ] Recorder: per-frame derived signals + timestamps + block markers → IndexedDB → export one file per session
-- [ ] Recorder self-check: exported file contains no image data and no full landmark mesh (automated test)
-- [ ] Session quality summary at the end: fps achieved, face-present ratio, blink count sanity — so a bad session is caught while the participant is still there
-- [ ] Short SUS questionnaire at the end [NFR3]
+Built 31 Oct (the build flag is Vite `--mode study`, not an env var: `pnpm dev:study`, `pnpm build:study`; the normal build has no `study.html`). Page: `study.html` → `src/study/`; recorder, store, forms data and checks: `src/core/recorder/`. Tests: `tests/unit/recorder/recorder.test.ts` (12), `pnpm test:e2e:study` (one full session with 5 s blocks on the fake camera, export passes the self-check, same-origin requests only; passed 31 Oct).
+
+- [x] Participant code entry (`P01`…`P08`), consent confirmation step
+  - Code from a P01…P08 list only (anything else is refused by the recorder too). Two experimenter confirmations: paper consent form signed, and "the camera image never leaves this computer" explained. Optional notes field (500 chars, "no names").
+- [x] Rest/baseline block (also serves as calibration)
+  - Always first, 5 min, no questionnaire after it. The feature pipeline is reset at its start, so the references and baseline come from the rest block.
+- [x] Three programming task blocks (Easy / Medium / Hard) plus an Underload block (repetitive, very easy; for boredom, §8b), ≥ 5 min each, order from a counterbalancing table
+  - Owner, 31 Oct: **placeholder shell** (the page shows a title, instructions and a timer; the experimenter runs the real task), **5 min** blocks, **balanced Latin square** (Williams design, 4 rows; P01/P05 row 0 … P04/P08 row 3; unit-tested for row/column balance and first-order carry-over). Titles are "Task A–D", not Easy/Hard, so the label does not steer the TLX answers. 🧑 Write the real task briefs into `src/study/config.ts` `BLOCK_TEXT` before B2.
+  - `?seconds=N` (5–300) shortens blocks for practice and the e2e test; real sessions open the page without it.
+  - Bug found by the e2e test: the preview `<video>` was moved out of the page after the camera check, the browser paused it, and recording stopped (1 frame in the file). Fixed: the video stays in the page and is only hidden.
+- [x] NASA-TLX form after each block (six subscales, 0–100); store raw subscale scores; plus a boredom self-report item (§8b)
+  - Raw (unweighted) TLX, 0–100 in steps of 5; raw subscales stored plus their mean. Extra items: boredom (§8b) and tiredness (§8a, for `fatigue`). A slider counts as answered only after it is touched.
+- [x] Recorder: per-frame derived signals + timestamps + block markers → IndexedDB → export one file per session
+  - Per frame (34 columns, `FRAME_COLUMNS`): frame time, block index (−1 between blocks), face found, the 13 per-frame signals (4 dp), eye-closed / gaze-centred / off-screen / looking-down / yawn / nod flags, and closure kind + duration on the frame a blink ends. Plus block start/end times, Latin row, `feature_spec` code hash. Written to IndexedDB in ~1 min chunks, so a crashed tab still leaves an exportable session (listed on the start screen). Export file `c2-study-P0x-<date>.json` (gitignored).
+  - 🧑 Check this matches the ethics application wording ("anonymised feature vectors") before the first session (ARCHITECTURE.md §9).
+- [x] Recorder self-check: exported file contains no image data and no full landmark mesh (automated test)
+  - `checkSessionExport`: exact column list, every row 34 finite numbers, no other numeric array over 16 values, no binary, no data URL / base64 / long string, P01…P08 code. Runs on every export in the page (refuses to save on a problem) and in the unit and e2e tests (a 1,434-value mesh, a data URL, a base64 blob, a typed array, a name and an extra column are all caught).
+- [x] Session quality summary at the end: fps achieved, face-present ratio, blink count sanity — so a bad session is caught while the participant is still there
+  - Per block: seconds, fps, face %, blinks per face-minute; warnings below 10 fps, under 80 % face, or blinks outside 2–50 /min. These bands are sanity limits, not tuned **(tune)** after B2.
+- [x] Short SUS questionnaire at the end [NFR3]
+  - Standard 10 items, 1–5, scored 0–100 (unit-tested: all 3s = 50, best = 100, worst = 0).
 
 ### B2. Dry runs 🧑
 
@@ -303,8 +316,12 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
   - Decided 30 Oct (owner): use the full 300W-LP (122,450 images incl. the flipped copies), the standard protocol, rather than the 61k originals to finish about 2 h sooner.
 - [x] Report the face-found rate per dataset (from the summaries). Trial on the first 240 items: RAF-DB 97.9 %, ExpW 94.2 %, FER2013 91.3 %, AFLW2000 88.8 %, 300W-LP 79.6 %. 300W-LP and AFLW include near-profile poses, where FaceMesh also fails in the app. P3 must report pose error only on faces it found, and say how many large-pose faces that drops.
   - Final, 30 Oct: RAF-DB 14,886 / 15,339 (97.0 %), FER2013 32,116 / 35,887 (89.5 %), ExpW 81,277 / 91,793 (88.5 %), AFLW2000 1,760 / 2,000 (88.0 %), 300W-LP 94,458 / 122,450 (77.1 %).
-- [ ] Parity: the app runs this model on WebGL, extraction on cpu. Compare landmarks for a handful of dataset images in the browser vs `extract-landmarks`; expect float-rounding differences only.
+- [x] Parity: the app runs this model on WebGL, extraction on cpu. Compare landmarks for a handful of dataset images in the browser vs `extract-landmarks`; expect float-rounding differences only.
   - 1 image so far (AFLW2000 `image00002.jpg`, Chromium WebGL vs `aflw2000.npy` row 0): mean |Δ| 5.5e-4, max 3.3e-3 (normalised; 0.25 px mean, 1.5 px max on 450 px). Larger than WASM vs WebGL on the same image (max 4.3e-4), so most of it is probably the JPEG decoder (jpeg-js vs Chrome), not the backend. Not confirmed; needs more images.
+  - Tool, 31 Oct: `pnpm landmark-parity <dataset> [--n=40] [--backend=webgl|wasm] [--headless]` (`scripts/landmark-parity.ts` + `scripts/landmark-parity/` page, dev server only). Node prepares each image with the extraction's own `prepareInput` (moved into `extract-landmarks-lib.ts`) and the browser gets the same RGB floats, so the decoder is out of the comparison. Writes `docs/bench/landmark-parity-<dataset>-<backend>.json` (|Δ| only, no landmarks).
+  - **Backend: float rounding only.** 40 AFLW2000 images, headless Chromium. WASM matches the cpu extraction exactly (0.000 px) where the offline row is clean. WebGL (SwiftShader) on those 11 clean rows: mean 0.013 px, max 0.33 px, max |Δz| 1e-6. So the 30 Oct 1.5 px was the JPEG decoder. 🧑 Optional: repeat headed (real GPU) without `--headless`.
+  - **Bug found in the extraction: rows depend on the previous image.** `face-landmarks-detection` 1.0.6 is not stateless with `staticImageMode: true`: `estimateFaces` still merges the new detection with the face box from the previous call's landmarks (`dist/tfjs/detector.js`, `calculateAssociationNormRect`). Each extraction worker ran its images in sequence, so a row's crop region came partly from the image before it (another person). With `detector.reset()` per image, WASM differs from the offline file on 29 of 40 AFLW2000 rows: mean 3.2 px, max 77.5 px on 450 px. Rows match exactly when the worker's previous image had no face (which resets the state). The live app is not affected (carrying the box between video frames is the intended tracking).
+  - Fixed in `extract-landmarks.ts` (reset before every image). **Every `.npy` from 30 Oct still has the problem**, and so do the P3/P4 models and numbers trained and tested on them (head pose 5.12°, expression macro-F1 0.570). 🧑 Decide: re-extract all five datasets (~10 h CPU with 12 workers, estimated from the 30 Oct run times), regenerate features, retrain P3/P4, re-test (the RAF-DB test set would then be used a third time, to be disclosed), or keep the numbers and report this as a limitation.
 
 ### P2. Features from landmarks
 
@@ -362,7 +379,7 @@ Does not depend on Milestone B, so it can run while the study is being prepared.
 ### P7. Event schema 🧑
 
 - [ ] 🧑 A new `boredom` field (or any new field) needs C01/C03/C04 sign-off before it goes in `LoadStateEvent` (invariant 5)
-  - Owner decision 30 Oct: instead of new `LoadStateEvent` fields, a separate **optional extras stream** on `adaptlearn.c02.extras` (`src/core/events/extras.ts`, exported from `signals.ts` as `subscribeExtras`): mood + `mood_source` (model or rules), boredom, overload, head angles, blinks, eyes-closed and gaze-centred fractions, once per second. `LoadStateEvent` is unchanged, so no sign-off is needed; teammates who ignore it are unaffected. Primitives only (validator rejects arrays/objects, FR7). Published by the demo page, not yet by `createLoadSensor()`. Shown on the Performance tab ("Extra signals" card). Documented in `INTEGRATION.md` §8a. 9 unit tests; the privacy e2e now also checks the extras flowed during its zero-request 60 s window (passed 30 Oct). 🧑 Tell C01/C03/C04 it exists (one message).
+  - Owner decision 30 Oct: instead of new `LoadStateEvent` fields, a separate **optional extras stream** on `adaptlearn.c02.extras` (`src/core/events/extras.ts`, exported from `signals.ts` as `subscribeExtras`): mood + `mood_source` (model or rules), boredom, overload, head angles, blinks, eyes-closed and gaze-centred fractions, once per second. `LoadStateEvent` is unchanged, so no sign-off is needed; teammates who ignore it are unaffected. Primitives only (validator rejects arrays/objects, FR7). Published by the demo page, and since 31 Oct also by `createLoadSensor()` (`mood` / `mood_source` always null there, because mood is computed only in the demo; boredom, overload and the measures are built by the same shared `buildExtrasEvent` in `src/core/events/extras-builder.ts`; `sensor.on('extras')`; option `broadcastExtras`, default = `broadcast`; 2 sensor tests). Shown on the Performance tab ("Extra signals" card). Documented in `INTEGRATION.md` §8a. 9 unit tests; the privacy e2e now also checks the extras flowed during its zero-request 60 s window (passed 30 Oct). 🧑 Tell C01/C03/C04 it exists (one message).
   - Owner, 30 Oct: ask after C02's own part (P1–P8) is finished. Until then boredom stays display-only (demo panel), not in the event stream.
 
 ### P8. Boredom, engagement, confusion, frustration from DAiSEE (plan, 30 Oct)
@@ -417,7 +434,12 @@ Can start on your own dry-run data before B3 finishes.
   - Done in Milestone P0 (WSL2, TensorFlow 2.19.0); see the notes there.
 - [x] Round-trip smoke test **before any real training**: build the tiny model → export → load in TF.js → parity within 1e-4. If this fails, switch to training in TF.js under Node.
   - 30 Oct: `python export.py --smoke` (untrained dense model of the head-pose shape, 1434 → 3) → TF.js graph model → `pnpm model-parity`: 32 rows, max |TF.js − Keras| = 1.07e-6, PASS. Graph format because the app already has `@tensorflow/tfjs-converter` (`loadGraphModel`); no `tfjs-layers` dependency needed. The 1D-CNN + GRU still needs its own round trip when it exists (GRU ops in the graph converter).
-- [ ] Loader for session exports → windows `[T, F]` + labels + participant id, reading `feature_spec.json`
+- [x] Loader for session exports → windows `[T, F]` + labels + participant id, reading `feature_spec.json`
+  - 31 Oct, in two steps so Python never computes a feature:
+    1. `pnpm session-to-features <export.json>… --out=<dir>` replays each export's per-frame signals through the TypeScript `FeaturePipeline`. It uses a new `pushSignals()`, the same code path as `push()` minus the mesh step. Replay starts at the rest block, so the baseline comes from the rest block only. It writes `<name>.raw.npy` / `.z.npy` [S, 14], `.seconds.csv` (block, kind, pure, valid) and `.meta.json` (order, TLX, SUS, code hashes). Unit test: the replay reproduces the live per-second features to 2 dp (the export stores signals to 4 dp), and the same seconds are valid.
+    2. `research/c2-load/training/sessions.py` provides `load_sessions`, `make_windows`, `feature_columns` (FR3 ablation) and `loso_folds`. `make_windows` builds windows as the browser does: 30 s, invalid seconds set to 0, at most 30 % invalid, never across a block boundary. Checked on two synthetic sessions in WSL: 248 windows [30, 14], folds participant-disjoint.
+  - **The loader does not choose labels.** Each window carries its block kind, block index and that block's raw TLX. The label mapping waits for the A0 label decision.
+  - `feature_spec.json` regenerated: `code_hash` 12bcb72e… → 42f73302…, because `src/core/window` changed (`pushSignals`). Feature definitions and values are unchanged (all feature tests pass). The local expression and head-pose `meta.json` files still record the old hash; nothing enforces it yet (C4).
 - [x] `scripts/landmarks-to-features.ts` (Node) for any public dataset landmarks
   - Done in P2.
 

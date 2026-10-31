@@ -1,10 +1,6 @@
-import {
-  EXTRAS_KIND,
-  EXTRAS_VERSION,
-  type ExtraSignalsEvent,
-  type LoadSensorStatus,
-} from '../core/events/index.js';
-import { FEATURE_INDEX, type FrameSignals } from '../core/features/index.js';
+import { buildExtrasEvent as buildCore } from '../core/events/extras-builder.js';
+import type { ExtraSignalsEvent, LoadSensorStatus } from '../core/events/index.js';
+import type { FrameSignals } from '../core/features/index.js';
 import type { BoredomReading, OverloadReading } from '../core/heuristics/index.js';
 import type { NormalisedSecond } from '../core/window/index.js';
 import type { MoodReading } from './mood.js';
@@ -20,32 +16,17 @@ export interface ExtrasInput {
   readonly now: Date;
 }
 
-/** Rounds for the wire: consumers need no more, and the JSON stays readable. */
-const round = (v: number, digits: number): number => Number(v.toFixed(digits));
-
 /**
  * One extras event from the readings the demo already computed this second
- * (src/core/events/extras.ts). Pure, so it is unit-tested without a camera.
+ * (src/core/events/extras.ts). The demo adds the mood, which only it computes;
+ * everything else is built exactly as createLoadSensor() builds it.
  */
 export function buildExtrasEvent(input: ExtrasInput): ExtraSignalsEvent {
-  const { mood, second, frame } = input;
+  const { mood } = input;
   const moodValue = mood.mood === 'no-face' ? null : mood.mood;
-  const raw = (name: keyof typeof FEATURE_INDEX, digits: number): number | null =>
-    second.valid ? round(second.raw[FEATURE_INDEX[name]] ?? 0, digits) : null;
-  return {
-    kind: EXTRAS_KIND,
-    extras_version: EXTRAS_VERSION,
-    timestamp: input.now.toISOString(),
-    status: input.status,
+  return buildCore({
+    ...input,
     mood: moodValue,
-    mood_source: moodValue !== null && mood.expression ? mood.source : null,
-    boredom: input.boredom.state,
-    overload: input.overload.state,
-    head_yaw_deg: frame ? round(frame.yaw, 1) : null,
-    head_pitch_deg: frame ? round(frame.pitch, 1) : null,
-    head_roll_deg: frame ? round(frame.roll, 1) : null,
-    blinks_last_second: raw('blink_count', 0),
-    eyes_closed_fraction: raw('eyes_closed_fraction', 3),
-    gaze_centred_fraction: raw('gaze_centred_fraction', 3),
-  };
+    moodSource: moodValue !== null && mood.expression ? mood.source : null,
+  });
 }

@@ -25,6 +25,7 @@ export {
   type ExtrasOverload,
   type ExtrasValidationResult,
 } from './extras.js';
+export { buildExtrasEvent, type ExtrasBuildInput } from './extras-builder.js';
 export {
   LoadStateHub,
   type HubEvents,

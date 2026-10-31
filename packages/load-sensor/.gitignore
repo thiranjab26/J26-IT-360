@@ -11,6 +11,10 @@ blob-report/
 # NASA-TLX answers and anything recorded from a person never enter git.
 data/
 *.session.json
+c2-study-*.json
+
+# Study-mode build (`playwright.study.config.ts`); never deployed.
+dist-study/
 
 # Raw video never enters git, not even as a test fixture (invariant 2).
 # Fake-camera clips for e2e/bench are generated or kept outside the repo.

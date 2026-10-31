@@ -11,7 +11,7 @@ describe('public API module', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('import opens nothing; createLoadSensor() opens only the event channel and reads no storage', async () => {
+  it('import opens nothing; createLoadSensor() opens only the event channels and reads no storage', async () => {
     const channels: string[] = [];
     vi.stubGlobal(
       'BroadcastChannel',
@@ -39,7 +39,8 @@ describe('public API module', () => {
     const sensor = api.createLoadSensor({ environment: { camera: media.env } });
     // Creating the sensor announces "disabled" so consumers know a sensor exists,
     // but reads no stored data and asks for no camera until enable().
-    expect(channels).toEqual(['adaptlearn.load-state']);
+    // The load-state channel and the optional extras channel (P7).
+    expect(channels.sort()).toEqual(['adaptlearn.c02.extras', 'adaptlearn.load-state']);
     expect(getItem).not.toHaveBeenCalled();
     expect(media.mediaDevices.calls).toHaveLength(0);
     sensor.destroy();

@@ -80,7 +80,7 @@ const mediapipeRuntimeStub = fileURLToPath(
 // next to the main frontend on 5173. Teammates consume the library as source
 // through the workspace package's `exports` (package.json), so there is no
 // separate library build.
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [cspMetaTag(), offlineServiceWorker()],
   resolve: {
     // Adapter A uses runtime 'tfjs' only. The MediaPipe-runtime packages that
@@ -115,7 +115,12 @@ export default defineConfig({
         'cog-admin': fileURLToPath(new URL('./cog-admin.html', import.meta.url)),
         consumer: fileURLToPath(new URL('./consumer.html', import.meta.url)),
         bench: fileURLToPath(new URL('./bench.html', import.meta.url)),
+        // Pilot-study runner (TODO B1): only in `--mode study` builds, so the
+        // normal build ships no study page (ARCHITECTURE.md §9).
+        ...(mode === 'study'
+          ? { study: fileURLToPath(new URL('./study.html', import.meta.url)) }
+          : {}),
       },
     },
   },
-});
+}));

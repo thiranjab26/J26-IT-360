@@ -11,6 +11,11 @@ import {
   type FaceResult,
   type LandmarkProvider,
 } from '../../src/core/landmarks/index.js';
+import {
+  EXTRAS_CHANNEL,
+  validateExtraSignalsEvent,
+  type ExtraSignalsEvent,
+} from '../../src/core/events/index.js';
 import { LatencyProbe } from '../../src/core/util/latency-probe.js';
 import { syntheticFace } from '../fixtures/synthetic-face.js';
 import { FakeChannelBus, ManualTimers } from './helpers/fake-channel.js';
@@ -312,6 +317,37 @@ describe('createLoadSensor (FR6, NFR8, invariant 4)', () => {
     expect(timers.pendingCount).toBe(0);
     expect(bus.open.size).toBe(0);
     expect(sensor.getState().status).toBe('disabled');
+  });
+
+  it('publishes the optional extras stream once per second, mood null (FR6, P7)', async () => {
+    const { sensor, bus, frames, enabled } = setup();
+    const received: ExtraSignalsEvent[] = [];
+    sensor.on('extras', (e) => received.push(e));
+    await enabled();
+    await frames(95);
+    // One per finished second (the last second is still open).
+    expect(received).toHaveLength(94);
+    const onChannel = bus.posted.filter((p) => p.name === EXTRAS_CHANNEL).map((p) => p.data);
+    expect(onChannel).toEqual(received);
+    for (const e of received) expect(validateExtraSignalsEvent(e).ok).toBe(true);
+    const last = received[received.length - 1];
+    expect(last).toMatchObject({ status: 'active', mood: null, mood_source: null });
+    expect(last?.head_yaw_deg).toBeCloseTo(0, 0);
+    expect(last?.gaze_centred_fraction).toBe(1);
+    // Same status as the load-state event of that second.
+    expect(last?.status).toBe(sensor.getState().status);
+    sensor.destroy();
+  });
+
+  it('broadcastExtras: false keeps the extras off the channel, still emitted locally', async () => {
+    const { sensor, bus, frames, enabled } = setup({ broadcastExtras: false });
+    let local = 0;
+    sensor.on('extras', () => (local += 1));
+    await enabled();
+    await frames(3);
+    expect(local).toBeGreaterThan(0);
+    expect(bus.posted.some((p) => p.name === EXTRAS_CHANNEL)).toBe(false);
+    sensor.destroy();
   });
 
   it('a throwing consumer listener does not break the sensor', async () => {

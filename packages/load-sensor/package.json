@@ -14,6 +14,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "dev:study": "vite --mode study",
+    "build:study": "vite build --mode study",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint . && prettier --check .",
@@ -21,6 +23,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:study": "playwright test -c playwright.study.config.ts",
     "bench": "tsx scripts/bench.ts",
     "evidence": "tsx scripts/evidence.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
@@ -29,6 +32,8 @@
     "extract-landmarks": "tsx scripts/extract-landmarks.ts",
     "landmarks-to-features": "tsx scripts/landmarks-to-features.ts",
     "model-parity": "tsx scripts/model-parity.ts",
+    "landmark-parity": "tsx scripts/landmark-parity.ts",
+    "session-to-features": "tsx scripts/session-to-features.ts",
     "daisee-to-features": "tsx scripts/daisee-to-features.ts"
   },
   "devDependencies": {

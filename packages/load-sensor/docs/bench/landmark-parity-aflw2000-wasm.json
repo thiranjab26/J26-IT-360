@@ -1,0 +1,379 @@
+{
+  "generated": "2026-10-31T07:26:24.724Z",
+  "dataset": "aflw2000",
+  "backend": "wasm",
+  "browser": "chromium 153.0.8010.12",
+  "headless": true,
+  "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "images": 40,
+  "found_in_browser": 40,
+  "units": "normalised: x, y as a fraction of the square crop, z in x units (FaceResult); px = normalised × crop side",
+  "mean_abs_xy": 0.007173417631739354,
+  "max_abs_xy": 0.17224454879760742,
+  "mean_abs_xy_px": 3.2280379342827095,
+  "max_abs_xy_px": 77.51004695892334,
+  "mean_abs_z": 0.007744087854498524,
+  "max_abs_z": 0.14690710976719856,
+  "per_image": [
+    {
+      "id": "AFLW2000/image00002.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 1.5300188104477887e-7,
+      "maxXy": 6.556510925292969e-7,
+      "meanZ": 2.2770910013357965e-7,
+      "maxZ": 6.854534149169922e-7
+    },
+    {
+      "id": "AFLW2000/image00075.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.015649206219357926,
+      "maxXy": 0.058606863021850586,
+      "meanZ": 0.01093362969606772,
+      "maxZ": 0.028020702302455902
+    },
+    {
+      "id": "AFLW2000/image00159.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.01607935822658459,
+      "maxXy": 0.07330280542373657,
+      "meanZ": 0.008903691949465812,
+      "maxZ": 0.052789852023124695
+    },
+    {
+      "id": "AFLW2000/image00251.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.024667639612652767,
+      "maxXy": 0.17224454879760742,
+      "meanZ": 0.0227901506464245,
+      "maxZ": 0.09495845064520836
+    },
+    {
+      "id": "AFLW2000/image00329.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.005706443665666062,
+      "maxXy": 0.052310943603515625,
+      "meanZ": 0.02172162054516604,
+      "maxZ": 0.07253369688987732
+    },
+    {
+      "id": "AFLW2000/image00412.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.0036045314596038483,
+      "maxXy": 0.011956930160522461,
+      "meanZ": 0.0020003094022624634,
+      "maxZ": 0.008248448371887207
+    },
+    {
+      "id": "AFLW2000/image00497.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 5.5801419533446245e-8,
+      "maxXy": 3.5762786865234375e-7,
+      "meanZ": 3.1387994054190535e-8,
+      "maxZ": 1.4528632164001465e-7
+    },
+    {
+      "id": "AFLW2000/image00565.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.02913239370704196,
+      "maxXy": 0.10423985123634338,
+      "meanZ": 0.04115230993607899,
+      "maxZ": 0.12608012650161982
+    },
+    {
+      "id": "AFLW2000/image00658.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 6.721109525927939e-8,
+      "maxXy": 5.364418029785156e-7,
+      "meanZ": 7.42302785450242e-8,
+      "maxZ": 2.5331974029541016e-7
+    },
+    {
+      "id": "AFLW2000/image00741.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.0022057004615851526,
+      "maxXy": 0.010484069585800171,
+      "meanZ": 0.002273160310297236,
+      "maxZ": 0.006918326020240784
+    },
+    {
+      "id": "AFLW2000/image00830.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 5.090710508274733e-8,
+      "maxXy": 2.384185791015625e-7,
+      "meanZ": 1.152843518463201e-8,
+      "maxZ": 1.4901161193847656e-7
+    },
+    {
+      "id": "AFLW2000/image00909.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.003665827900545368,
+      "maxXy": 0.016600489616394043,
+      "meanZ": 0.004784088876537631,
+      "maxZ": 0.012086138129234314
+    },
+    {
+      "id": "AFLW2000/image00989.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.015594566653961917,
+      "maxXy": 0.07140994071960449,
+      "meanZ": 0.014028457617656904,
+      "maxZ": 0.06074805557727814
+    },
+    {
+      "id": "AFLW2000/image01083.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.0019162960942819029,
+      "maxXy": 0.008689641952514648,
+      "meanZ": 0.0031907833300050636,
+      "maxZ": 0.011422745883464813
+    },
+    {
+      "id": "AFLW2000/image01173.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.01934608371312648,
+      "maxXy": 0.10159015655517578,
+      "meanZ": 0.011975994846332499,
+      "maxZ": 0.033033959567546844
+    },
+    {
+      "id": "AFLW2000/image01282.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.001969704661658618,
+      "maxXy": 0.008780151605606079,
+      "meanZ": 0.0020573356898171084,
+      "maxZ": 0.004898093640804291
+    },
+    {
+      "id": "AFLW2000/image01395.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.008903139025347003,
+      "maxXy": 0.08071628212928772,
+      "meanZ": 0.005755891460988298,
+      "maxZ": 0.01305546989897266
+    },
+    {
+      "id": "AFLW2000/image01547.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 6.138779628226947e-7,
+      "maxXy": 0.000004857778549194336,
+      "meanZ": 1.1917614436729822e-7,
+      "maxZ": 6.407499313354492e-7
+    },
+    {
+      "id": "AFLW2000/image01693.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.026684603899343243,
+      "maxXy": 0.09364926815032959,
+      "meanZ": 0.01621734215979631,
+      "maxZ": 0.07247372716665268
+    },
+    {
+      "id": "AFLW2000/image01831.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.001863258808975938,
+      "maxXy": 0.011625289916992188,
+      "meanZ": 0.0011005080030136547,
+      "maxZ": 0.004113826900720596
+    },
+    {
+      "id": "AFLW2000/image01951.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.0039951096456419975,
+      "maxXy": 0.019955754280090332,
+      "meanZ": 0.002271608518056146,
+      "maxZ": 0.008973304182291031
+    },
+    {
+      "id": "AFLW2000/image02049.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.014516691034309036,
+      "maxXy": 0.07270875573158264,
+      "meanZ": 0.0355057386205181,
+      "maxZ": 0.0993887297809124
+    },
+    {
+      "id": "AFLW2000/image02165.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.0036614097685993465,
+      "maxXy": 0.01724785566329956,
+      "meanZ": 0.006199771448312097,
+      "maxZ": 0.015634685754776
+    },
+    {
+      "id": "AFLW2000/image02272.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.00608595473122896,
+      "maxXy": 0.03592318296432495,
+      "meanZ": 0.009284889748844583,
+      "maxZ": 0.02620890736579895
+    },
+    {
+      "id": "AFLW2000/image02389.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 6.234795478597345e-8,
+      "maxXy": 3.5762786865234375e-7,
+      "meanZ": 4.1222957714955676e-8,
+      "maxZ": 1.2665987014770508e-7
+    },
+    {
+      "id": "AFLW2000/image02553.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 3.941325961795312e-7,
+      "maxXy": 0.0000018477439880371094,
+      "meanZ": 1.8310163483787405e-7,
+      "maxZ": 6.556510925292969e-7
+    },
+    {
+      "id": "AFLW2000/image02674.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 1.6727956269076678e-7,
+      "maxXy": 8.344650268554688e-7,
+      "meanZ": 1.478011239608399e-7,
+      "maxZ": 4.954636096954346e-7
+    },
+    {
+      "id": "AFLW2000/image02792.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.010698431954723022,
+      "maxXy": 0.05182957649230957,
+      "meanZ": 0.006784216902061915,
+      "maxZ": 0.03845891356468201
+    },
+    {
+      "id": "AFLW2000/image02902.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.0227841787881931,
+      "maxXy": 0.17219960689544678,
+      "meanZ": 0.032420951220724206,
+      "maxZ": 0.14690710976719856
+    },
+    {
+      "id": "AFLW2000/image03043.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 4.860023075566631e-8,
+      "maxXy": 2.980232238769531e-7,
+      "meanZ": 2.837976612244191e-8,
+      "maxZ": 1.341104507446289e-7
+    },
+    {
+      "id": "AFLW2000/image03208.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 8.940696716308594e-8,
+      "maxXy": 8.940696716308594e-7,
+      "meanZ": 1.158901133718725e-7,
+      "maxZ": 4.172325134277344e-7
+    },
+    {
+      "id": "AFLW2000/image03391.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.00814364177163176,
+      "maxXy": 0.03311285376548767,
+      "meanZ": 0.0030359164563709797,
+      "maxZ": 0.022889137268066406
+    },
+    {
+      "id": "AFLW2000/image03543.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.009371803956550535,
+      "maxXy": 0.046402156352996826,
+      "meanZ": 0.006762997861625237,
+      "maxZ": 0.029658658429980278
+    },
+    {
+      "id": "AFLW2000/image03639.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.001636231045343886,
+      "maxXy": 0.005678266286849976,
+      "meanZ": 0.0017519297422063668,
+      "maxZ": 0.005220934748649597
+    },
+    {
+      "id": "AFLW2000/image03719.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 3.6909989233296284e-8,
+      "maxXy": 1.7881393432617188e-7,
+      "meanZ": 2.3576705575293265e-8,
+      "maxZ": 1.4901161193847656e-7
+    },
+    {
+      "id": "AFLW2000/image03779.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.00487646772272916,
+      "maxXy": 0.022161483764648438,
+      "meanZ": 0.0012177716647685168,
+      "maxZ": 0.0056419819593429565
+    },
+    {
+      "id": "AFLW2000/image03852.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.00475009561956677,
+      "maxXy": 0.023594796657562256,
+      "meanZ": 0.002925118920292825,
+      "maxZ": 0.008274823427200317
+    },
+    {
+      "id": "AFLW2000/image03964.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.005140157221625539,
+      "maxXy": 0.01927962899208069,
+      "meanZ": 0.010183704875368208,
+      "maxZ": 0.029225148260593414
+    },
+    {
+      "id": "AFLW2000/image04128.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.011881327404636719,
+      "maxXy": 0.05260789394378662,
+      "meanZ": 0.019333249182358996,
+      "maxZ": 0.05181306414306164
+    },
+    {
+      "id": "AFLW2000/image04259.jpg",
+      "size": 450,
+      "foundInBrowser": true,
+      "meanXy": 0.002404711018296964,
+      "maxXy": 0.010410189628601074,
+      "meanZ": 0.003199370544268684,
+      "maxZ": 0.011306896805763245
+    }
+  ]
+}

@@ -3,8 +3,13 @@ import { HeuristicLoadClassifier } from './classifier/heuristic.js';
 import type { LoadClassifier } from './classifier/types.js';
 import type { ChannelFactory } from './events/broadcast.js';
 import { Emitter } from './events/emitter.js';
+import { ExtrasPublisher, type ExtraSignalsEvent } from './events/extras.js';
+import { buildExtrasEvent } from './events/extras-builder.js';
 import { LoadStateHub, type HubTimers, type SourceStatus } from './events/hub.js';
 import { SENSING_STATUSES, type LoadSensorStatus, type LoadStateEvent } from './events/types.js';
+import type { FrameSignals } from './features/frame-signals.js';
+import { BoredomEstimator } from './heuristics/boredom.js';
+import { OverloadEstimator } from './heuristics/overload.js';
 import type { StrainStorage } from './heuristics/strain.js';
 import {
   LandmarkTracker,
@@ -59,6 +64,12 @@ export interface LoadSensorOptions {
   readonly heartbeatMs?: number;
   /** Publish on the `adaptlearn.load-state` BroadcastChannel (default true). */
   readonly broadcast?: boolean;
+  /**
+   * Also publish the optional extras stream on `adaptlearn.c02.extras`
+   * (src/core/events/extras.ts) once per second (default: same as `broadcast`).
+   * `mood` is always null here: only the C02 demo page computes it.
+   */
+  readonly broadcastExtras?: boolean;
   /** Replaces the `heuristic-0` placeholder, e.g. with the trained model. */
   readonly classifier?: LoadClassifier;
   /** Where `strain` keeps today's totals (default localStorage; null = memory only). */
@@ -82,6 +93,8 @@ export interface LoadSensorEvents extends Record<string, unknown> {
   change: LoadStateEvent;
   /** Non-fatal problems (a failed inference, a model that would not load). */
   error: unknown;
+  /** Optional extra signals, once per finished second while sensing (INTEGRATION.md §8a). */
+  extras: ExtraSignalsEvent;
 }
 
 /** The public sensor object (ARCHITECTURE.md §8 Delivery). */
@@ -170,6 +183,12 @@ class LoadSensorImpl implements LoadSensor {
   readonly #hub: LoadStateHub;
   readonly #emitter = new Emitter<LoadSensorEvents>();
   readonly #cleanup: (() => void)[] = [];
+  readonly #boredom = new BoredomEstimator();
+  readonly #overload = new OverloadEstimator();
+  readonly #extras: ExtrasPublisher | null;
+  /** Signals of the latest processed frame, for the extras' head angles. */
+  #latestSignals: FrameSignals | null = null;
+  readonly #now: () => number;
 
   readonly #probe: LatencyProbe | null;
   /** Arrival of the frame being pushed into the pipeline (latency probe only). */
@@ -205,6 +224,11 @@ class LoadSensorImpl implements LoadSensor {
     );
     this.#pipeline = new FeaturePipeline({ useExpressionFeatures: this.useExpressionFeatures });
     this.#probe = env.latencyProbe ?? null;
+    this.#now = env.now ?? Date.now;
+    this.#extras =
+      (options.broadcastExtras ?? options.broadcast ?? true)
+        ? new ExtrasPublisher(env.channelFactory)
+        : null;
     const classifier =
       options.classifier ??
       new HeuristicLoadClassifier({ useExpressionFeatures: this.useExpressionFeatures });
@@ -259,6 +283,9 @@ class LoadSensorImpl implements LoadSensor {
         this.#pushing = null;
         this.#hub.updatePipeline(this.#pipeline.state);
       }),
+      this.#pipeline.onFrame((f) => {
+        this.#latestSignals = f.signals;
+      }),
       this.#pipeline.onSecond((second) => {
         const w = this.#pipeline.window;
         this.#hub.pushSecond(
@@ -267,6 +294,20 @@ class LoadSensorImpl implements LoadSensor {
           w.classifiable ? w.toModelInput() : null,
         );
         this.#probe?.decisionMade(second.frames);
+        // After the hub, so this second's load and engagement are already published.
+        const latest = this.#hub.latest;
+        const extras = buildExtrasEvent({
+          status: latest.status,
+          mood: null,
+          moodSource: null,
+          boredom: this.#boredom.update(second, latest),
+          overload: this.#overload.update(second, latest),
+          frame: this.#latestSignals,
+          second,
+          now: new Date(this.#now()),
+        });
+        this.#extras?.publish(extras);
+        this.#emitter.emit('extras', extras);
       }),
       this.#camera.onStatus(({ status }) => {
         this.#onCameraStatus(status);
@@ -362,8 +403,7 @@ class LoadSensorImpl implements LoadSensor {
   }
 
   recalibrate(): void {
-    this.#pipeline.reset();
-    this.#hub.reset();
+    this.#resetEstimates();
   }
 
   destroy(): void {
@@ -372,6 +412,7 @@ class LoadSensorImpl implements LoadSensor {
     this.#destroyed = true;
     for (const fn of this.#cleanup.splice(0)) fn();
     this.#hub.close();
+    this.#extras?.close();
     this.#provider.dispose();
     this.#emitter.clear();
   }
@@ -380,8 +421,15 @@ class LoadSensorImpl implements LoadSensor {
     this.#tracker.stop();
     this.#camera.stop();
     // Sensing ended: the next session gets a fresh baseline and fresh estimates.
+    this.#resetEstimates();
+  }
+
+  #resetEstimates(): void {
     this.#pipeline.reset();
     this.#hub.reset();
+    this.#boredom.reset();
+    this.#overload.reset();
+    this.#latestSignals = null;
   }
 
   #onCameraStatus(status: CameraStatus): void {
@@ -390,8 +438,7 @@ class LoadSensorImpl implements LoadSensor {
     if (failure) {
       // E.g. the camera was unplugged mid-session: stop cleanly, say why.
       this.#tracker.stop();
-      this.#pipeline.reset();
-      this.#hub.reset();
+      this.#resetEstimates();
       this.#hub.setSource(failure);
       return;
     }

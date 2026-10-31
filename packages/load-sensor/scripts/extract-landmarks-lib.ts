@@ -9,6 +9,7 @@
  */
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import jpeg from 'jpeg-js';
 
 export const DATASETS = ['aflw2000', '300w-lp', 'raf-db', 'expw', 'fer2013'] as const;
 export type DatasetName = (typeof DATASETS)[number];
@@ -118,6 +119,47 @@ export function resampleCrop(src: RawImage, crop: Crop, out: number): Float32Arr
     }
   }
   return dst;
+}
+
+/**
+ * Builds the model input for one item: RGB 0..255 floats, plus the crop in
+ * source pixels. Shared by extract-landmarks and landmark-parity, so the
+ * parity check feeds the browser exactly the pixels the extraction used.
+ */
+export async function prepareInput(
+  item: Item,
+  margin: number,
+): Promise<{ rgb: Float32Array; crop: Crop; size: number }> {
+  const src = item.source;
+  if (src.kind === 'gray48') {
+    const data = Uint8Array.from(src.pixels.split(' '), Number);
+    if (data.length !== 48 * 48)
+      throw new Error(`expected 2304 pixels, got ${String(data.length)}`);
+    const crop = { x: 0, y: 0, size: 48 };
+    const img = { data, width: 48, height: 48, channels: 1 } as const;
+    return { rgb: resampleCrop(img, crop, FER_OUTPUT_SIZE), crop, size: FER_OUTPUT_SIZE };
+  }
+  const decoded = jpeg.decode(await readFile(src.path), {
+    useTArray: true,
+    formatAsRGBA: true,
+    maxResolutionInMP: 200,
+    maxMemoryUsageInMB: 1024,
+  });
+  const img = {
+    data: decoded.data,
+    width: decoded.width,
+    height: decoded.height,
+    channels: 4,
+  } as const;
+  if (src.box) {
+    const crop = squareCrop(src.box, margin);
+    return { rgb: resampleCrop(img, crop, CROP_OUTPUT_SIZE), crop, size: CROP_OUTPUT_SIZE };
+  }
+  // Whole image (300W-LP, AFLW2000: 450×450, face centred). Padded to a square
+  // if needed; at scale 1 the resample is an exact copy.
+  const size = Math.max(img.width, img.height);
+  const crop = { x: (img.width - size) / 2, y: (img.height - size) / 2, size };
+  return { rgb: resampleCrop(img, crop, size), crop, size };
 }
 
 /** Header of a version 1.0 .npy file holding little-endian float32 data of `shape`. */

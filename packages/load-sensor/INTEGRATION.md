@@ -154,14 +154,14 @@ toggle.onclick = () => (sensor.status === 'disabled' ? sensor.enable() : sensor.
 | `enable()`                               | Opens the camera (the browser may prompt). Call this only after the learner opts in. Resolves with the status and never rejects. |
 | `pause()` / `resume()`                   | Keep the camera open but stop processing.                                                                                        |
 | `disable()`                              | Stops every camera track (LED off) and forgets the baseline.                                                                     |
-| `on('state' \| 'change' \| 'error', cb)` | `state`: every event. `change`: only real changes. `error`: non-fatal problems.                                                  |
+| `on('state' \| 'change' \| 'error', cb)` | `state`: every event. `change`: only real changes. `error`: non-fatal problems. Also `extras` (§8a).                             |
 | `getState()`                             | Last emitted event, synchronously.                                                                                               |
 | `markBreak()`                            | The learner took a break. Resets "time since the last break" in `strain`.                                                        |
 | `recalibrate()`                          | Starts a new 30 s baseline.                                                                                                      |
 | `destroy()`                              | Disables, then releases the model, timers and channel.                                                                           |
 | `studyGate`                              | `'open'`, or `'needs_camera'` under the (not yet approved) `required` policy.                                                    |
 
-Options: `video` (preview element), `targetFps` (15), `useExpressionFeatures` (true; FR3 ablation), `heartbeatMs` (5000), `broadcast` (true), `classifier` (replaces heuristic-0), `strainStorage` (localStorage; `null` keeps totals in memory only), `cameraPolicy` (`'optional'`).
+Options: `video` (preview element), `targetFps` (15), `useExpressionFeatures` (true; FR3 ablation), `heartbeatMs` (5000), `broadcast` (true), `broadcastExtras` (same as `broadcast`; §8a), `classifier` (replaces heuristic-0), `strainStorage` (localStorage; `null` keeps totals in memory only), `cameraPolicy` (`'optional'`).
 
 ## 8a. Optional extra signals (second stream)
 
@@ -192,7 +192,7 @@ const stop = subscribeExtras((x) => {
 | `eyes_closed_fraction`                              | 0..1 or `null`                                                                                        | Share of the last second's frames with the eyes closed.                                                                                                            |
 | `gaze_centred_fraction`                             | 0..1 or `null`                                                                                        | Share of the last second's frames with the gaze on the screen.                                                                                                     |
 
-- **Who publishes it.** C02's demo page publishes the extras, because the mood, boredom and overload readings are computed there. `createLoadSensor()` (§8) does not publish them yet.
+- **Who publishes it.** Both C02's demo page and `createLoadSensor()` (§8, since 31 Oct 2026). From `createLoadSensor()`, `mood` and `mood_source` are always `null`, because only the demo page computes mood. Every other field is the same. The camera page can also read them with `sensor.on('extras', cb)`, and can keep them off the channel with `broadcastExtras: false`.
 - **Validation.** `subscribeExtras` drops anything that isn't a valid version-1 extras event. As with the main event, arrays and objects are rejected, so no landmarks or pixels can travel here.
 - **Advisory only.** Only `mood` can come from a trained model (RAF-DB test macro-F1 0.570, measured on photos, not webcams). Everything else is a rule or a raw measure. Use it to offer things, not to make decisions on the learner's behalf.
 - You can see the live JSON on the C02 demo's **Performance** tab, in the card "Extra signals (optional stream)".

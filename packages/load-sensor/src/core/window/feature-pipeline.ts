@@ -139,7 +139,16 @@ export class FeaturePipeline {
    * @param aspect frame width / height
    */
   push(tMs: number, landmarks: Float32Array | null, aspect: number): FrameFeatures {
-    const signals = landmarks ? computeFrameSignals({ landmarks, aspect }) : null;
+    return this.pushSignals(tMs, landmarks ? computeFrameSignals({ landmarks, aspect }) : null);
+  }
+
+  /**
+   * Feeds one frame's already-computed signals (null = no face). Used to
+   * replay a study-session export, which stores per-frame signals but never
+   * the mesh (ARCHITECTURE.md §9), through the same per-second code: the
+   * training data then comes from this TypeScript, never from Python (§6).
+   */
+  pushSignals(tMs: number, signals: FrameSignals | null): FrameFeatures {
     const frame = signals ? this.#withFace(tMs, signals) : this.#withoutFace(tMs);
     this.#aggregator.push(frame);
     for (const listener of this.#frameListeners) listener(frame);

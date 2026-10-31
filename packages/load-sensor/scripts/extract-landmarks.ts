@@ -29,23 +29,18 @@ import { fileURLToPath } from 'node:url';
 import '@tensorflow/tfjs-backend-cpu';
 import * as tf from '@tensorflow/tfjs-core';
 import * as fld from '@tensorflow-models/face-landmarks-detection';
-import jpeg from 'jpeg-js';
 import { keypointsToLandmarks } from '../src/core/landmarks/keypoints.js';
 import { FACEMESH_ASSET_PATHS } from '../src/core/landmarks/tfjs-facemesh-provider.js';
 import { LANDMARK_COUNT, LANDMARK_STRIDE } from '../src/core/landmarks/types.js';
 import {
-  CROP_OUTPUT_SIZE,
   csvField,
   DATASETS,
   DEFAULT_CROP_MARGIN,
-  FER_OUTPUT_SIZE,
   listItems,
   npyHeader,
-  resampleCrop,
-  squareCrop,
+  prepareInput as prepare,
   type Crop,
   type DatasetName,
-  type Item,
 } from './extract-landmarks-lib.js';
 
 const SCRIPT = fileURLToPath(import.meta.url);
@@ -119,43 +114,6 @@ async function createDetector(): Promise<fld.FaceLandmarksDetector> {
   });
 }
 
-/** Builds the model input for one item: RGB 0..255 floats, plus the crop in source pixels. */
-async function prepare(
-  item: Item,
-  margin: number,
-): Promise<{ rgb: Float32Array; crop: Crop; size: number }> {
-  const src = item.source;
-  if (src.kind === 'gray48') {
-    const data = Uint8Array.from(src.pixels.split(' '), Number);
-    if (data.length !== 48 * 48)
-      throw new Error(`expected 2304 pixels, got ${String(data.length)}`);
-    const crop = { x: 0, y: 0, size: 48 };
-    const img = { data, width: 48, height: 48, channels: 1 } as const;
-    return { rgb: resampleCrop(img, crop, FER_OUTPUT_SIZE), crop, size: FER_OUTPUT_SIZE };
-  }
-  const decoded = jpeg.decode(await readFile(src.path), {
-    useTArray: true,
-    formatAsRGBA: true,
-    maxResolutionInMP: 200,
-    maxMemoryUsageInMB: 1024,
-  });
-  const img = {
-    data: decoded.data,
-    width: decoded.width,
-    height: decoded.height,
-    channels: 4,
-  } as const;
-  if (src.box) {
-    const crop = squareCrop(src.box, margin);
-    return { rgb: resampleCrop(img, crop, CROP_OUTPUT_SIZE), crop, size: CROP_OUTPUT_SIZE };
-  }
-  // Whole image (300W-LP, AFLW2000: 450×450, face centred). Padded to a square
-  // if needed; at scale 1 the resample is an exact copy.
-  const size = Math.max(img.width, img.height);
-  const crop = { x: (img.width - size) / 2, y: (img.height - size) / 2, size };
-  return { rgb: resampleCrop(img, crop, size), crop, size };
-}
-
 // ---------------------------------------------------------------------------
 // Worker: processes items with index % workers === k, appending to its part files.
 // ---------------------------------------------------------------------------
@@ -207,7 +165,13 @@ async function runWorker(opts: Options, k: number): Promise<void> {
       size = input.size;
       const pixels = tf.tensor3d(input.rgb, [size, size, 3], 'float32');
       try {
-        // staticImageMode: every image is independent; no tracking between items.
+        // Every image is independent. staticImageMode alone does not ensure
+        // that in face-landmarks-detection 1.0.6: it still merges the new
+        // detection with the face box from the previous image's landmarks
+        // (dist/tfjs/detector.js, calculateAssociationNormRect), so reset()
+        // first. Found 31 Oct by `pnpm landmark-parity` (TODO P1): extractions
+        // before that date carry this state (29 of 40 AFLW2000 rows differed).
+        detector.reset();
         const faces = await detector.estimateFaces(pixels, { staticImageMode: true });
         if (faces[0]) landmarks = keypointsToLandmarks(faces[0].keypoints, size, size);
       } finally {

@@ -7,7 +7,14 @@ import tseslint from 'typescript-eslint';
 import { privacyConfig } from './eslint/privacy.js';
 
 export default defineConfig(
-  globalIgnores(['dist/', 'coverage/', 'playwright-report/', 'test-results/', 'public/']),
+  globalIgnores([
+    'dist/',
+    'dist-study/',
+    'coverage/',
+    'playwright-report/',
+    'test-results/',
+    'public/',
+  ]),
 
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
