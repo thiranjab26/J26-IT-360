@@ -27,7 +27,7 @@ literature are in `docs/c4/research-scope-change.md`; the day plan is `docs/c4/P
 | Folder | Contents |
 |---|---|
 | `study/` | Viva script, MCQ, Google Form text, observer form, Zoom set-up, ethics form draft, participants template |
-| `analysis/` | `run_stats.py` (statistics and charts), `crisperwhisper_colab.ipynb` (filler-aware transcripts) `filler_detector_colab.ipynb` (PP2 filler detector, part 1: PodcastFillers) and `filler_detector_part2_colab.ipynb` (part 2: pilot recordings) |
+| `analysis/` | `run_stats.py` (statistics and charts), `test_cutoffs.py` (PP2 step 1: the frozen pilot cut-offs on new students), `crisperwhisper_colab.ipynb` (filler-aware transcripts) `filler_detector_colab.ipynb` (PP2 filler detector, part 1: PodcastFillers) and `filler_detector_part2_colab.ipynb` (part 2: pilot recordings) |
 
 The measurement code lives in viva-service so the system can use the same thresholds:
 `app/domain/fluency.py` (measures and the literature profile), `app/integrations/syllables.py`
