@@ -1,6 +1,6 @@
 # Viva run sheet (one session, about 30 minutes)
 
-Use this for the practice viva (code **P00**) and for every real session (P01 to P10). Keep it open
+Use this for the practice viva (code **P00**) and for every real session (P11 onward). Keep it open
 next to the script.
 
 ## What you need
@@ -69,11 +69,9 @@ next to the script.
 
 ## After recording (not recorded)
 
-1. Optional, ask aloud and write down: "I knew the answers to most questions, 1 to 5" and
-   "Speaking in English made it harder to explain, 1 to 5".
-2. Thank them; tell the observer to stay a minute.
-3. Ask the observer for the overall answer (Yes / No / Unsure) and get the form (photo is fine).
-4. **End the meeting for all.** Zoom now converts the files; wait until it finishes.
+1. Thank them; tell the observer to stay a minute.
+2. Ask the observer for the overall answer (Yes / No / Unsure) and get the form (photo is fine).
+3. **End the meeting for all.** Zoom now converts the files; wait until it finishes.
 
 ## Files
 

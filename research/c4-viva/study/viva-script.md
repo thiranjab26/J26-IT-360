@@ -201,4 +201,4 @@ It should **return** the answer, so the calling code can store it or use it in a
 
 “That is the end of the viva. Thank you for taking part.”
 
-Stop the recording. Ask any planned self-rating questions afterward.
+Stop the recording.
